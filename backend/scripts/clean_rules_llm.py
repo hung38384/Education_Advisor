@@ -50,10 +50,40 @@ Extract and format EXACTLY into Markdown tables:
 - The bonus points (điểm thưởng) for VSTEP/IELTS.
 - The score conversion (điểm quy đổi) replacing the English THPT exam score for VSTEP/IELTS.
 
-Output the final result entirely in Vietnamese, using clean Markdown formatting (H1, H2, bullet points, tables). DO NOT add any conversational filler like "Here is the extracted data". Just output the Markdown.
-
-================ RAW DOCUMENT CONTENT BELOW ================
+Output the final result entirely in Vietnamese, using clean Markdown formatting. Do NOT add conversational filler.
 """
+
+
+TMU_HINT = """
+ADDITIONAL REQUIREMENTS FOR TMU:
+- Keep exact admission method codes if available (for example: 100, 301, 402, 409, 410, 500).
+- Separate clearly each branch: THPT, DGNL/DGTD, and combined methods with language certificates.
+- Keep conversion tables and bonus-score rules for IELTS/VSTEP or equivalent international certificates.
+- Keep program-specific constraints if listed (for example language majors, IPOP, advanced or dual-degree programs).
+"""
+
+
+CTU_HINT = """
+ADDITIONAL REQUIREMENTS FOR CTU:
+- Prioritize extraction of THPT, hoc ba, and V-SAT pathways if present.
+- Keep exact conversion rules from hoc ba or V-SAT to THPT-equivalent scores if provided.
+- Keep major-specific conditions (such as pedagogy majors, aptitude-subject majors, or minimum subject thresholds).
+- Do not infer IELTS/VSTEP conversion if the document does not provide it.
+"""
+
+
+RAW_MARKER = "\n\n================ RAW DOCUMENT CONTENT BELOW ================"
+
+
+def build_prompt(raw_filename: str) -> str:
+    university_code = raw_filename.split("_", 1)[0].upper()
+
+    if university_code == "TMU":
+        return MASTER_PROMPT + "\n\n" + TMU_HINT + RAW_MARKER
+    if university_code == "CTU":
+        return MASTER_PROMPT + "\n\n" + CTU_HINT + RAW_MARKER
+    return MASTER_PROMPT + RAW_MARKER
+
 
 def clean_admission_rules():
     base_dir = Path(__file__).parent.parent
@@ -84,10 +114,7 @@ def clean_admission_rules():
             with open(raw_path, "r", encoding="utf-8") as f:
                 raw_content = f.read()
 
-            # Nối Prompt và Content
-            full_prompt = MASTER_PROMPT + "\n\n" + raw_content
-
-            # Gọi Gemini xử lý
+            full_prompt = build_prompt(raw_path.name) + "\n\n" + raw_content
             response = model.generate_content(full_prompt)
 
             # Lưu file đã làm sạch
