@@ -51,4 +51,12 @@ htmlcov/
 *.pkl
 *.joblib
 chroma/
+backend/data/chroma_db/
 langgraph/
+
+# Local AI assistant metadata
+.codex/
+.claude/
+AGENTS.md
+CLAUDE.md
+package-lock.json

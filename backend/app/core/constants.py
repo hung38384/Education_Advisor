@@ -50,7 +50,7 @@ TARGET_UNIVERSITIES = [
         "name": "Đại học Kinh tế TP.HCM",
     },
     {
-        "code": "TMA",
+        "code": "TMU",
         "school_id": 426,
         "name": "Đại học Thương mại",
     },
@@ -95,7 +95,7 @@ TARGET_UNIVERSITIES = [
         "name": "Học viện Ngoại giao",
     },
     {
-        "code": "TCT",
+        "code": "CTU",
         "school_id": 318,
         "name": "Đại học Cần Thơ",
     },
