@@ -24,7 +24,7 @@ Hà Nội - 2024
 
 Số: /QĐ-ĐHTM
 
-Hà Nội, ngày tháng 03 năm 2024
+Hà Nội, ngày ... tháng 03 năm 2024
 
 # QUYẾT ĐỊNH
 
@@ -125,31 +125,25 @@ Email: tuyensinh@tmu.edu.vn
 
 Kết quả khảo sát sinh viên có việc làm trong khoảng thời gian 12 tháng kể từ khi được công nhận tốt nghiệp được xác định theo từng ngành, lĩnh vực đào tạo, được khảo sát ở năm liền kề trước năm tuyển sinh, đối tượng khảo sát là sinh viên đã tốt nghiệp ở năm trước cách năm tuyển sinh một năm.
 
-| STT      | Lĩnh vực / Ngành đào tạo                        | Mã ngành | Chỉ tiêu tuyển sinh | Số SV trúng tuyển | Số SV tốt nghiệp | Tỷ lệ SV đã có việc làm (%) |
-| -------- | ----------------------------------------------- | -------- | ------------------- | ----------------- | ---------------- | --------------------------- |
-| 1        | Kinh doanh và quản lý                           | 2575     |                     | 2761              | 3456             | 99.02                       |
-| 1.1      | Quản trị kinh doanh                             | 7340101  | 525                 | 532               | 660              | 98.28                       |
-| 1.2      | Marketing                                       | 7340115  | 375                 | 428               | 645              | 99.12                       |
-| 1.3      | Kinh doanh quốc tế                              | 7340120  | 200                 | 204               | 320              | 97.33                       |
-| 1.4      | Thương mại điện tử                              | 7340122  | 200                 | 283               | 379              | 100.00                      |
-| 1.5      | Tài chính - Ngân hàng                           | 7340201  | 350                 | 302               | 387              | 99.65                       |
-| 1.6      | Kế toán                                         | 7340301  | 325                 | 369               | 526              | 99.46                       |
-| 1.7      | Kiểm toán                                       | 7340302  | 100                 | 134               | 24               | 94.12                       |
-| 1.8      | Quản trị nhân lực                               | 7340404  | 250                 | 255               | 296              | 98.64                       |
-| 1.9      | Hệ thống thông tin quản lý                      | 7340405  | 250                 | 254               | 219              | 100.00                      |
-| 2        | Pháp luật                                       |          | 200                 | 106               | 211              | 96.50                       |
-| 2.1      | Luật kinh tế                                    | 7380107  | 200                 | 106               | 211              | 96.50                       |
-| 3        | Công nghệ kỹ thuật                              |          | 100                 | 121               | 36               | 97.22                       |
-| 3.1      | Logistics và quản lý chuỗi cung ứng             | 7510605  | 100                 | 121               | 36               | 97.22                       |
-| 4        | Nhân văn                                        |          | 250                 | 269               | 341              | 99.58                       |
-| 4.1      | Ngôn ngữ Anh                                    | 7220201  | 250                 | 269               | 341              | 99.58                       |
-| 5        | Khoa học xã hội và hành vi                      |          | 375                 | 366               | 526              | 97.62                       |
-| 5.1      | Kinh tế                                         | 7310101  | 275                 | 253               | 365              | 99.23                       |
-| 5.2      | Kinh tế quốc tế                                 | 7310106  | 100                 | 113               | 161              | 94.02                       |
-| 6        | Du lịch, khách sạn, thể thao và dịch vụ cá nhân |          | 600                 | 619               | 479              | 100.00                      |
-| 6.1      | Quản trị dịch vụ du lịch và lữ hành             | 7810103  | 300                 | 279               | 234              | 100.00                      |
-| 6.2      | Quản trị khách sạn                              | 7810201  | 300                 | 340               | 245              | 100.00                      |
-| **Tổng** |                                                 | 4100     |                     | 4242              | 5049             | **98.90**                   |
+| STT     | Lĩnh vực / Ngành đào tạo                        | Mã ngành | Chỉ tiêu tuyển sinh | Số SV trúng tuyển | Số SV tốt nghiệp | Tỷ lệ SV đã có việc làm (%) |
+| ------- | ----------------------------------------------- | -------- | ------------------- | ----------------- | ---------------- | --------------------------- |
+| 1       | Kinh doanh và quản lý                           | 7340101  | 525                 | 532               | 660              | 98.28                       |
+| 7340115 | 375                                             | 428      | 645                 | 99.12             |                  |                             |
+| 7340120 | 200                                             | 204      | 320                 | 97.33             |                  |                             |
+| 7340122 | 200                                             | 283      | 379                 | 100.00            |                  |                             |
+| 7340201 | 350                                             | 302      | 387                 | 99.65             |                  |                             |
+| 7340301 | 325                                             | 369      | 526                 | 99.46             |                  |                             |
+| 7340302 | 100                                             | 134      | 24                  | 94.12             |                  |                             |
+| 7340404 | 250                                             | 255      | 296                 | 98.64             |                  |                             |
+| 7340405 | 250                                             | 254      | 219                 | 100.00            |                  |                             |
+| 2       | Pháp luật                                       | 7380107  | 200                 | 106               | 211              | 96.50                       |
+| 3       | Công nghệ kỹ thuật                              | 7510605  | 100                 | 121               | 36               | 97.22                       |
+| 4       | Nhân văn                                        | 7220201  | 250                 | 269               | 341              | 99.58                       |
+| 5       | Khoa học xã hội và hành vi                      | 7310101  | 275                 | 253               | 365              | 99.23                       |
+| 7310106 | 100                                             | 113      | 161                 | 94.02             |                  |                             |
+| 6       | Du lịch, khách sạn, thể thao và dịch vụ cá nhân | 7810103  | 300                 | 279               | 234              | 100.00                      |
+| 7810201 | 300                                             | 340      | 245                 | 100.00            |                  |                             |
+| Tổng    |                                                 | 4100     | 4242                | 5049              | 98.90            |                             |
 
 Ghi chú: Tỷ lệ SV tốt nghiệp đã có việc làm trong khoảng thời gian 12 tháng kể từ khi được công nhận tốt nghiệp (khảo sát thực hiện năm 2023 đối với SV tốt nghiệp năm 2022).
 
@@ -179,42 +173,42 @@ Trường tuyển sinh theo các phương thức:
 
 # 8.2.1. Điểm trúng tuyển theo kết quả thi tốt nghiệp THPT
 
-| Mã | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                  | Tổ hợp xét tuyển   | Điểm trúng tuyển 2022 | Điểm trúng tuyển 2023 |
-| -- | -------------------------------------------------------------------------------------------------------------- | ------------------ | --------------------- | --------------------- |
-| 1  | TM01 Quản trị kinh doanh (Quản trị kinh doanh)                                                                 | A00, A01, D01, D07 | 26.35                 | 26.50                 |
-| 2  | TM02 Quản trị kinh doanh (Quản trị kinh doanh - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 |                       |                       |
+| STT | Mã xét tuyển | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                             | Tổ hợp xét tuyển   | Điểm trúng tuyển 2022 | Điểm trúng tuyển 2023 |
+| --- | ------------ | --------------------------------------------------------------------------------------------------------- | ------------------ | --------------------- | --------------------- |
+| 1   | TM01         | Quản trị kinh doanh (Quản trị kinh doanh)                                                                 | A00, A01, D01, D07 | 26.35                 | 26.50                 |
+| 2   | TM02         | Quản trị kinh doanh (Quản trị kinh doanh - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 |                       |                       |
 
 
 
 
 
-# 4
+# Điểm trúng tuyển
 
-| Mã   | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                            | Tổ hợp xét tuyển   | Điểm trúng tuyển 2022 | Điểm trúng tuyển 2023 |
-| ---- | ------------------------------------------------------------------------------------------------------------------------ | ------------------ | --------------------- | --------------------- |
-| TM03 | Quản trị kinh doanh (Khởi nghiệp và phát triển kinh doanh)                                                               | A00, A01, D01, D07 | 26.10                 | 26.30                 |
-| TM04 | Marketing (Marketing thương mại)                                                                                         | A00, A01, D01, D07 | 27.00                 | 27.00                 |
-| TM05 | Marketing (Quản trị thương hiệu)                                                                                         | A00, A01, D01, D07 | 26.70                 | 26.80                 |
-| TM06 | Logistics và Quản lý chuỗi cung ứng (Logistics và Quản lý chuỗi cung ứng)                                                | A00, A01, D01, D07 | 27.00                 | 26.80                 |
-| TM07 | Kế toán (Kế toán doanh nghiệp)                                                                                           | A00, A01, D01, D07 | 26.20                 | 25.90                 |
-| TM08 | ICAEW CFAB - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP                                               | A00, A01, D01, D07 |                       |                       |
-| TM09 | Kế toán (Kế toán công)                                                                                                   | A00, A01, D01, D07 | 25.80                 | 25.80                 |
-| TM10 | Kiểm toán (Kiểm toán)                                                                                                    | A00, A01, D01, D07 | 26.20                 | 26.20                 |
-| TM11 | Kinh doanh quốc tế (Thương mại quốc tế)                                                                                  | A00, A01, D01, D07 | 26.60                 | 27.00                 |
-| TM12 | Kinh tế quốc tế (Kinh tế quốc tế)                                                                                        | A00, A01, D01, D07 | 26.50                 | 26.70                 |
-| TM13 | Kinh tế (Quản lý kinh tế)                                                                                                | A00, A01, D01, D07 | 26.00                 | 25.70                 |
-| TM14 | Tài chính - Ngân hàng (Tài chính - Ngân hàng thương mại)                                                                 | A00, A01, D01, D07 | 25.90                 | 25.90                 |
-| TM15 | Tài chính - Ngân hàng (Tài chính - Ngân hàng thương mại - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 |                       |                       |
-| TM16 | Tài chính - Ngân hàng (Tài chính công)                                                                                   | A00, A01, D01, D07 | 25.80                 | 25.70                 |
-| TM17 | Thương mại điện tử (Quản trị Thương mại điện tử)                                                                         | A00, A01, D01, D07 | 27.00                 | 26.70                 |
-| TM18 | Ngôn ngữ Anh (Tiếng Anh thương mại)                                                                                      | A01, D01, D07      | 26.05                 | 25.80                 |
-| TM19 | Luật kinh tế (Luật kinh tế)                                                                                              | A00, A01, D01, D07 | 25.80                 | 25.70                 |
-| TM20 | Quản trị kinh doanh (Tiếng Pháp thương mại)                                                                              | A00, A01, D01, D03 | 25.80                 | 24.50                 |
-| TM21 | Ngôn ngữ Trung Quốc (Tiếng Trung thương mại)                                                                             | A00, A01, D01, D04 | 26.00                 | 26.90                 |
-| TM22 | Hệ thống thông tin quản lý (Quản trị Hệ thống thông tin)                                                                 | A00, A01, D01, D07 | 26.10                 | 26.00                 |
-| TM23 | Quản trị nhân lực (Quản trị nhân lực doanh nghiệp)                                                                       | A00, A01, D01, D07 | 26.20                 | 25.90                 |
-| TM24 | Quản trị khách sạn (Quản trị khách sạn - Chương trình định hướng nghề nghiệp)                                            | A00, A01, D01, D07 | 25.50                 | 24.50                 |
-| TM25 | Quản trị dịch vụ du lịch và lữ hành (Quản trị dịch vụ du lịch và lữ hành - Chương trình định hướng nghề nghiệp)          | A00, A01, D01, D07 | 25.60                 | 24.50                 |
+| STT | Mã   | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                            | Tổ hợp xét tuyển   | Điểm trúng tuyển 2022 | Điểm trúng tuyển 2023 |
+| --- | ---- | ------------------------------------------------------------------------------------------------------------------------ | ------------------ | --------------------- | --------------------- |
+| 3   | TM03 | Quản trị kinh doanh (Khởi nghiệp và phát triển kinh doanh)                                                               | A00, A01, D01, D07 | 26.10                 | 26.30                 |
+| 4   | TM04 | Marketing (Marketing thương mại)                                                                                         | A00, A01, D01, D07 | 27.00                 | 27.00                 |
+| 5   | TM05 | Marketing (Quản trị thương hiệu)                                                                                         | A00, A01, D01, D07 | 26.70                 | 26.80                 |
+| 6   | TM06 | Logistics và Quản lý chuỗi cung ứng (Logistics và Quản lý chuỗi cung ứng)                                                | A00, A01, D01, D07 | 27.00                 | 26.80                 |
+| 7   | TM07 | Kế toán (Kế toán doanh nghiệp)                                                                                           | A00, A01, D01, D07 | 26.20                 | 25.90                 |
+| 8   | TM08 | Kế toán (Kế toán tích hợp chứng chỉ quốc tế ICAEW CFAB - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)  | A00, A01, D01, D07 |                       |                       |
+| 9   | TM09 | Kế toán (Kế toán công)                                                                                                   | A00, A01, D01, D07 | 25.80                 | 25.80                 |
+| 10  | TM10 | Kiểm toán (Kiểm toán)                                                                                                    | A00, A01, D01, D07 | 26.20                 | 26.20                 |
+| 11  | TM11 | Kinh doanh quốc tế (Thương mại quốc tế)                                                                                  | A00, A01, D01, D07 | 26.60                 | 27.00                 |
+| 12  | TM12 | Kinh tế quốc tế (Kinh tế quốc tế)                                                                                        | A00, A01, D01, D07 | 26.50                 | 26.70                 |
+| 13  | TM13 | Kinh tế (Quản lý kinh tế)                                                                                                | A00, A01, D01, D07 | 26.00                 | 25.70                 |
+| 14  | TM14 | Tài chính - Ngân hàng (Tài chính - Ngân hàng thương mại)                                                                 | A00, A01, D01, D07 | 25.90                 | 25.90                 |
+| 15  | TM15 | Tài chính - Ngân hàng (Tài chính - Ngân hàng thương mại - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 |                       |                       |
+| 16  | TM16 | Tài chính - Ngân hàng (Tài chính công)                                                                                   | A00, A01, D01, D07 | 25.80                 | 25.70                 |
+| 17  | TM17 | Thương mại điện tử (Quản trị Thương mại điện tử)                                                                         | A00, A01, D01, D07 | 27.00                 | 26.70                 |
+| 18  | TM18 | Ngôn ngữ Anh (Tiếng Anh thương mại)                                                                                      | A01, D01, D07      | 26.05                 | 25.80                 |
+| 19  | TM19 | Luật kinh tế (Luật kinh tế)                                                                                              | A00, A01, D01, D07 | 25.80                 | 25.70                 |
+| 20  | TM20 | Quản trị kinh doanh (Tiếng Pháp thương mại)                                                                              | A00, A01, D01, D03 | 25.80                 | 24.50                 |
+| 21  | TM21 | Ngôn ngữ Trung Quốc (Tiếng Trung thương mại)                                                                             | A00, A01, D01, D04 | 26.00                 | 26.90                 |
+| 22  | TM22 | Hệ thống thông tin quản lý (Quản trị Hệ thống thông tin)                                                                 | A00, A01, D01, D07 | 26.10                 | 26.00                 |
+| 23  | TM23 | Quản trị nhân lực (Quản trị nhân lực doanh nghiệp)                                                                       | A00, A01, D01, D07 | 26.20                 | 25.90                 |
+| 24  | TM24 | Quản trị khách sạn (Quản trị khách sạn - Chương trình định hướng nghề nghiệp)                                            | A00, A01, D01, D07 | 25.50                 | 24.50                 |
+| 25  | TM25 | Quản trị dịch vụ du lịch và lữ hành (Quản trị dịch vụ du lịch và lữ hành - Chương trình định hướng nghề nghiệp)          | A00, A01, D01, D07 | 25.60                 | 24.50                 |
 
 
 
@@ -223,21 +217,21 @@ Trường tuyển sinh theo các phương thức:
 
 # 5
 
-| Mã | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                                          | Tổ hợp xét tuyển   | Điểm trúng tuyển                        | 2022               | 2023 |   |
-| -- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------- | ------------------ | ---- | - |
-| 26 | TM26 Hệ thống thông tin quản lý (Quản trị Hệ thống thông tin - Chương trình định hướng nghề nghiệp)                                    | A00, A01, D01, D07 | 26.00                                   | 25.30              |      |   |
-| 27 | TM27 Quản trị nhân lực (Quản trị nhân lực doanh nghiệp - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                | A00, A01, D01, D07 |                                         |                    |      |   |
-| 28 | TM28 Marketing (Marketing số)                                                                                                          | A00, A01, D01, D07 | 26.90                                   | 27.00              |      |   |
-| 29 | TM29 Luật kinh tế (Luật Thương mại quốc tế)                                                                                            | A00, A01, D01, D07 | 25.80                                   | 25.60              |      |   |
-|    |                                                                                                                                        | 30                 | TM30 Thương mại điện tử (Kinh doanh số) | A00, A01, D01, D07 |      |   |
-| 31 | TM31 Quản trị khách sạn (Quản trị khách sạn)                                                                                           | A00, A01, D01, D07 |                                         | 24.50              |      |   |
-| 32 | TM32 Quản trị dịch vụ du lịch và lữ hành (Quản trị dịch vụ du lịch và lữ hành)                                                         | A00, A01, D01, D07 |                                         | 25.60              |      |   |
-| 33 | TM33 Kinh tế số (Phân tích kinh doanh trong môi trường số)                                                                             | A00, A01, D01, D07 |                                         | 25.80              |      |   |
-| 34 | TM34 Quản trị khách sạn (Quản trị khách sạn - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                           | A00, A01, D01, D07 |                                         |                    |      |   |
-| 35 | TM35 Marketing (Marketing thương mại - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                                  | A00, A01, D01, D07 |                                         |                    |      |   |
-| 36 | TM36 Kinh doanh quốc tế (Thương mại quốc tế - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                           | A00, A01, D01, D07 |                                         |                    |      |   |
-| 37 | TM37 Logistics và Quản lý chuỗi cung ứng (Logistics và xuất nhập khẩu - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 |                                         |                    |      |   |
-| 38 | TM38 Tài chính - Ngân hàng (Công nghệ Tài chính ngân hàng)                                                                             | A00, A01, D01, D07 |                                         |                    |      |   |
+| STT | Mã   | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                                     | Tổ hợp xét tuyển   | Điểm trúng tuyển 2022 | Điểm trúng tuyển 2023 |
+| --- | ---- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --------------------- | --------------------- |
+| 26  | TM26 | Hệ thống thông tin quản lý (Quản trị Hệ thống thông tin - Chương trình định hướng nghề nghiệp)                                    | A00, A01, D01, D07 | 26.00                 | 25.30                 |
+| 27  | TM27 | Quản trị nhân lực (Quản trị nhân lực doanh nghiệp - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                | A00, A01, D01, D07 |                       |                       |
+| 28  | TM28 | Marketing (Marketing số)                                                                                                          | A00, A01, D01, D07 | 26.90                 | 27.00                 |
+| 29  | TM29 | Luật kinh tế (Luật Thương mại quốc tế)                                                                                            | A00, A01, D01, D07 | 25.80                 | 25.60                 |
+| 30  | TM30 | Thương mại điện tử (Kinh doanh số)                                                                                                | A00, A01, D01, D07 |                       |                       |
+| 31  | TM31 | Quản trị khách sạn (Quản trị khách sạn)                                                                                           | A00, A01, D01, D07 | 24.50                 |                       |
+| 32  | TM32 | Quản trị dịch vụ du lịch và lữ hành (Quản trị dịch vụ du lịch và lữ hành)                                                         | A00, A01, D01, D07 | 25.60                 |                       |
+| 33  | TM33 | Kinh tế số (Phân tích kinh doanh trong môi trường số)                                                                             | A00, A01, D01, D07 | 25.80                 |                       |
+| 34  | TM34 | Quản trị khách sạn (Quản trị khách sạn - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                           | A00, A01, D01, D07 |                       |                       |
+| 35  | TM35 | Marketing (Marketing thương mại - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                                  | A00, A01, D01, D07 |                       |                       |
+| 36  | TM36 | Kinh doanh quốc tế (Thương mại quốc tế - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                           | A00, A01, D01, D07 |                       |                       |
+| 37  | TM37 | Logistics và Quản lý chuỗi cung ứng (Logistics và xuất nhập khẩu - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 |                       |                       |
+| 38  | TM38 | Tài chính - Ngân hàng (Công nghệ Tài chính ngân hàng)                                                                             | A00, A01, D01, D07 |                       |                       |
 
 # 8.2.2. Điểm trúng tuyển theo phương thức khác
 
@@ -259,26 +253,26 @@ https://tuyensinh.tmu.edu.vn/tin-tuc/thong-bao-diem-chuan-du-dieu-kien-trung-tuy
 
 Đường link công khai danh mục ngành được phép đào tạo trên trang thông tin điện tử của Trường: https://qldt.tmu.edu.vn/danh-muc/chuong-trinh-dao-tao-3858
 
-| STT | Tên ngành                           | Mã ngành | Số văn bản cho phép mở ngành | Ngày tháng năm ban hành văn bản cho phép mở ngành | Số quyết định chuyển đổi tên ngành (gần nhất) | Ngày tháng năm ban hành quyết định chuyển đổi tên ngành | Cơ quan có thẩm quyền cho phép đào tạo | Năm tuyển sinh đầu gần nhất |
-| --- | ----------------------------------- | -------- | ---------------------------- | ------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------- | -------------------------------------- | --------------------------- |
-| 1   | Quản trị nhân lực                   | 7340404  | 6265/QĐ-BGDĐT                | 09/12/2011                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2012                        |
-| 2   | Ngôn ngữ Anh                        | 7220201  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2005                        |
-| 3   | Kiểm toán                           | 7340302  | 176/QĐ-ĐHTM                  | 22/02/2019                                        |                                               |                                                         | ĐHTM                                   | 2019                        |
-| 4   | Quản trị dịch vụ du lịch và lữ hành | 7810103  | 578/QĐ-BGDĐT                 | 07/02/2013                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2013                        |
-| 5   | Quản trị khách sạn                  | 7810201  | 578/QĐ-BGDĐT                 | 07/02/2013                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2013                        |
-| 6   | Kinh doanh quốc tế                  | 7340120  | 6265/QĐ-BGDĐT                | 09/12/2011                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2012                        |
-| 7   | Luật kinh tế                        | 7380107  | 6265/QĐ-BGDĐT                | 09/12/2011                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2012                        |
-| 8   | Kế toán                             | 7340301  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 1993                        |
-| 9   | Logistics và quản lý chuỗi cung ứng | 7510605  | 229/QĐ-ĐHTM                  | 04/03/2019                                        |                                               |                                                         | ĐHTM                                   | 2019                        |
-| 10  | Thương mại điện tử                  | 7340122  | 1973/QĐ-BGDĐT                | 03/06/2013                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2014                        |
-| 11  | Kinh tế quốc tế                     | 7310106  | 20A/QĐ-ĐHTM                  | 12/01/2017                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2017                        |
-| 12  | Quản trị kinh doanh                 | 7340101  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 1993                        |
-| 13  | Marketing                           | 7340115  | 6265/QĐ-BGDĐT                | 09/12/2011                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2012                        |
-| 14  | Kinh tế                             | 7310101  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 1965                        |
-| 15  | Tài chính - Ngân hàng               | 7340201  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2006                        |
-| 16  | Hệ thống thông tin quản lý          | 7340405  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                                   | 2008                        |
-| 17  | Kinh tế số                          | 7310109  | 2393/QĐ-ĐHTM                 | 28/12/2022                                        |                                               |                                                         | ĐHTM                                   | 2023                        |
-| 18  | Ngôn ngữ Trung Quốc                 | 7220204  | 2391/QĐ-ĐHTM                 | 28/12/2022                                        |                                               |                                                         | ĐHTM                                   | 2023                        |
+| STT | Tên ngành                           | Mã ngành | Số văn bản cho phép mở ngành | Ngày tháng năm ban hành văn bản cho phép mở ngành | Số quyết định chuyển đổi tên ngành (gần nhất) | Ngày tháng năm ban hành quyết định chuyển đổi tên ngành | Cơ quan có thẩm quyền | Năm tự chủ | Năm tuyển sinh gần nhất |
+| --- | ----------------------------------- | -------- | ---------------------------- | ------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------- | --------------------- | ---------- | ----------------------- |
+| 1   | Quản trị nhân lực                   | 7340404  | 6265/QĐ-BGDĐT                | 09/12/2011                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2012       | 2022                    |
+| 2   | Ngôn ngữ Anh                        | 7220201  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2005       | 2022                    |
+| 3   | Kiểm toán                           | 7340302  | 176/QĐ-ĐHTM                  | 22/02/2019                                        |                                               |                                                         | ĐHTM                  | 2019       | 2022                    |
+| 4   | Quản trị dịch vụ du lịch và lữ hành | 7810103  | 578/QĐ-BGDĐT                 | 07/02/2013                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2013       | 2022                    |
+| 5   | Quản trị khách sạn                  | 7810201  | 578/QĐ-BGDĐT                 | 07/02/2013                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2013       | 2022                    |
+| 6   | Kinh doanh quốc tế                  | 7340120  | 6265/QĐ-BGDĐT                | 09/12/2011                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2012       | 2022                    |
+| 7   | Luật kinh tế                        | 7380107  | 6265/QĐ-BGDĐT                | 09/12/2011                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2012       | 2022                    |
+| 8   | Kế toán                             | 7340301  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 1993       | 2022                    |
+| 9   | Logistics và quản lý chuỗi cung ứng | 7510605  | 229/QĐ-ĐHTM                  | 04/03/2019                                        |                                               |                                                         | ĐHTM                  | 2019       | 2022                    |
+| 10  | Thương mại điện tử                  | 7340122  | 1973/QĐ-BGDĐT                | 03/06/2013                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2014       | 2022                    |
+| 11  | Kinh tế quốc tế                     | 7310106  | 20A/QĐ-ĐHTM                  | 12/01/2017                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2017       | 2022                    |
+| 12  | Quản trị kinh doanh                 | 7340101  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 1993       | 2022                    |
+| 13  | Marketing                           | 7340115  | 6265/QĐ-BGDĐT                | 09/12/2011                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2012       | 2022                    |
+| 14  | Kinh tế                             | 7310101  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 1965       | 2022                    |
+| 15  | Tài chính - Ngân hàng               | 7340201  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2006       | 2022                    |
+| 16  | Hệ thống thông tin quản lý          | 7340405  | 6073/QĐ-BGDĐT                | 28/12/2010                                        | 800/QĐ-ĐHTM                                   | 21/11/2017                                              | ĐHTM                  | 2008       | 2022                    |
+| 17  | Kinh tế số                          | 7310109  | 2393/QĐ-ĐHTM                 | 28/12/2022                                        |                                               |                                                         | ĐHTM                  |            | 2023                    |
+| 18  | Ngôn ngữ Trung Quốc                 | 7220204  | 2391/QĐ-ĐHTM                 | 28/12/2022                                        |                                               |                                                         | ĐHTM                  |            | 2023                    |
 
 # 10. Điều kiện bảo đảm chất lượng
 
@@ -300,7 +294,8 @@ Nếu có các thông tin mới của Bộ Giáo dục và Đào tạo (Bộ GD&
 # 1.1. Đối tượng, điều kiện tuyển sinh:
 
 - Thí sinh có đủ điều kiện tham gia tuyển sinh theo quy định của Bộ Giáo dục và Đào tạo đồng thời đạt ngưỡng đảm bảo chất lượng đầu vào đối với từng phương thức xét tuyển theo quy định của Trường.
-- Ngoài ra, đối tượng tuyển sinh được quy định cụ thể theo từng phương thức tuyển sinh như sau:
+
+Ngoài ra, đối tượng tuyển sinh được quy định cụ thể theo từng phương thức tuyển sinh như sau:
 
 # 1.1.1. Mã phương thức xét tuyển 301 - Xét tuyển thẳng, ưu tiên xét tuyển theo quy định hiện hành của Bộ GD&#x26;ĐT và quy định của Trường
 
@@ -373,7 +368,6 @@ Xét tuyển thẳng, ưu tiên xét tuyển theo quy định hiện hành của
 
 
 
-
 # 1.3.2. Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2024
 
 Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2024 theo từng tổ hợp bài thi/môn thi - Mã phương thức xét tuyển 100
@@ -415,50 +409,23 @@ Lưu ý:
 
 
 
+
 # 10
 
-|           | Điểm         | 10  | 10  | 10  | 10  | 10  |
-| --------- | ------------ | --- | --- | --- | --- | --- |
-| Loại      | Hệ số        | 1,2 | 1,1 | 1,0 | 0,9 | 0,8 |
-| chứng chỉ | Điểm quy đổi | 12  | 11  | 10  | 9   | 8   |
-
-# HSK
-
-| Cấp độ | Cấp độ | Cấp độ | Ngôn ngữ Trung Quốc (Tiếng Trung thương mại) |
-| ------ | ------ | ------ | -------------------------------------------- |
-| 6      | 5      | 4      |                                              |
-
-# TCF
-
-| Từ 600 | 550-599 | 549 | 499 | 449 | 400- | Quản trị kinh doanh (Tiếng Pháp thương mại) |
-| ------ | ------- | --- | --- | --- | ---- | ------------------------------------------- |
-
-# DELF
-
-| C2 | C1 | B2 |   |
-| -- | -- | -- | - |
-
-# IELTS Academic
-
-| Từ 7.5 | 7.0 | 6.5 | 6.0 | 5.5 |
-| ------ | --- | --- | --- | --- |
-
-# TOEFL iBT
-
-| (không bao gồm bản Home edition) | Từ 90 | 83-89 | 74-82 | 63-73 | 50-62 | Tất cả các ngành (chuyên ngành/chương trình) |
-| -------------------------------- | ----- | ----- | ----- | ----- | ----- | -------------------------------------------- |
-
-# SAT
-
-| Từ 1401 | 1301 - 1400 | 1300 | 1201 - 1200 | 1101- | 1000- |
-| ------- | ----------- | ---- | ----------- | ----- | ----- |
-
-# ACT
-
-| Từ 31 | 28-30 | 25-27 | 22-24 | 20-21 |
-| ----- | ----- | ----- | ----- | ----- |
-
-# Xét tuyển kết hợp chứng chỉ quốc tế
+| Điểm                                       | 10                                           | 10                                          | 10          | 10                                           | 10        |     |   |   |   |   |   |
+| ------------------------------------------ | -------------------------------------------- | ------------------------------------------- | ----------- | -------------------------------------------- | --------- | --- | - | - | - | - | - |
+| Loại                                       | Hệ số                                        | Ngành (chuyên ngành) được đăng ký xét tuyển |             |                                              |           |     |   |   |   |   |   |
+| chứng chỉ                                  | Điểm quy đổi                                 | 1,2                                         | 1,1         | 1,0                                          | 0,9       | 0,8 |   |   |   |   |   |
+| HSK                                        | Cấp độ                                       | Cấp độ                                      | Cấp độ      | Ngôn ngữ Trung Quốc (Tiếng Trung thương mại) |           |     |   |   |   |   |   |
+|                                            | 6                                            |                                             | 5           |                                              | 4         |     |   |   |   |   |   |
+| TCF                                        | Từ 600                                       | 550-599                                     | 500-549     | 450-499                                      | 400-449   |     |   |   |   |   |   |
+|                                            | Quản trị kinh doanh (Tiếng Pháp thương mại)  |                                             |             |                                              |           |     |   |   |   |   |   |
+| DELF                                       | C2                                           | C1                                          |             | B2                                           |           |     |   |   |   |   |   |
+| IELTS Academic                             | Từ 7.5                                       | 7.0                                         | 6.5         | 6.0                                          | 5.5       |     |   |   |   |   |   |
+| TOEFL iBT (không bao gồm bản Home edition) | Từ 90                                        | 83-89                                       | 74-82       | 63-73                                        | 50-62     |     |   |   |   |   |   |
+|                                            | Tất cả các ngành (chuyên ngành/chương trình) |                                             |             |                                              |           |     |   |   |   |   |   |
+| SAT                                        | Từ 1401                                      | 1301 - 1400                                 | 1201 - 1300 | 1101-1200                                    | 1000-1100 |     |   |   |   |   |   |
+| ACT                                        | Từ 31                                        | 28-30                                       | 25-27       | 22-24                                        | 20-21     |     |   |   |   |   |   |
 
 (2) Xét tuyển kết hợp chứng chỉ quốc tế còn hiệu lực tính đến ngày đăng ký xét tuyển với kết quả học tập cấp THPT - Mã phương thức xét tuyển 410
 
@@ -468,29 +435,33 @@ Trong đó, điểm từng môn được xác định là điểm trung bình c�
 
 Điểm xét tuyển = [Điểm kết quả học tập môn Toán + Điểm kết quả học tập môn Văn/Lý/Hóa + Điểm quy đổi CCQT (theo Bảng 1)*2]*30/44 + Điểm ưu tiên (nếu có).
 
-# Xét tuyển kết hợp giải Học sinh giỏi (HSG)
-
 (3) Xét tuyển kết hợp giải Học sinh giỏi (HSG) với kết quả thi tốt nghiệp THPT năm 2024 - Mã phương thức xét tuyển 500
 
 Điểm xét tuyển = [Tổng điểm 3 bài thi/môn thi theo tổ hợp xét tuyển + Điểm thưởng giải HSG (theo Bảng 2)]*30/35 + Điểm ưu tiên (nếu có).
 
 
 
+
+
 # Bảng 2. Quy định điểm thưởng giải học sinh giỏi
 
-| Giải HSG                  | Điểm thưởng                                  | Ngành (chuyên ngành/chương trình) được đăng ký xét tuyển |
-| ------------------------- | -------------------------------------------- | -------------------------------------------------------- |
-| - HSG cấp quốc gia        | 5                                            | Tất cả các ngành, trừ ngành Ngôn ngữ Anh                 |
-| KK                        |                                              |                                                          |
-| - HSG cấp tỉnh/ Thành phố | 3                                            | Tất cả các ngành                                         |
-| 2                         | Quản trị kinh doanh (Tiếng Pháp thương mại)  |                                                          |
-| 1                         | Ngôn ngữ Trung Quốc (Tiếng Trung thương mại) |                                                          |
-
-Môn đạt giải: Toán học/Vật Lý/Hóa học, Tiếng Anh/Ngữ văn, Tiếng Pháp, Tiếng Trung.
-
-- Hệ thống thông tin quản lý (quản trị Hệ thống thông tin) – chương trình chuẩn và chương trình định hướng nghề nghiệp.
-
-- Kinh tế số (Phân tích Kinh doanh trong môi trường số).
+| Giải HSG                 | Điểm thưởng | Ngành (chuyên ngành/chương trình) được đăng ký xét tuyển                                                               |                  |
+| ------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Loại giải                | 5           | Tất cả các ngành, trừ ngành Ngôn ngữ Anh                                                                               |                  |
+|                          | 3           |                                                                                                                        |                  |
+| 2                        |             |                                                                                                                        |                  |
+|                          | 1           |                                                                                                                        |                  |
+| - HSG cấp quốc gia       | Giải KK     |                                                                                                                        |                  |
+| - HSG cấp tỉnh/Thành phố | Giải Nhất   |                                                                                                                        |                  |
+|                          | Giải Nhì    |                                                                                                                        |                  |
+|                          | Giải Ba     |                                                                                                                        |                  |
+| Môn đạt giải             |             |                                                                                                                        |                  |
+| Toán học/Vật Lý/Hóa học  |             | Tất cả các ngành, trừ ngành Ngôn ngữ Anh                                                                               |                  |
+| Tiếng Anh/Ngữ văn        |             |                                                                                                                        | Tất cả các ngành |
+| Tiếng Pháp               |             | Quản trị kinh doanh (Tiếng Pháp thương mại)                                                                            |                  |
+| Tiếng Trung              |             | Ngôn ngữ Trung Quốc (Tiếng Trung thương mại)                                                                           |                  |
+|                          |             | - Hệ thống thông tin quản lý (quản trị Hệ thống thông tin) – chương trình chuẩn và chương trình định hướng nghề nghiệp |                  |
+|                          |             | - Kinh tế số (Phân tích Kinh doanh trong môi trường số)                                                                |                  |
 
 Trong đó, Điểm ưu tiên (nếu có) bao gồm điểm ưu tiên theo đối tượng và điểm ưu tiên theo khu vực được xác định theo Quy chế tuyển sinh hiện hành; Các phương thức 200, 402a, 402b, 409, 410, 500: thí sinh phải nộp hồ sơ trực tuyến để xét tuyển trước tại Trường và chỉ đăng ký nguyện vọng đã đủ ĐKTT trên Cổng thông tin của Bộ GD&#x26;ĐT.
 
@@ -502,41 +473,37 @@ Trong đó, Điểm ưu tiên (nếu có) bao gồm điểm ưu tiên theo đố
 
 - Chỉ tiêu tuyển sinh đối với từng ngành (chuyên ngành/chương trình) theo từng phương thức xét tuyển và trình độ đào tạo năm 2024:
 
-| STT | Trình độ đào tạo | Mã xét tuyển | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                             | Tổ hợp xét tuyển   | Tổng chỉ tiêu | Theo KQ thi TN THPT (40%) | Theo phương thức khác (60%) |
-| --- | ---------------- | ------------ | --------------------------------------------------------------------------------------------------------- | ------------------ | ------------- | ------------------------- | --------------------------- |
-| 1   | Đại học          | TM01         | Quản trị kinh doanh (Quản trị kinh doanh)                                                                 | A00, A01, D01, D07 | 300           | 120                       | 180                         |
-| 2   | Đại học          | TM02         | Quản trị kinh doanh (Quản trị kinh doanh - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 3   | Đại học          | TM03         | Quản trị kinh doanh (Khởi nghiệp và phát triển kinh doanh)                                                | A00, A01, D01, D07 | 90            | 36                        | 54                          |
-| 4   | Đại học          | TM04         | Marketing (Marketing thương mại)                                                                          | A00, A01, D01, D07 | 200           | 84                        | 126                         |
-| 5   | Đại học          | TM05         | Marketing (Quản trị thương hiệu)                                                                          | A00, A01, D01, D07 | 170           | 68                        | 102                         |
-| 6   | Đại học          | TM06         | Logistics và Quản lý chuỗi cung ứng (Logistics và Quản lý chuỗi cung ứng)                                 | A00, A01, D01, D07 | 180           | 72                        | 108                         |
-| 7   | Đại học          | TM07         | Kế toán (Kế toán doanh nghiệp)                                                                            | A00, A01, D01, D07 | 150           | 60                        | 90                          |
-| 8   | Đại học          | TM08         | CFAB - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP                                      | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 9   | Đại học          | TM09         | Kế toán (Kế toán công)                                                                                    | A00, A01, D01, D07 | 80            | 32                        | 48                          |
-| 10  | Đại học          | TM10         | Kiểm toán (Kiểm toán)                                                                                     | A00, A01, D01, D07 | 150           | 60                        | 90                          |
+| STT | Trình độ đào tạo | Mã xét tuyển | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                           | Tổ hợp xét tuyển   | Chỉ tiêu tổng | Theo KQ thi TN THPT (40%) | Theo phương thức khác (60%) |
+| --- | ---------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------- | ------------------------- | --------------------------- |
+| 1   | Đại học          | TM01         | Quản trị kinh doanh (Quản trị kinh doanh)                                                                               | A00, A01, D01, D07 | 300           | 120                       | 180                         |
+| 2   | Đại học          | TM02         | Quản trị kinh doanh (Quản trị kinh doanh - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)               | A00, A01, D01, D07 | 100           | 40                        | 60                          |
+| 3   | Đại học          | TM03         | Quản trị kinh doanh (Khởi nghiệp và phát triển kinh doanh)                                                              | A00, A01, D01, D07 | 90            | 36                        | 54                          |
+| 4   | Đại học          | TM04         | Marketing (Marketing thương mại)                                                                                        | A00, A01, D01, D07 | 200           | 84                        | 126                         |
+| 5   | Đại học          | TM05         | Marketing (Quản trị thương hiệu)                                                                                        | A00, A01, D01, D07 | 170           | 68                        | 102                         |
+| 6   | Đại học          | TM06         | Logistics và Quản lý chuỗi cung ứng (Logistics và Quản lý chuỗi cung ứng)                                               | A00, A01, D01, D07 | 180           | 72                        | 108                         |
+| 7   | Đại học          | TM07         | Kế toán (Kế toán doanh nghiệp)                                                                                          | A00, A01, D01, D07 | 150           | 60                        | 90                          |
+| 8   | Đại học          | TM08         | Kế toán (Kế toán tích hợp chứng chỉ quốc tế ICAEW CFAB - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 | 100           | 40                        | 60                          |
+| 9   | Đại học          | TM09         | Kế toán (Kế toán công)                                                                                                  | A00, A01, D01, D07 | 80            | 32                        | 48                          |
+| 10  | Đại học          | TM10         | Kiểm toán (Kiểm toán)                                                                                                   | A00, A01, D01, D07 | 150           | 60                        | 90                          |
 
 
 
 
-
-# Trình độ đào tạo
-
-| STT | Mã xét tuyển | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                            | Tổ hợp xét tuyển   | Tổng chỉ tiêu | Theo KQ thi TN THPT (40%) | Theo phương thức khác (60%) |
-| --- | ------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------ | ------------- | ------------------------- | --------------------------- |
-| 11  | TM11         | Kinh doanh quốc tế (Thương mại quốc tế)                                                                                  | A00, A01, D01, D07 | 150           | 60                        | 90                          |
-| 12  | TM12         | Kinh tế quốc tế (Kinh tế quốc tế)                                                                                        | A00, A01, D01, D07 | 130           | 52                        | 78                          |
-| 13  | TM13         | Kinh tế (Quản lý kinh tế)                                                                                                | A00, A01, D01, D07 | 250           | 100                       | 150                         |
-| 14  | TM14         | Tài chính - Ngân hàng (Tài chính - Ngân hàng thương mại)                                                                 | A00, A01, D01, D07 | 150           | 60                        | 90                          |
-| 15  | TM15         | Tài chính - Ngân hàng (Tài chính - Ngân hàng thương mại - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 16  | TM16         | Tài chính - Ngân hàng (Tài chính công)                                                                                   | A00, A01, D01, D07 | 80            | 32                        | 48                          |
-| 17  | TM17         | Thương mại điện tử (Quản trị Thương mại điện tử)                                                                         | A00, A01, D01, D07 | 220           | 88                        | 132                         |
-| 18  | TM18         | Ngôn ngữ Anh (Tiếng Anh thương mại)                                                                                      | A01, D01, D07      | 250           | 100                       | 150                         |
-| 19  | TM19         | Luật kinh tế (Luật kinh tế)                                                                                              | A00, A01, D01, D07 | 120           | 48                        | 72                          |
-| 20  | TM20         | Quản trị kinh doanh (Tiếng Pháp thương mại)                                                                              | A00, A01, D01, D03 | 65            | 26                        | 39                          |
-| 21  | TM21         | Ngôn ngữ Trung Quốc (Tiếng Trung thương mại)                                                                             | A00, A01, D01, D04 | 180           | 72                        | 108                         |
-| 22  | TM22         | Hệ thống thông tin quản lý (Quản trị Hệ thống thông tin)                                                                 | A00, A01, D01, D07 | 150           | 60                        | 90                          |
-| 23  | TM23         | Quản trị nhân lực (Quản trị nhân lực doanh nghiệp)                                                                       | A00, A01, D01, D07 | 200           | 80                        | 120                         |
-
+| STT | Trình độ đào tạo | Mã xét tuyển | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                            | Tổ hợp xét tuyển   | Chỉ tiêu | Theo KQ thi Tổng (40%) | THPT khác (60%) |
+| --- | ---------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------ | -------- | ---------------------- | --------------- |
+| 11  | Đại học          | TM11         | Kinh doanh quốc tế (Thương mại quốc tế)                                                                                  | A00, A01, D01, D07 | 150      | 60                     | 90              |
+| 12  | Đại học          | TM12         | Kinh tế quốc tế (Kinh tế quốc tế)                                                                                        | A00, A01, D01, D07 | 130      | 52                     | 78              |
+| 13  | Đại học          | TM13         | Kinh tế (Quản lý kinh tế)                                                                                                | A00, A01, D01, D07 | 250      | 100                    | 150             |
+| 14  | Đại học          | TM14         | Tài chính - Ngân hàng (Tài chính - Ngân hàng thương mại)                                                                 | A00, A01, D01, D07 | 150      | 60                     | 90              |
+| 15  | Đại học          | TM15         | Tài chính - Ngân hàng (Tài chính - Ngân hàng thương mại - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 | 100      | 40                     | 60              |
+| 16  | Đại học          | TM16         | Tài chính - Ngân hàng (Tài chính công)                                                                                   | A00, A01, D01, D07 | 80       | 32                     | 48              |
+| 17  | Đại học          | TM17         | Thương mại điện tử (Quản trị Thương mại điện tử)                                                                         | A00, A01, D01, D07 | 220      | 88                     | 132             |
+| 18  | Đại học          | TM18         | Ngôn ngữ Anh (Tiếng Anh thương mại)                                                                                      | A01, D01, D07      | 250      | 100                    | 150             |
+| 19  | Đại học          | TM19         | Luật kinh tế (Luật kinh tế)                                                                                              | A00, A01, D01, D07 | 120      | 48                     | 72              |
+| 20  | Đại học          | TM20         | Quản trị kinh doanh (Tiếng Pháp thương mại)                                                                              | A00, A01, D01, D03 | 65       | 26                     | 39              |
+| 21  | Đại học          | TM21         | Ngôn ngữ Trung Quốc (Tiếng Trung thương mại)                                                                             | A00, A01, D01, D04 | 180      | 72                     | 108             |
+| 22  | Đại học          | TM22         | Hệ thống thông tin quản lý (Quản trị Hệ thống thông tin)                                                                 | A00, A01, D01, D07 | 150      | 60                     | 90              |
+| 23  | Đại học          | TM23         | Quản trị nhân lực (Quản trị nhân lực doanh nghiệp)                                                                       | A00, A01, D01, D07 | 200      | 80                     | 120             |
 
 
 
@@ -544,47 +511,36 @@ Trong đó, Điểm ưu tiên (nếu có) bao gồm điểm ưu tiên theo đố
 
 # 14
 
-| STT | Trình độ đào tạo | Mã xét tuyển | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                      | Tổ hợp xét tuyển   | Tổng chỉ tiêu | Theo KQ thi TN THPT (40%) | Theo phương thức khác (60%) |
-| --- | ---------------- | ------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------ | ------------- | ------------------------- | --------------------------- |
-| 24  | Đại học          | TM24         | Quản trị khách sạn (Quản trị khách sạn - Chương trình định hướng nghề nghiệp)                                      | A00, A01, D01, D07 | 60            | 24                        | 36                          |
-| 25  | Đại học          | TM25         | Quản trị dịch vụ du lịch và lữ hành (Quản trị dịch vụ du lịch và lữ hành - Chương trình định hướng nghề nghiệp)    | A00, A01, D01, D07 | 55            | 22                        | 33                          |
-| 26  | Đại học          | TM26         | Hệ thống thông tin quản lý (Quản trị Hệ thống thông tin - Chương trình định hướng nghề nghiệp)                     | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 27  | Đại học          | TM27         | Quản trị nhân lực (Quản trị nhân lực doanh nghiệp - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 28  | Đại học          | TM28         | Marketing (Marketing số)                                                                                           | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 29  | Đại học          | TM29         | Luật kinh tế (Luật Thương mại quốc tế)                                                                             | A00, A01, D01, D07 | 70            | 28                        | 42                          |
-| 30  | Đại học          | TM30         | Thương mại điện tử (Kinh doanh số)                                                                                 | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 31  | Đại học          | TM31         | Quản trị khách sạn (Quản trị khách sạn)                                                                            | A00, A01, D01, D07 | 110           | 44                        | 66                          |
-| 32  | Đại học          | TM32         | Quản trị dịch vụ du lịch và lữ hành (Quản trị dịch vụ du lịch và lữ hành)                                          | A00, A01, D01, D07 | 110           | 44                        | 66                          |
-| 33  | Đại học          | TM33         | Kinh tế số (Phân tích kinh doanh trong môi trường số)                                                              | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 34  | Đại học          | TM34         | Quản trị khách sạn (Quản trị khách sạn - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)            | A00, A01, D01, D07 | 80            | 32                        | 48                          |
+| STT | Trình độ đào tạo | Mã xét tuyển | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                      | Tổ hợp xét tuyển   | Chỉ tiêu | Theo KQ thi TN THPT (40%) | Phương thức khác (60%) |
+| --- | ---------------- | ------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------ | -------- | ------------------------- | ---------------------- |
+| 24  | Đại học          | TM24         | Quản trị khách sạn (Quản trị khách sạn - Chương trình định hướng nghề nghiệp)                                      | A, A, D, D         | 60       | 36                        | 24                     |
+| 25  | Đại học          | TM25         | Quản trị dịch vụ du lịch và lữ hành (Quản trị dịch vụ du lịch và lữ hành - Chương trình định hướng nghề nghiệp)    | A00, A01, D01, D07 | 55       | 33                        | 22                     |
+| 26  | Đại học          | TM26         | Hệ thống thông tin quản lý (Quản trị Hệ thống thông tin - Chương trình định hướng nghề nghiệp)                     | A, A, D, D         | 100      | 60                        | 40                     |
+| 27  | Đại học          | TM27         | Quản trị nhân lực (Quản trị nhân lực doanh nghiệp - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 | 100      | 60                        | 40                     |
+| 28  | Đại học          | TM28         | Marketing (Marketing số)                                                                                           | A00, A01, D01, D07 | 100      | 60                        | 40                     |
+| 29  | Đại học          | TM29         | Luật kinh tế (Luật Thương mại quốc tế)                                                                             | A00, A01, D01, D07 | 70       | 42                        | 28                     |
+| 30  | Đại học          | TM30         | Thương mại điện tử (Kinh doanh số)                                                                                 | A00, A01, D01, D07 | 100      | 60                        | 40                     |
+| 31  | Đại học          | TM31         | Quản trị khách sạn (Quản trị khách sạn)                                                                            | A00, A01, D01, D07 | 110      | 66                        | 44                     |
+| 32  | Đại học          | TM32         | Quản trị dịch vụ du lịch và lữ hành (Quản trị dịch vụ du lịch và lữ hành)                                          | A, A, D, D         | 110      | 66                        | 44                     |
+| 33  | Đại học          | TM33         | Kinh tế số (Phân tích kinh doanh trong môi trường số)                                                              | A00, A01, D01, D07 | 100      | 60                        | 40                     |
+| 34  | Đại học          | TM34         | Quản trị khách sạn (Quản trị khách sạn - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)            | A, A, D, D         | 80       | 48                        | 32                     |
 
 
 
 
 
+| STT | Mã   | Chỉ tiêu | Tên ngành (Chuyên ngành/Chương trình đào tạo) | Tổ hợp xét tuyển                                                                                 | Theo KQ thi                                                                                                                       | Theo phương thức   |      |    |
+| --- | ---- | -------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---- | -- |
+| 35  | TM35 |          | 07                                            | Marketing (Marketing thương mại - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A, A, D, D                                                                                                                        | 100                | 40   | 60 |
+| 36  | TM36 |          |                                               | 100                                                                                              | Kinh doanh quốc tế (Thương mại quốc tế - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                           | A, A, D01, D07     | 40   | 60 |
+| 37  | TM37 |          |                                               | 100                                                                                              | Logistics và Quản lý chuỗi cung ứng (Logistics và xuất nhập khẩu - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 | 40   | 60 |
+| 38  | TM38 |          |                                               | 100                                                                                              | Tài chính - Ngân hàng (Công nghệ Tài chính ngân hàng)                                                                             | A00, A01, D01, D07 | 40   | 60 |
+|     | Tổng |          | 4950                                          |                                                                                                  |                                                                                                                                   | 1980               | 2970 |    |
 
-# 15
-
-| STT  | Trình độ đào tạo | Mã xét tuyển | Tên ngành (Chuyên ngành/Chương trình đào tạo)                                                                                     | Tổ hợp xét tuyển   | Tổng chỉ tiêu | Theo KQ thi TN THPT (40%) | Theo phương thức khác (60%) |
-| ---- | ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------- | ------------------------- | --------------------------- |
-| 35   | Đại học          | TM35         | Marketing (Marketing thương mại - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                                  | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 36   | Đại học          | TM36         | Kinh doanh quốc tế (Thương mại quốc tế - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP)                           | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 37   | Đại học          | TM37         | Logistics và Quản lý chuỗi cung ứng (Logistics và xuất nhập khẩu - Chương trình định hướng chuyên sâu nghề nghiệp quốc tế - IPOP) | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| 38   | Đại học          | TM38         | Tài chính - Ngân hàng (Công nghệ Tài chính ngân hàng)                                                                             | A00, A01, D01, D07 | 100           | 40                        | 60                          |
-| Tổng |                  |              | 4950                                                                                                                              | 1980               | 2970          |                           |                             |
-
-# Ghi chú:
+Ghi chú:
 
 - Mã phương thức xét tuyển, tên phương thức xét tuyển được quy định tại mục II, tiểu mục 1.3 Đề án này.
 - Các môn trong tổ hợp xét tuyển:
-- A00: Toán, Vật lý, Hóa học
-- A01: Toán, Vật lý, Tiếng Anh
-- D01: Toán, Ngữ văn, Tiếng Anh
-- D07: Toán, Hóa học, Tiếng Anh
-- D03: Toán, Ngữ văn, Tiếng Pháp
-- D04: Toán, Ngữ văn, Tiếng Trung
-
-
 
 
 
@@ -670,12 +626,15 @@ Thí sinh cần cập nhật thông tin khi có thay đổi, điều chỉnh, hi
 # 1.7.1. Phương thức 301
 
 - Thí sinh gửi hồ sơ theo Thông báo kèm theo Đề án này về Phòng Truyền thông và Tuyển sinh, Trường Đại học Thương mại (số 79 đường Hồ Tùng Mậu, phường Mai Dịch, quận Cầu Giấy, TP Hà Nội), điện thoại: 0857.288.882.
+
 - Thời gian nộp hồ sơ dự kiến: Từ 20/04/2024
 
 # 1.7.2. Các phương thức 200, 402a, 402b, 409, 410, 500
 
 - Trường tổ chức cho thí sinh ĐKXT trực tuyến trên cổng thông tin ĐKXT https://dangkyxettuyen.tmu.edu.vn theo “Thông báo đăng ký xét tuyển trực tuyến”.
+
 - Thí sinh đủ điều kiện trúng tuyển sẽ phải đăng ký nguyện vọng đủ điều kiện trúng tuyển trên cổng thông tin của Bộ GD&#x26;ĐT mới hoàn tất quy trình đăng ký xét tuyển.
+
 - Thời gian nộp hồ sơ dự kiến: Từ 01/05/2024 đến 10/06/2024
 
 # 1.7.3. Phương thức 100
@@ -695,6 +654,14 @@ Trường áp dụng chính sách ưu tiên chung theo quy chế tuyển sinh hi
 
 
 
+# 1.8. Điểm ưu tiên
+
+- Mức điểm ưu tiên áp dụng cho nhóm đối tượng UT1 (gồm các đối tượng 01 đến 04) là 2,0 điểm và cho nhóm đối tượng UT2 (gồm các đối tượng 05 đến 07) là 1,0 điểm (chi tiết xem Phụ lục 3 Đề án này).
+
+- Các mức điểm ưu tiên khu vực, ưu tiên đối tượng tương ứng với tổng điểm 3 môn (trong tổ hợp môn xét tuyển) theo thang điểm 10 đối với từng môn thi (không nhân hệ số); Điểm ưu tiên đối với thí sinh đạt tổng điểm từ 22,5 trở lên (khi quy đổi về điểm theo thang 10 và tổng điểm 3 môn tối đa là 30) được xác định theo công thức sau:
+
+Điểm ưu tiên = [(30 – Tổng điểm đạt được)/7,5] × Mức điểm ưu tiên quy định
+
 # 1.8.2. Xét tuyển thẳng, ưu tiên xét tuyển
 
 Trường thực hiện xét tuyển thẳng, ưu tiên xét tuyển theo các quy định hiện hành của Bộ GD&#x26;ĐT và quy định của Trường (Thông báo xét tuyển thẳng, ưu tiên xét tuyển được Trường ban hành kèm theo Đề án này).
@@ -707,20 +674,22 @@ Thí sinh nộp lệ phí theo quy định của Bộ GD&#x26;ĐT;
 
 # 1.9.2. Đối với các nguyện vọng đăng ký theo các phương thức xét tuyển trước
 
-- Mức thu lệ phí: 20.000 đồng/nguyện vọng
-- Phương thức thu: thí sinh nộp trực tiếp về Trường
-
-Thông tin chuyển tiền qua tài khoản:
-
-- Tên tài khoản: Trường Đại học Thương mại
-- Số tài khoản: 2151866884 – Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV), chi nhánh Cầu Giấy.
-- Nội dung chuyển khoản: Họ tên thí sinh_số CCCD_TSDH2024
+| - Mức thu lệ phí:                    | 20.000 đồng/nguyện vọng                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| - Phương thức thu:                   | thí sinh nộp trực tiếp về Trường                                                      |
+| Thông tin chuyển tiền qua tài khoản: |                                                                                       |
+| + Tên tài khoản:                     | Trường Đại học Thương mại                                                             |
+| + Số tài khoản:                      | 2151866884 – Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV), chi nhánh Cầu Giấy. |
+| + Nội dung chuyển khoản:             | Họ tên thí sinh\_số CCCD\_TSDH2024                                                    |
 
 # 1.10. Học phí năm học 2024 – 2025 đối với sinh viên đại học chính quy tuyển sinh năm 2024
 
 - Học phí các chương trình đào tạo chuẩn: từ 2.400.000 đến 2.600.000 đồng/tháng theo từng chương trình đào tạo.
+
 - Học phí các chương trình đào tạo định hướng chuyên sâu nghề nghiệp quốc tế (IPOP): 3.500.000 đồng/tháng.
+
 - Học phí các chương trình đào tạo định hướng nghề nghiệp: 2.600.000 đồng/tháng.
+
 - Mức thu học phí hàng năm tăng không quá 12,5% so với năm trước liền kề (theo Nghị định 81/NĐ-CP ngày 27/08/2021 của Chính phủ).
 
 # 1.11. Thời gian dự kiến tuyển sinh các đợt trong năm
@@ -798,7 +767,6 @@ Trường Đại học Thương mại luôn xác định việc hợp tác giữ
 
 
 
-
 # 22
 
 # b) Trách nhiệm của mỗi bên
@@ -845,11 +813,9 @@ Cán bộ kê khai        Hà Nội, ngày     tháng 03 năm 2024
 
 Nguyễn Quang Trung
 
-SĐT: 082.352.6868    PGS,TS Nguyễn Hoàng
+SĐT: 082.352.6868        PGS,TS Nguyễn Hoàng
 
 Email: tuyensinh@tmu.edu.vn
-
-
 
 
 
@@ -872,20 +838,13 @@ Tuyển sinh trong phạm vi toàn quốc.
 - Xét tuyển theo kết quả học tập ghi trên học bạ/bảng điểm tốt nghiệp Trung học phổ thông, bổ túc THPT, cụ thể là xét theo điểm trung bình chung lớp 12 của 3 môn theo tổ hợp xét tuyển.
 - Xét tuyển theo kết quả thi TN THPT quốc gia.
 - Các tổ hợp xét tuyển:
-- Tổ hợp 1: Toán – Lý – Hóa
-- Tổ hợp 2: Toán – Lý – Anh
-- Tổ hợp 3: Toán – Hóa – Anh
-- Tổ hợp 4: Toán – Văn – Anh
-- Điểm xét tuyển theo kết quả thi tốt nghiệp THPT = Tổng điểm 3 môn/bài thi theo tổ hợp đăng ký xét tuyển + Điểm ưu tiên (nếu có)
-- Điểm xét tuyển theo kết quả học tập = Tổng điểm trung bình chung lớp 12 của các môn theo tổ hợp đăng ký xét tuyển + Điểm ưu tiên (nếu có)
-- Điểm ưu tiên bao gồm: Điểm ưu tiên khu vực (nếu có) và điểm ưu tiên đối tượng (nếu có) theo quy chế tuyển sinh hiện hành.
 
 # 1.4. Chỉ tiêu tuyển sinh
 
-| Stt | Trình độ đào tạo | Mã ngành | Tên ngành           | Mã phương thức xét tuyển | Tên phương thức xét tuyển | Chỉ tiêu (dự kiến) |
-| --- | ---------------- | -------- | ------------------- | ------------------------ | ------------------------- | ------------------ |
-| 1   | Đại học          | TM01     | Quản trị kinh doanh | 100, 200                 |                           | 50                 |
-| 2   | Đại học          | TM07     | Kế toán             | 100, 200                 |                           | 50                 |
+| Stt | Mã trình độ đào tạo | Mã ngành | Tên ngành                                 | Phương thức xét tuyển | Chỉ tiêu (dự kiến) |
+| --- | ------------------- | -------- | ----------------------------------------- | --------------------- | ------------------ |
+| 1   | Đại học             | TM01     | Quản trị kinh doanh (Quản trị kinh doanh) | 100, 200              | 50                 |
+| 2   | Đại học             | TM07     | Kế toán (Kế toán doanh nghiệp)            | 100, 200              | 50                 |
 
 
 
@@ -923,9 +882,13 @@ Thí sinh thỏa mãn các điều kiện sau đây được đăng ký xét tuy
 
 - Lệ phí xét tuyển: 200.000 đồng/hồ sơ/thí sinh
 - Thí sinh nộp lệ phí xét tuyển vào tài khoản Trường Đại học Thương mại:
-- Tên tài khoản: Trường Đại học Thương mại
-- Số tài khoản: 2153045625 – Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV), chi nhánh Cầu Giấy.
-- Nội dung chuyển khoản: LephiVLVH2024_Hotenthisinh
+
+| Tên tài khoản:         | Trường Đại học Thương mại                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| Số tài khoản:          | 2153045625 – Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV), chi nhánh Cầu Giấy. |
+| Nội dung chuyển khoản: | LephiVLVH2024\_Hotenthisinh                                                           |
+
+
 
 
 
@@ -945,6 +908,8 @@ Theo thông báo của Trường.
 - Tổ chức đào tạo theo học chế tín chỉ.
 
 # 2. Tuyển sinh đào tạo đại học, cao đẳng vừa làm vừa học với đối tượng tốt nghiệp từ trung cấp trở lên: Không tuyển
+
+
 
 
 
@@ -995,10 +960,7 @@ Xét tuyển theo kết quả của kỳ thi tốt nghiệp THPT Quốc gia theo
 
 
 
-
-# 27
-
-# (2) Các tổ hợp môn xét tuyển:
+# 2. Các tổ hợp môn xét tuyển:
 
 - Toán, Vật lý, Hóa học (XT01);
 - Toán, Vật lý, Ngoại ngữ (XT02);
@@ -1032,8 +994,6 @@ Chỉ tiêu tuyển sinh giữa các ngành và giữa các đợt tuyển sinh 
 
 
 
-
-
 # 7. Tổ chức tuyển sinh
 
 # 7.1. Thời gian tuyển sinh
@@ -1052,8 +1012,10 @@ Thí sinh thỏa mãn các điều kiện sau đây được ĐKXT đại học 
 
 # 8. Lệ phí xét tuyển
 
-- - Lệ phí xét tuyển: 200.000đ/hồ sơ/thí sinh
-- - Thí sinh nộp lệ phí xét tuyển vào tài khoản Trường Đại học Thương mại
+- Lệ phí xét tuyển: 200.000đ/hồ sơ/thí sinh
+
+- Thí sinh nộp lệ phí xét tuyển vào tài khoản Trường Đại học Thương mại
+
 - + Số tài khoản: 2154672646 – Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV), Chi nhánh Cầu Giấy
 - + Nội dung chuyển khoản: Họ tên thí sinh <dấu cách=""> số điện thoại <dấu cách=""> TSTX2024</dấu></dấu>
 
@@ -1074,8 +1036,11 @@ Năm 2024, Trường dự kiến tuyển sinh 6 đợt (khoảng 2 tháng/đợt
 # 11. Các nội dung khác (không trái quy định hiện hành)
 
 - Thông báo tuyển sinh, danh sách trúng tuyển được Trường công bố trên Cổng thông tin điện tử https://tmu.edu.vn/;
+
 - Quá thời hạn nhập học trong giấy báo trúng tuyển và nhập học, được xem là thí sinh từ chối nhập học;
+
 - Tổ chức đào tạo theo học chế tín chỉ.
+
 
 
 
@@ -1115,6 +1080,11 @@ Năm 2024, Trường dự kiến tuyển sinh 6 đợt (khoảng 2 tháng/đợt
 
 
 
+
+
+
+# Danh sách các trường Trung học phổ thông chuyên
+
 | STT | Tên trường                                          | Tỉnh/Thành phố    |
 | --- | --------------------------------------------------- | ----------------- |
 | 13  | Trường Trung học phổ thông chuyên Thủ Khoa Nghĩa    | An Giang          |
@@ -1146,6 +1116,7 @@ Năm 2024, Trường dự kiến tuyển sinh 6 đợt (khoảng 2 tháng/đợt
 | 39  | Trường Trung học phổ thông chuyên Vị Thanh          | Hậu Giang         |
 | 40  | Trường Trung học phổ thông chuyên Hoàng Văn Thụ     | Hòa Bình          |
 | 41  | Trường Trung học phổ thông chuyên Hưng Yên          | Hưng Yên          |
+
 
 
 
@@ -1185,6 +1156,9 @@ Năm 2024, Trường dự kiến tuyển sinh 6 đợt (khoảng 2 tháng/đợt
 
 
 
+
+# Danh sách các trường Trung học phổ thông chuyên
+
 | STT | Tên trường                                           | Tỉnh/Thành phố |
 | --- | ---------------------------------------------------- | -------------- |
 | 71  | Trường Trung học phổ thông chuyên Nguyễn Thiện Thành | Trà Vinh       |
@@ -1192,6 +1166,7 @@ Năm 2024, Trường dự kiến tuyển sinh 6 đợt (khoảng 2 tháng/đợt
 | 73  | Trường Trung học phổ thông chuyên Nguyễn Bỉnh Khiêm  | Vĩnh Long      |
 | 74  | Trường Trung học phổ thông chuyên Vĩnh Phúc          | Vĩnh Phúc      |
 | 75  | Trường Trung học phổ thông chuyên Nguyễn Tất Thành   | Yên Bái        |
+
 
 
 
@@ -1217,7 +1192,7 @@ Năm 2024, Trường dự kiến tuyển sinh 6 đợt (khoảng 2 tháng/đợt
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Nhóm UT1  |                                                                                                                                                                                                                                                                                                                                                                 |
 | 01        | Công dân Việt Nam là người dân tộc thiểu số có nơi thường trú trong thời gian học THPT hoặc trung cấp trên 18 tháng tại Khu vực 1.                                                                                                                                                                                                                              |
-|           | Công nhân trực tiếp sản xuất đã làm việc liên tục 5 năm trở lên, trong đó có ít nhất 2 năm là chiến sĩ thi đua được cấp tỉnh trở lên công nhận và cấp bằng khen.                                                                                                                                                                                                |
+| 02        | Công nhân trực tiếp sản xuất đã làm việc liên tục 5 năm trở lên, trong đó có ít nhất 2 năm là chiến sĩ thi đua được cấp tỉnh trở lên công nhận và cấp bằng khen.                                                                                                                                                                                                |
 |           | a) Thương binh, bệnh binh, người có "Giấy chứng nhận người được hưởng chính sách như thương binh;                                                                                                                                                                                                                                                               |
 |           | b) Quân nhân; sĩ quan, hạ sĩ quan, chiến sĩ nghĩa vụ trong Công an nhân dân tại ngũ được cử đi học có thời gian phục vụ từ 12 tháng trở lên tại Khu vực 1;                                                                                                                                                                                                      |
 |           | c) Quân nhân; sĩ quan, hạ sĩ quan, chiến sĩ nghĩa vụ trong Công an nhân dân tại ngũ được cử đi học có thời gian phục vụ từ 18 tháng trở lên;                                                                                                                                                                                                                    |
@@ -1230,14 +1205,14 @@ Năm 2024, Trường dự kiến tuyển sinh 6 đợt (khoảng 2 tháng/đợt
 | Nhóm UT2  |                                                                                                                                                                                                                                                                                                                                                                 |
 |           | a) Thanh niên xung phong tập trung được cử đi học;                                                                                                                                                                                                                                                                                                              |
 |           | b) Quân nhân; sĩ quan, hạ sĩ quan, chiến sĩ nghĩa vụ trong Công an nhân dân tại ngũ được cử đi học có thời gian phục vụ dưới 12 tháng ở Khu vực 1 và dưới 18 tháng ở khu vực khác;                                                                                                                                                                              |
-|           | c) Chỉ huy trưởng, Chỉ huy phó ban chỉ huy quân sự xã, phường, thị trấn; Thôn đội trưởng, Trung đội trưởng Dân quân tự vệ nòng cốt, Dân quân tự vệ đã hoàn thành nghĩa vụ tham gia Dân quân tự vệ nòng cốt từ 12 tháng trở lên, dự thi vào ngành Quân sự cơ sở. Thời hạn tối đa được hưởng ưu tiên là 18 tháng kể từ ngày ký quyết định xuất ngũ đến ngày ĐKXT. |
+| 05        | c) Chỉ huy trưởng, Chỉ huy phó ban chỉ huy quân sự xã, phường, thị trấn; Thôn đội trưởng, Trung đội trưởng Dân quân tự vệ nòng cốt, Dân quân tự vệ đã hoàn thành nghĩa vụ tham gia Dân quân tự vệ nòng cốt từ 12 tháng trở lên, dự thi vào ngành Quân sự cơ sở. Thời hạn tối đa được hưởng ưu tiên là 18 tháng kể từ ngày ký quyết định xuất ngũ đến ngày ĐKXT. |
 
 
 
 
 
 
-# 36
+# Đối tượng
 
 | Đối tượng | Mô tả đối tượng, điều kiện                                                                                                                                                                                                                                                                                                                                   |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
