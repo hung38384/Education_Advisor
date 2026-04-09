@@ -60,3 +60,6 @@ langgraph/
 AGENTS.md
 CLAUDE.md
 package-lock.json
+
+# Keep local vendor tools out of git
+vendor/
