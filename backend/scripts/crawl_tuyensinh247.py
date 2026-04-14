@@ -12,6 +12,7 @@ import asyncio
 import sys
 import logging
 import random
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -37,6 +38,61 @@ MAX_DELAY_BETWEEN_REQUESTS = 1.5  # Max delay between API calls (seconds)
 DELAY_BETWEEN_UNIVERSITIES = 3    # Delay between processing different universities (seconds)
 MAX_RETRIES = 3                   # Max retry attempts for failed requests
 RETRY_BACKOFF = 2                 # Exponential backoff multiplier for retries
+
+
+# ============================================================================
+# Admission Method Categorization (Regex-based)
+# ============================================================================
+
+def categorize_method(combined_text: str) -> str:
+    """
+    Phân loại dựa trên Regex siêu nhạy. Đã fix lỗi phân biệt HOA/thường.
+    """
+    if not combined_text:
+        return "UNKNOWN"
+    
+    # ÉP TOÀN BỘ VỀ CHỮ THƯỜNG ĐỂ MATCH REGEX
+    text = combined_text.lower()
+
+    if re.search(r'(tư duy|tsa)', text):
+        return "DGTD_TSA"
+
+    # DGNL HN - Bắt các cụm từ (tất cả đều chữ thường)
+    if re.search(r'(hsa)', text) or (re.search(r'(năng lực|đgnl|dgnl)', text) and re.search(r'(hà nội|qghn|\bhn\b)', text)):
+        return "DGNL_HSA"
+
+    # DGNL HCM
+    if re.search(r'(apt)', text) or (re.search(r'(năng lực|đgnl|dgnl)', text) and re.search(r'(hcm|hồ chí minh|qg hcm)', text)):
+        return "DGNL_APT"
+
+    if re.search(r'(đánh giá năng lực|đgnl|dgnl)', text):
+        return "DGNL_CHUNG"
+
+    if re.search(r'\b(sat|act|a-level|alevel)\b', text) or re.search(r'(ccqt|chứng chỉ quốc tế)', text):
+        return "CHUNG_CHI_QUOC_TE"
+
+    if re.search(r'(nước ngoài|quốc tế)', text) and re.search(r'(tốt nghiệp|bằng|chương trình)', text):
+        return "TOT_NGHIEP_QUOC_TE"
+
+    if re.search(r'(thi riêng|năng khiếu|chuyên biệt|thực hành)', text):
+        return "KY_THI_RIENG"
+
+    if re.search(r'(tài năng|xttn|phỏng vấn|hsg|học sinh giỏi|olympia|quốc gia|giải|ưu tiên xét tuyển|uu-tien-xet-tuyen|ưtxt|xt thẳng|xét tuyển thẳng|xet-tuyen-thang|tuyển thẳng)', text):
+        return "XET_TUYEN_TAI_NANG"
+
+    if re.search(r'\b(ielts|toefl|toeic|vstep)\b', text) or re.search(r'(chứng chỉ ngoại ngữ)', text):
+        return "NGOAI_NGU_KET_HOP"
+
+    if re.search(r'(tốt nghiệp thpt|thpt qg|thpt quốc gia|thi-thpt|điểm thi thpt)', text):
+        return "THPT_QG"
+        
+    if re.search(r'(học bạ|ket-qua-thpt)', text):
+        return "HOC_BA"
+
+    if re.search(r'(kết hợp|ket-hop)', text):
+        return "XET_KET_HOP_CHUNG"
+
+    return "UNKNOWN"
 
 
 class AdmissionScoreCrawler:
@@ -151,37 +207,51 @@ class AdmissionScoreCrawler:
     
     def _map_method_type(self, admission_name: str, university_code: str) -> str:
         """
-        Map admission method name to standardized method type using simple string matching.
-        
-        Args:
-            admission_name: Raw admission method name from API
-            university_code: University code for context-specific mapping
-            
-        Returns:
-            Standardized method type: THPT, HSA, APT, TSA, HOC_BA, IELTS_COMBINED, or OTHER
+        Fallback method for simple string matching.
         """
         if not admission_name:
-            return "OTHER"
+            return "UNKNOWN"
         
-        # Convert to uppercase for case-insensitive matching
-        name_upper = admission_name.upper()
+        # SỬA .upper() THÀNH .lower() ĐỂ KHỚP VỚI REGEX BÊN DƯỚI
+        name_lower = admission_name.lower()
         
-        if "THPT" in name_upper:
-            return "THPT"
-        elif "ĐGNL" in name_upper or "ĐÁNH GIÁ NĂNG LỰC" in name_upper:
-            # HSA for specified universities, APT for others
-            if university_code in ["QHI", "QSB", "QHX", "QHF"]:
-                return "HSA"
-            else:
-                return "APT"
-        elif "TƯ DUY" in name_upper or "ĐGTD" in name_upper:
-            return "TSA"
-        elif "HỌC BẠ" in name_upper:
+        if re.search(r'(tư duy|tsa)', name_lower):
+            return "DGTD_TSA"
+
+        if re.search(r'(hsa)', name_lower) or (re.search(r'(năng lực|đgnl|dgnl)', name_lower) and re.search(r'(hà nội|qghn|\bhn\b)', name_lower)):
+            return "DGNL_HSA"
+
+        if re.search(r'(apt)', name_lower) or (re.search(r'(năng lực|đgnl|dgnl)', name_lower) and re.search(r'(hcm|hồ chí minh|qg hcm)', name_lower)):
+            return "DGNL_APT"
+
+        if re.search(r'(đánh giá năng lực|đgnl|dgnl)', name_lower):
+            return "DGNL_CHUNG"
+
+        if re.search(r'\b(sat|act|a-level|alevel)\b', name_lower) or re.search(r'(ccqt|chứng chỉ quốc tế)', name_lower):
+            return "CHUNG_CHI_QUOC_TE"
+
+        if re.search(r'(nước ngoài|quốc tế)', name_lower) and re.search(r'(tốt nghiệp|bằng|chương trình)', name_lower):
+            return "TOT_NGHIEP_QUOC_TE"
+
+        if re.search(r'(thi riêng|năng khiếu|chuyên biệt|phỏng vấn|thực hành)', name_lower):
+            return "KY_THI_RIENG"
+
+        if re.search(r'(tài năng|xttn|hsg|học sinh giỏi|olympia|quốc gia|giải|ưu tiên xét tuyển|uu-tien-xet-tuyen|ưtxt|xt thẳng|xét tuyển thẳng|xet-tuyen-thang|tuyển thẳng)', name_lower):
+            return "XET_TUYEN_TAI_NANG"
+
+        if re.search(r'\b(ielts|toefl|toeic|vstep)\b', name_lower) or re.search(r'(chứng chỉ ngoại ngữ)', name_lower):
+            return "NGOAI_NGU_KET_HOP"
+
+        if re.search(r'(tốt nghiệp thpt|thpt qg|thpt quốc gia|thi-thpt|điểm thi thpt)', name_lower):
+            return "THPT_QG"
+            
+        if re.search(r'(học bạ|ket-qua-thpt)', name_lower):
             return "HOC_BA"
-        elif "KẾT HỢP" in name_upper or "CHỨNG CHỈ" in name_upper or "IELTS" in name_upper:
-            return "IELTS_COMBINED"
-        else:
-            return "OTHER"
+
+        if re.search(r'(kết hợp|ket-hop)', name_lower):
+            return "XET_KET_HOP_CHUNG"
+
+        return "UNKNOWN"
     
     async def crawl_university(
         self, 
@@ -243,18 +313,30 @@ class AdmissionScoreCrawler:
                         if not items:
                             continue
                         
+                        # Combine multiple fields for better categorization
                         admission_name = items[0].get("admission_name", "")
-                        method_type = self._map_method_type(admission_name, university_code)
+                        admission_alias = items[0].get("admission_alias", "")
+                        introtext = items[0].get("introtext", "")
+                        combined_text = f"{admission_name} {admission_alias} {introtext}"
+                        
+                        # Use regex-based categorization with combined fields
+                        method_type = categorize_method(combined_text)
                         
                         logger.info(f"   {year} - {admission_name} ({method_type}): {len(items)} records")
                         
                         # Process each item
                         for item in items:
+                            # Tạo lại combined text cho TỪNG item (phòng trường hợp các item khác introtext)
+                            ad_name = item.get("admission_name") or ""
+                            ad_alias = item.get("admission_alias") or ""
+                            intro = item.get("introtext") or ""
+                            item_combined_context = f"{ad_name} | {ad_alias} | {intro}"
+                            
                             record = {
                                 "university_code": university_code,
                                 "year": item.get("year"),
-                                "method_name": item.get("admission_name"),
-                                "method_type": method_type,
+                                "method_name": ad_name,
+                                "method_alias": ad_alias,
                                 "major_code": item.get("code"),
                                 "major_name": item.get("name"),
                                 "score": float(item.get("mark")) if item.get("mark") else None,
@@ -262,7 +344,10 @@ class AdmissionScoreCrawler:
                                     [c.strip() for c in item.get("block", "").split(",")]
                                     if item.get("block") else []
                                 ),
-                                "notes": item.get("introtext") or None,
+                                "notes": intro or None,
+                                # --- 2 TRƯỜNG QUAN TRỌNG ĐỂ AI QUERY ---
+                                "raw_method_context": item_combined_context,
+                                "method_tag": categorize_method(item_combined_context) 
                             }
                             all_records.append(record)
                         

@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = Field(default="")
     OPENAI_MODEL: str = Field(default="gpt-4")
     OPENAI_TEMPERATURE: float = Field(default=0.7)
+    GOOGLE_API_KEY: str | None = None
+    GROQ_API_KEY: str | None = None
+    LLAMA_CLOUD_API_KEY: str | None = None
 
     # Security Configuration
     SECRET_KEY: str = Field(default="your-secret-key-change-this-in-production")

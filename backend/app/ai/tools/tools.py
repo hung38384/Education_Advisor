@@ -134,6 +134,7 @@ def get_historical_scores(
     university: str,
     major: Optional[str] = None,
     year: Optional[str] = None,
+    method_tag: Optional[str] = None,
 ) -> str:
     """
     Truy vấn Điểm Chuẩn Lịch Sử từ MongoDB.
@@ -152,20 +153,21 @@ def get_historical_scores(
         university: Mã trường đại học (Bắt buộc, VD: "BKA", "QHI", "BVH")
         major: Mã ngành học hoặc tên ngành (Tùy chọn, VD: "IT1", "NK", "C01")
         year: Năm xét tuyển (Tùy chọn, VD: "2023", "2024", "2025")
+        method_tag: Tên tag phương thức (Tùy chọn, BẮT BUỘC map vào 1 trong 3: "THPT_QG", "DGTD_TSA", "XET_TUYEN_TAI_NANG")
     
     Returns:
         Chuỗi văn bản chứa thông tin điểm chuẩn lịch sử được định dạng.
         Bao gồm trường, năm, ngành, và các điểm chuẩn tương ứng.
     
     Example:
-        >>> get_historical_scores("BKA", major="IT1", year="2024")
+        >>> get_historical_scores("BKA", major="IT1", year="2024", method_tag="DGTD_TSA")
         'Kết quả tra cứu điểm chuẩn trường BKA...'
     """
     import os
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
     
-    logger.info(f"📊 Fetching historical scores | University: {university} | Major: {major} | Year: {year}")
+    logger.info(f"📊 Fetching historical scores | University: {university} | Major: {major} | Year: {year} | Method: {method_tag}")
     
     client = None
     try:
@@ -189,6 +191,9 @@ def get_historical_scores(
         
         if major:
             query_filter["major_code"] = major
+            
+        if method_tag:
+            query_filter["method_tag"] = method_tag
         
         if year:
             # Convert year to int if provided as string for proper querying

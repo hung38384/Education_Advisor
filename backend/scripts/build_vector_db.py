@@ -261,7 +261,7 @@ def test_vector_search(vector_store: Chroma, query: str, k: int = 2) -> None:
             logger.info(f"📄 Content ({len(doc.page_content)} chars):")
             logger.info(f"   {doc.page_content[:500]}...")  # Show first 500 chars
             logger.info(f"📋 Metadata: {doc.metadata}")
-            logger.info()
+            logger.info("")
     
     except Exception as e:
         logger.error(f"❌ Search failed: {e}")
