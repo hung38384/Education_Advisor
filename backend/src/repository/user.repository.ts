@@ -58,7 +58,7 @@ export class SQLiteUserRepository implements UserRepository {
     }
 
     updatePassword(id: number, passwordHash: string): boolean {
-        const stmt = this.db.prepare('UPDATE "user" SET password = ? WHERE id = ? AND deletedAt IS NULL');
+        const stmt = this.db.prepare('UPDATE "user" SET password = ?, tokenVersion = tokenVersion + 1 WHERE id = ? AND deletedAt IS NULL');
         const result = stmt.run(passwordHash, id);
         return result.changes > 0;
     }
@@ -87,11 +87,11 @@ export class SQLiteUserRepository implements UserRepository {
     updateStatus(id: number, accountStatus: AccountStatus): User | undefined {
         const stmt = this.db.prepare(`
             UPDATE "user"
-            SET accountStatus = ?
-            WHERE id = ? AND deletedAt IS NULL
+            SET accountStatus = ?, tokenVersion = tokenVersion + 1
+            WHERE id = ? AND deletedAt IS NULL AND accountStatus != ?
         `);
 
-        const result = stmt.run(accountStatus, id);
+        const result = stmt.run(accountStatus, id, accountStatus);
         if (result.changes === 0) {
             return undefined;
         }

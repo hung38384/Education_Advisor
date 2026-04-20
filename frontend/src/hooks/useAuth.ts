@@ -10,6 +10,7 @@ import {
     LoginPayload,
     RegisterPayload,
     ResetPasswordPayload,
+    ChangePasswordPayload,
 } from '@/services/authService';
 import { accessTokenAtom, authInitializedAtom, currentUserAtom } from '@/store/atoms';
 
@@ -57,6 +58,12 @@ export function useForgotPassword() {
 export function useResetPassword() {
     return useMutation({
         mutationFn: (payload: ResetPasswordPayload) => authService.resetPassword(payload),
+    });
+}
+
+export function useChangePassword() {
+    return useMutation({
+        mutationFn: (payload: ChangePasswordPayload) => authService.changePassword(payload),
     });
 }
 

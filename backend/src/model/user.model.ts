@@ -11,13 +11,14 @@ export interface User {
     name: string;
     role: UserRole;
     accountStatus: AccountStatus;
+    tokenVersion: number;
     deletedAt: string | null;
     createdAt: string;
 }
 
-export type PublicUser = Omit<User, 'password'>;
+export type PublicUser = Omit<User, 'password' | 'tokenVersion'>;
 
 export function toPublicUser(user: User): PublicUser {
-    const { password, ...publicUser } = user;
+    const { password, tokenVersion, ...publicUser } = user;
     return publicUser;
 }

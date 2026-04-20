@@ -7,7 +7,7 @@ across different environments (development, staging, production).
 """
 
 from typing import List
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     Loads from .env file and environment variables. Environment variables
     take precedence over .env file values.
     """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     # Application Configuration
     PROJECT_NAME: str = Field(default="AI-Powered University Admission Planner")
@@ -40,6 +46,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = Field(default="")
     OPENAI_MODEL: str = Field(default="gpt-4")
     OPENAI_TEMPERATURE: float = Field(default=0.7)
+    GOOGLE_API_KEY: str = Field(default="")
+    LLAMA_CLOUD_API_KEY: str = Field(default="")
 
     # Security Configuration
     SECRET_KEY: str = Field(default="your-secret-key-change-this-in-production")
@@ -54,9 +62,8 @@ class Settings(BaseSettings):
     # Logging Configuration
     LOG_LEVEL: str = Field(default="INFO")
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    # Internal service-to-service authentication
+    INTERNAL_API_KEY: str = Field(default="")
 
 
 # Global settings instance - instantiated once and reused throughout the application
