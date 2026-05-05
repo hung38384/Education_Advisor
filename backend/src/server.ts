@@ -3,9 +3,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { setupRoutes } from './routes/index';
 import { createDatabase } from './config/database';
-import { SQLiteProductRepository } from './repository/product.repository';
-import { ProductService } from './services/product.service';
-import { ProductController } from './controllers/product.controller';
 import { SQLiteUserRepository } from './repository/user.repository';
 import { SQLitePasswordResetTokenRepository } from './repository/password-reset-token.repository';
 import { AuthService, AuthServiceError } from './services/auth.service';
@@ -16,24 +13,49 @@ import { AdminUserService } from './services/admin-user.service';
 import { AdminUserController } from './controllers/admin-user.controller';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import type { UserRepository } from './repository/user.repository';
+import type { Database } from 'better-sqlite3';
+import { requestMetricsStore, requestObservabilityMiddleware } from './middleware/observability.middleware';
+import { SQLiteStudentProfileRepository } from './repository/student-profile.repository';
+import { StudentProfileService } from './services/student-profile.service';
+import { StudentProfileController } from './controllers/student-profile.controller';
+import { SQLitePersonalityRepository } from './repository/personality.repository';
+import { PersonalityService } from './services/personality.service';
+import { PersonalityController } from './controllers/personality.controller';
+import { SQLiteAssessmentRepository } from './repository/assessment.repository';
+import { AssessmentService } from './services/assessment.service';
+import { AssessmentController } from './controllers/assessment.controller';
+import { SQLiteQARepository } from './repository/qa.repository';
+import { QAService } from './services/qa.service';
+import { QAController } from './controllers/qa.controller';
+import { SQLiteAdmissionCartRepository } from './repository/admission-cart.repository';
+import { AdmissionService } from './services/admission.service';
+import { AdmissionController } from './controllers/admission.controller';
+import { createQAInferenceClientFromEnv, QAInferenceClient } from './clients/ai.client';
 
 dotenv.config();
 
-interface AppDependencies {
-    productController: ProductController;
+export interface AppDependencies {
     authController: AuthController;
     adminUserController: AdminUserController;
+    studentProfileController: StudentProfileController;
+    personalityController: PersonalityController;
+    assessmentController: AssessmentController;
+    qaController: QAController;
+    admissionController: AdmissionController;
     userRepository: UserRepository;
     authService: AuthService;
     authenticateToken: RequestHandler;
 }
 
-function createDependencies(): AppDependencies {
-    const db = createDatabase();
+export interface DependencyOverrides {
+    qaInferenceClient?: QAInferenceClient | null;
+}
 
-    const productRepository = new SQLiteProductRepository(db);
-    const productService = new ProductService(productRepository);
-    const productController = new ProductController(productService);
+export function createDependencies(
+    database?: Database,
+    overrides: DependencyOverrides = {}
+): AppDependencies {
+    const db = database ?? createDatabase();
 
     const userRepository = new SQLiteUserRepository(db);
     const resetTokenRepository = new SQLitePasswordResetTokenRepository(db);
@@ -42,26 +64,96 @@ function createDependencies(): AppDependencies {
     const adminUserService = new AdminUserService(userRepository);
     const adminUserController = new AdminUserController(adminUserService);
 
+    const studentProfileRepository = new SQLiteStudentProfileRepository(db);
+    const studentProfileService = new StudentProfileService(studentProfileRepository);
+    const studentProfileController = new StudentProfileController(studentProfileService);
+
+    const personalityRepository = new SQLitePersonalityRepository(db);
+    const personalityService = new PersonalityService(personalityRepository);
+    const personalityController = new PersonalityController(personalityService);
+
+    const assessmentRepository = new SQLiteAssessmentRepository(db);
+    const assessmentService = new AssessmentService(
+        assessmentRepository,
+        studentProfileRepository,
+        personalityRepository
+    );
+    const assessmentController = new AssessmentController(assessmentService);
+
+    const qaRepository = new SQLiteQARepository(db);
+    const qaInferenceClient = overrides.qaInferenceClient === undefined
+        ? createQAInferenceClientFromEnv()
+        : overrides.qaInferenceClient;
+    const qaService = new QAService(
+        qaRepository,
+        studentProfileRepository,
+        personalityRepository,
+        assessmentRepository,
+        qaInferenceClient
+    );
+    const qaController = new QAController(qaService);
+
+    const admissionCartRepository = new SQLiteAdmissionCartRepository(db);
+    const admissionService = new AdmissionService(admissionCartRepository, studentProfileRepository);
+    const admissionController = new AdmissionController(admissionService);
+
     const authenticateToken = createAuthenticateToken(userRepository);
 
     return {
-        productController,
         authController,
         adminUserController,
+        studentProfileController,
+        personalityController,
+        assessmentController,
+        qaController,
+        admissionController,
         userRepository,
         authService,
         authenticateToken,
     };
 }
 
-function initServer({ productController, authController, adminUserController, authenticateToken }: AppDependencies) {
+export function initServer({
+    authController,
+    adminUserController,
+    studentProfileController,
+    personalityController,
+    assessmentController,
+    qaController,
+    admissionController,
+    authenticateToken,
+}: AppDependencies) {
     const app = express();
+    const requestLogEnabled = process.env.REQUEST_LOG_ENABLED
+        ? isEnabled(process.env.REQUEST_LOG_ENABLED)
+        : process.env.NODE_ENV !== 'production';
+    const metricsEnabled = process.env.METRICS_ENABLED
+        ? isEnabled(process.env.METRICS_ENABLED)
+        : true;
+
     app.use(cors());
     app.use(express.json());
+    if (requestLogEnabled) {
+        app.use(requestObservabilityMiddleware);
+    }
+
+    if (metricsEnabled) {
+        app.get('/api/metrics', (req, res) => {
+            res.json({
+                timestamp: new Date().toISOString(),
+                metrics: requestMetricsStore.snapshot(),
+            });
+        });
+    }
+
     setupRoutes(app, {
-        productController,
         authController,
         adminUserController,
+        studentProfileController,
+        personalityController,
+        assessmentController,
+        qaController,
+        admissionController,
         authenticateToken,
         requireSuperadmin,
     });
@@ -157,7 +249,9 @@ async function bootstrap(): Promise<void> {
     });
 }
 
-void bootstrap().catch((error) => {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-});
+if (require.main === module) {
+    void bootstrap().catch((error) => {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    });
+}

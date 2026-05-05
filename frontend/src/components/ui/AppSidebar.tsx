@@ -16,12 +16,22 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
+    { href: '/', label: 'Home' },
     { href: '/dashboard', label: 'Dashboard' },
-    { href: '/product', label: 'Products' },
+    { href: '/profile', label: 'Profile' },
+    { href: '/personality', label: 'Personality' },
+    { href: '/admissions', label: 'Admissions' },
+    { href: '/admissions/cart', label: 'Admissions Cart' },
+    { href: '/review', label: 'Review' },
+    { href: '/qa', label: 'Q&A' },
     { href: '/admin/users', label: 'Admin Users', roles: ['superadmin'] },
 ];
 
 function isActive(pathname: string, href: string): boolean {
+    if (href === '/admissions' && pathname.startsWith('/admissions/cart')) {
+        return false;
+    }
+
     return pathname === href || pathname.startsWith(`${href}/`);
 }
 

@@ -1,0 +1,135 @@
+import { Database } from 'better-sqlite3';
+import { StudentProfile, UpsertStudentProfileInput } from '../model/student-profile.model';
+
+export interface StudentProfileRepository {
+    findByUserId(userId: number): StudentProfile | undefined;
+    upsertByUserId(userId: number, input: UpsertStudentProfileInput): StudentProfile | undefined;
+}
+
+interface StudentProfileRow {
+    id: number;
+    userId: number;
+    fullName: string;
+    phone: string | null;
+    gender: string | null;
+    dateOfBirth: string | null;
+    city: string | null;
+    schoolName: string | null;
+    grade10: number | null;
+    grade11: number | null;
+    grade12: number | null;
+    favoriteSubjects: string | null;
+    targetMajor: string | null;
+    targetUniversity: string | null;
+    bio: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+function parseFavoriteSubjects(rawValue: string | null): string[] {
+    if (!rawValue) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(rawValue);
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed.filter((item): item is string => typeof item === 'string');
+    } catch {
+        return [];
+    }
+}
+
+function toModel(row: StudentProfileRow): StudentProfile {
+    return {
+        id: row.id,
+        userId: row.userId,
+        fullName: row.fullName,
+        phone: row.phone,
+        gender: row.gender,
+        dateOfBirth: row.dateOfBirth,
+        city: row.city,
+        schoolName: row.schoolName,
+        grade10: row.grade10,
+        grade11: row.grade11,
+        grade12: row.grade12,
+        favoriteSubjects: parseFavoriteSubjects(row.favoriteSubjects),
+        targetMajor: row.targetMajor,
+        targetUniversity: row.targetUniversity,
+        bio: row.bio,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+    };
+}
+
+export class SQLiteStudentProfileRepository implements StudentProfileRepository {
+    constructor(private db: Database) { }
+
+    findByUserId(userId: number): StudentProfile | undefined {
+        const stmt = this.db.prepare('SELECT * FROM student_profile WHERE userId = ?');
+        const row = stmt.get(userId) as StudentProfileRow | undefined;
+        if (!row) {
+            return undefined;
+        }
+
+        return toModel(row);
+    }
+
+    upsertByUserId(userId: number, input: UpsertStudentProfileInput): StudentProfile | undefined {
+        const stmt = this.db.prepare(`
+            INSERT INTO student_profile (
+                userId,
+                fullName,
+                phone,
+                gender,
+                dateOfBirth,
+                city,
+                schoolName,
+                grade10,
+                grade11,
+                grade12,
+                favoriteSubjects,
+                targetMajor,
+                targetUniversity,
+                bio
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(userId) DO UPDATE SET
+                fullName = excluded.fullName,
+                phone = excluded.phone,
+                gender = excluded.gender,
+                dateOfBirth = excluded.dateOfBirth,
+                city = excluded.city,
+                schoolName = excluded.schoolName,
+                grade10 = excluded.grade10,
+                grade11 = excluded.grade11,
+                grade12 = excluded.grade12,
+                favoriteSubjects = excluded.favoriteSubjects,
+                targetMajor = excluded.targetMajor,
+                targetUniversity = excluded.targetUniversity,
+                bio = excluded.bio,
+                updatedAt = CURRENT_TIMESTAMP
+        `);
+
+        stmt.run(
+            userId,
+            input.fullName,
+            input.phone ?? null,
+            input.gender ?? null,
+            input.dateOfBirth ?? null,
+            input.city ?? null,
+            input.schoolName ?? null,
+            input.grade10 ?? null,
+            input.grade11 ?? null,
+            input.grade12 ?? null,
+            JSON.stringify(input.favoriteSubjects ?? []),
+            input.targetMajor ?? null,
+            input.targetUniversity ?? null,
+            input.bio ?? null
+        );
+
+        return this.findByUserId(userId);
+    }
+}

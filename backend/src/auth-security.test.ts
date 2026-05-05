@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import Database from 'better-sqlite3';
 import { AuthService } from './services/auth.service';
@@ -17,6 +18,7 @@ function createBaseUser(overrides: Partial<User> = {}): User {
         name: 'User',
         role: 'user',
         accountStatus: 'active',
+        tokenVersion: 0,
         deletedAt: null,
         createdAt: '2026-01-01 00:00:00',
         ...overrides,
@@ -112,6 +114,98 @@ test('forgot password does not expose reset token in production', async () => {
     process.env.AUTH_DEBUG_RETURN_RESET_TOKEN = previousDebugFlag;
 });
 
+test('change password rejects incorrect current password', async () => {
+    const userRepository = createUserRepository({
+        findById: () => createBaseUser({
+            password: bcrypt.hashSync('12345678', 10),
+        }),
+        updatePassword: () => true,
+    });
+
+    const resetRepository = createResetTokenRepository();
+    const service = new AuthService(userRepository, resetRepository);
+
+    await assert.rejects(
+        () => service.changePassword({
+            userId: 1,
+            oldPassword: 'wrong-password',
+            newPassword: '87654321',
+        }),
+        (error: unknown) => {
+            assert.equal((error as { message?: string }).message, 'Current password is incorrect');
+            return true;
+        }
+    );
+});
+
+test('change password invalidates outstanding reset tokens', async () => {
+    let invalidatedUserId: number | undefined;
+
+    const userRepository = createUserRepository({
+        findById: () => createBaseUser({
+            password: bcrypt.hashSync('12345678', 10),
+        }),
+        updatePassword: () => true,
+    });
+
+    const resetRepository = createResetTokenRepository({
+        invalidateUserTokens: (userId: number) => {
+            invalidatedUserId = userId;
+            return 1;
+        },
+    });
+
+    const service = new AuthService(userRepository, resetRepository);
+
+    const result = await service.changePassword({
+        userId: 1,
+        oldPassword: '12345678',
+        newPassword: '87654321',
+    });
+
+    assert.equal(result.message, 'Password changed successfully');
+    assert.equal(invalidatedUserId, 1);
+});
+
+test('reset password rejects token that cannot be consumed', async () => {
+    let updatePasswordCalled = false;
+
+    const userRepository = createUserRepository({
+        findById: () => createBaseUser(),
+        updatePassword: () => {
+            updatePasswordCalled = true;
+            return true;
+        },
+    });
+
+    const resetRepository = createResetTokenRepository({
+        findValidByTokenHash: () => ({
+            id: 99,
+            userId: 1,
+            tokenHash: 'hashed-token',
+            expiresAt: '2099-01-01 00:15:00',
+            usedAt: null,
+            createdAt: '2099-01-01 00:00:00',
+        }),
+        markUsed: () => false,
+    });
+
+    const service = new AuthService(userRepository, resetRepository);
+
+    await assert.rejects(
+        () => service.resetPassword({
+            token: 'raw-token',
+            newPassword: '87654321',
+        }),
+        (error: unknown) => {
+            assert.equal((error as { message?: string }).message, 'Reset token is invalid or expired');
+            return true;
+        }
+    );
+
+    assert.equal(updatePasswordCalled, false);
+});
+
 test('forgot password exposes reset token in non-production when debug flag is true', async () => {
     const previousNodeEnv = process.env.NODE_ENV;
     const previousDebugFlag = process.env.AUTH_DEBUG_RETURN_RESET_TOKEN;
@@ -156,7 +250,11 @@ test('auth middleware uses current role from database instead of role in token',
     });
 
     const middleware = createAuthenticateToken(repository);
-    const token = jwt.sign({ userId: 1, role: 'superadmin' }, process.env.JWT_ACCESS_SECRET);
+    const token = jwt.sign(
+        { userId: 1, role: 'superadmin', tokenVersion: 0 },
+        process.env.JWT_ACCESS_SECRET,
+        { audience: 'educationadvisor-api', issuer: 'educationadvisor-auth' }
+    );
 
     const req = {
         headers: {
@@ -199,7 +297,11 @@ test('auth middleware blocks disabled user with forbidden response', () => {
     });
 
     const middleware = createAuthenticateToken(repository);
-    const token = jwt.sign({ userId: 1, role: 'superadmin' }, process.env.JWT_ACCESS_SECRET);
+    const token = jwt.sign(
+        { userId: 1, role: 'superadmin', tokenVersion: 0 },
+        process.env.JWT_ACCESS_SECRET,
+        { audience: 'educationadvisor-api', issuer: 'educationadvisor-auth' }
+    );
 
     const req = {
         headers: {
@@ -232,6 +334,49 @@ test('auth middleware blocks disabled user with forbidden response', () => {
     process.env.JWT_ACCESS_SECRET = previousSecret;
 });
 
+test('auth middleware rejects token with invalid audience', () => {
+    const previousSecret = process.env.JWT_ACCESS_SECRET;
+    process.env.JWT_ACCESS_SECRET = 'test-secret';
+
+    const repository = createUserRepository({
+        findByIdIncludingDeleted: () => createBaseUser({ accountStatus: 'active' }),
+    });
+
+    const middleware = createAuthenticateToken(repository);
+    const token = jwt.sign(
+        { userId: 1, role: 'user', tokenVersion: 0 },
+        process.env.JWT_ACCESS_SECRET,
+        { audience: 'invalid-audience', issuer: 'educationadvisor-auth' }
+    );
+
+    const req = {
+        headers: {
+            authorization: `Bearer ${token}`,
+        },
+    } as any;
+
+    let responseStatus = 0;
+    const res = {
+        status(code: number) {
+            responseStatus = code;
+            return this;
+        },
+        json() {
+            return this;
+        },
+    } as any;
+
+    let nextCalled = false;
+    middleware(req, res, () => {
+        nextCalled = true;
+    });
+
+    assert.equal(nextCalled, false);
+    assert.equal(responseStatus, 401);
+
+    process.env.JWT_ACCESS_SECRET = previousSecret;
+});
+
 test('admin listing includes role user for superadmin role management', () => {
     const db = new Database(':memory:');
 
@@ -256,6 +401,69 @@ test('admin listing includes role user for superadmin role management', () => {
 
     assert.equal(users.length, 1);
     assert.equal(users[0]?.role, 'user');
+
+    db.close();
+});
+
+test('updateStatus rotates token version', () => {
+    const db = new Database(':memory:');
+
+    db.exec(`
+        CREATE TABLE "user" (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            accountStatus TEXT NOT NULL,
+            tokenVersion INTEGER NOT NULL DEFAULT 0,
+            deletedAt DATETIME,
+            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        INSERT INTO "user" (email, password, name, role, accountStatus, tokenVersion, deletedAt)
+        VALUES ('status@example.com', 'hashed', 'Status User', 'user', 'active', 3, NULL);
+    `);
+
+    const repository = new SQLiteUserRepository(db);
+    const updatedUser = repository.updateStatus(1, 'disabled');
+
+    assert.ok(updatedUser);
+    assert.equal(updatedUser?.accountStatus, 'disabled');
+    assert.equal(updatedUser?.tokenVersion, 4);
+
+    db.close();
+});
+
+test('updateStatus does not rotate token version when status is unchanged', () => {
+    const db = new Database(':memory:');
+
+    db.exec(`
+        CREATE TABLE "user" (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            accountStatus TEXT NOT NULL,
+            tokenVersion INTEGER NOT NULL DEFAULT 0,
+            deletedAt DATETIME,
+            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        INSERT INTO "user" (email, password, name, role, accountStatus, tokenVersion, deletedAt)
+        VALUES ('same-status@example.com', 'hashed', 'Same Status User', 'user', 'active', 7, NULL);
+    `);
+
+    const repository = new SQLiteUserRepository(db);
+    const unchanged = repository.updateStatus(1, 'active');
+
+    assert.equal(unchanged, undefined);
+
+    const latest = repository.findById(1);
+    assert.ok(latest);
+    assert.equal(latest?.accountStatus, 'active');
+    assert.equal(latest?.tokenVersion, 7);
 
     db.close();
 });

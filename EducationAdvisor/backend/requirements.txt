@@ -6,6 +6,10 @@ python-multipart==0.0.9
 pymongo>=4.9,<5.0
 motor>=3.5.1,<4.0
 
+# PDF Parsing (Hybrid Ensemble)
+markitdown>=0.1.0
+llama-parse>=0.6.0
+
 # AI/LLM & Orchestration
 langchain>=0.2.16,<0.3.0
 langchain-core>=0.2.43,<0.3.0

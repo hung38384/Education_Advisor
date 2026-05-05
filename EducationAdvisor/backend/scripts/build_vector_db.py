@@ -18,7 +18,6 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any
 import re
-import json
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -115,10 +114,10 @@ def extract_metadata_from_filename(filename: str) -> Dict[str, str]:
 def read_markdown_file(filepath: Path) -> str:
     """
     Read content from a Markdown file.
-
+    
     Args:
         filepath: Path to the Markdown file
-
+        
     Returns:
         str: File content
     """
@@ -130,42 +129,6 @@ def read_markdown_file(filepath: Path) -> str:
     except Exception as e:
         logger.error(f"❌ Failed to read {filepath.name}: {e}")
         return ""
-
-
-def load_structured_metadata(clean_filename: str) -> Dict[str, Any]:
-    """Load structured JSON metadata paired with a *_clean.md file if present."""
-    structured_filename = clean_filename.replace("_clean.md", "_structured.json")
-    structured_path = INPUT_DIR / structured_filename
-
-    if not structured_path.exists():
-        return {}
-
-    try:
-        with open(structured_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
-    except Exception as e:
-        logger.warning(f"⚠️  Failed to read structured metadata {structured_filename}: {e}")
-        return {}
-
-    metadata: Dict[str, Any] = {
-        "has_structured": True,
-    }
-
-    if isinstance(payload, dict):
-        metadata["structured_sections"] = sorted(list(payload.keys()))
-
-        for key in [
-            "admission_methods",
-            "prerequisites",
-            "formulas",
-            "conversions",
-            "tuition_facts",
-        ]:
-            value = payload.get(key)
-            if isinstance(value, list):
-                metadata[f"count_{key}"] = len(value)
-
-    return metadata
 
 
 def chunk_markdown_content(
@@ -195,12 +158,7 @@ def chunk_markdown_content(
     
     # Add source to metadata
     metadata["source"] = filename
-
-    # Merge optional metadata from *_structured.json (backward compatible)
-    structured_metadata = load_structured_metadata(filename)
-    if structured_metadata:
-        metadata.update(structured_metadata)
-
+    
     try:
         # Initialize MarkdownHeaderTextSplitter with specific headers
         # Split only on H1 (#) and H2 (##) headers
@@ -303,7 +261,7 @@ def test_vector_search(vector_store: Chroma, query: str, k: int = 2) -> None:
             logger.info(f"📄 Content ({len(doc.page_content)} chars):")
             logger.info(f"   {doc.page_content[:500]}...")  # Show first 500 chars
             logger.info(f"📋 Metadata: {doc.metadata}")
-            logger.info()
+            logger.info("")
     
     except Exception as e:
         logger.error(f"❌ Search failed: {e}")

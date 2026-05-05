@@ -2,9 +2,10 @@ import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'ax
 import { ACCESS_TOKEN_STORAGE_KEY } from '@/config/auth';
 
 const DEFAULT_AXIOS_TIMEOUT = 60 * 1000; // 60s
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001/api';
 
 const api = axios.create({
-    baseURL: 'http://localhost:5001/api', // Should ideally come from env: process.env.NEXT_PUBLIC_API_BASE_URL
+    baseURL: API_BASE_URL,
     timeout: DEFAULT_AXIOS_TIMEOUT,
     headers: {
         'Content-Type': 'application/json',

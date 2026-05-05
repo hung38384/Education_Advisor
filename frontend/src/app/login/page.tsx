@@ -18,7 +18,7 @@ export default function LoginPage() {
 
     useEffect(() => {
         if (initialized && accessToken && currentUser) {
-            router.replace('/product');
+            router.replace('/dashboard');
         }
     }, [initialized, accessToken, currentUser, router]);
 
@@ -28,7 +28,7 @@ export default function LoginPage() {
 
         try {
             await loginMutation.mutateAsync({ email, password });
-            router.push('/product');
+            router.push('/dashboard');
         } catch (error) {
             setMessage(getApiErrorMessage(error, 'Login failed'));
         }

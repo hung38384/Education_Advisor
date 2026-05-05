@@ -16,8 +16,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain.tools import tool
-from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+try:
+    from langchain_chroma import Chroma
+except Exception:
+    Chroma = None
 
 # Configure logging
 logging.basicConfig(
@@ -31,17 +35,20 @@ chroma_dir = Path(__file__).parent.parent.parent.parent / "data" / "chroma_db"
 
 logger.info(f"Initializing VectorDB from: {chroma_dir}")
 
-# Initialize embeddings with Google Gemini Embedding model
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2-preview")
-
-# Initialize Chroma vector store with persistence
-vectorstore = Chroma(
-    persist_directory=str(chroma_dir),
-    embedding_function=embeddings,
-    collection_name="admission_rules",
-)
-
-logger.info("✅ VectorDB initialized successfully")
+vectorstore = None
+if Chroma is not None:
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2-preview")
+        vectorstore = Chroma(
+            persist_directory=str(chroma_dir),
+            embedding_function=embeddings,
+            collection_name="admission_rules",
+        )
+        logger.info("✅ VectorDB initialized successfully")
+    except Exception as e:
+        logger.warning(f"VectorDB disabled due to initialization error: {e}")
+else:
+    logger.info("VectorDB dependency not installed; running without Chroma")
 
 
 @tool
@@ -77,7 +84,10 @@ def search_admission_rules(
         'Trường: BKA | Năm: 2024 | ...'
     """
     logger.info(f"🔍 Searching admission rules | Query: '{query}' | University: {university} | Year: {year}")
-    
+
+    if vectorstore is None:
+        return "Tạm thời chưa truy cập được cơ sở dữ liệu luật xét tuyển (VectorDB). Vui lòng thử lại sau."
+
     try:
         # Build filter dictionary for metadata filtering
         # Chroma requires filters in a specific format with $and operator for multiple conditions
@@ -134,6 +144,7 @@ def get_historical_scores(
     university: str,
     major: Optional[str] = None,
     year: Optional[str] = None,
+    method_tag: Optional[str] = None,
 ) -> str:
     """
     Truy vấn Điểm Chuẩn Lịch Sử từ MongoDB.
@@ -152,20 +163,21 @@ def get_historical_scores(
         university: Mã trường đại học (Bắt buộc, VD: "BKA", "QHI", "BVH")
         major: Mã ngành học hoặc tên ngành (Tùy chọn, VD: "IT1", "NK", "C01")
         year: Năm xét tuyển (Tùy chọn, VD: "2023", "2024", "2025")
+        method_tag: Tên tag phương thức (Tùy chọn, BẮT BUỘC map vào 1 trong 3: "THPT_QG", "DGTD_TSA", "XET_TUYEN_TAI_NANG")
     
     Returns:
         Chuỗi văn bản chứa thông tin điểm chuẩn lịch sử được định dạng.
         Bao gồm trường, năm, ngành, và các điểm chuẩn tương ứng.
     
     Example:
-        >>> get_historical_scores("BKA", major="IT1", year="2024")
+        >>> get_historical_scores("BKA", major="IT1", year="2024", method_tag="DGTD_TSA")
         'Kết quả tra cứu điểm chuẩn trường BKA...'
     """
     import os
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
     
-    logger.info(f"📊 Fetching historical scores | University: {university} | Major: {major} | Year: {year}")
+    logger.info(f"📊 Fetching historical scores | University: {university} | Major: {major} | Year: {year} | Method: {method_tag}")
     
     client = None
     try:
@@ -189,6 +201,9 @@ def get_historical_scores(
         
         if major:
             query_filter["major_code"] = major
+            
+        if method_tag:
+            query_filter["method_tag"] = method_tag
         
         if year:
             # Convert year to int if provided as string for proper querying

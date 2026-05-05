@@ -16,8 +16,28 @@ function getPageTitle(pathname: string): string {
         return 'Admin Users';
     }
 
-    if (pathname.startsWith('/product')) {
-        return 'Products';
+    if (pathname.startsWith('/profile')) {
+        return 'Profile';
+    }
+
+    if (pathname.startsWith('/personality')) {
+        return 'Personality';
+    }
+
+    if (pathname.startsWith('/admissions/cart')) {
+        return 'Admissions Cart';
+    }
+
+    if (pathname.startsWith('/admissions')) {
+        return 'Admissions';
+    }
+
+    if (pathname.startsWith('/review')) {
+        return 'Review';
+    }
+
+    if (pathname.startsWith('/qa')) {
+        return 'Q&A';
     }
 
     if (pathname.startsWith('/dashboard')) {
