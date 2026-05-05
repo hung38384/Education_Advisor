@@ -1,701 +1,560 @@
-from __future__ import annotations
+"""
+clean_rules_llm.py
 
-import json
+Reads hybrid .md files (output of ingest_pdf.py) and uses Gemini to distill
+them into clean, structured Markdown files ready for ChromaDB chunking.
+
+Naming convention:
+  Input  → data/processed_rules/<UNI>_DeAn<YEAR>.md
+  Output → data/processed_rules/<UNI>_DeAn<YEAR>_clean.md
+"""
+
 import os
-import re
-import unicodedata
 from pathlib import Path
-from typing import Any, Callable
-
+from typing import List
 from dotenv import load_dotenv
 import google.generativeai as genai
 
-ExtractorFn = Callable[[str], str]
+# --- Load API Key ---
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("❌ Không tìm thấy GOOGLE_API_KEY trong file .env")
 
-RAW_MARKER = "\n\n================ RAW DOCUMENT CONTENT BELOW ================"
+genai.configure(api_key=GOOGLE_API_KEY)
 
-STEP_METHODS_PREREQUISITES = "STEP_METHODS_PREREQUISITES"
-STEP_FORMULAS = "STEP_FORMULAS"
-STEP_CONVERSIONS = "STEP_CONVERSIONS"
-STEP_TUITION_FACTS = "STEP_TUITION_FACTS"
-STEP_TIE_BREAKERS = "STEP_TIE_BREAKERS"
-
-FORMULA_BONUS_TOKENS = ("uu tien", "bonus", "khuyen khich")
-
-
-def _remove_accents(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value)
-    normalized = normalized.replace("đ", "d").replace("Đ", "D")
-    return "".join(ch for ch in normalized if not unicodedata.combining(ch)).lower()
+# Gemini 2.5 Flash: context window lớn, lý tưởng cho tài liệu dài
+# (Model sẽ được khởi tạo sau khi định nghĩa MASTER_PROMPT)
 
 
-def _extract_json_object(value: str) -> str:
-    stripped = value.strip()
+# ============================================================================
+# 🧠 MASTER EXTRACTION PROMPT — Phiên bản Nâng cấp Toàn diện
+# ============================================================================
 
-    if stripped.startswith("```"):
-        stripped = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", stripped)
-        stripped = re.sub(r"\s*```$", "", stripped)
+MASTER_PROMPT = """\
+Bạn là một Chuyên gia Phân tích Dữ liệu Tuyển sinh Đại học Việt Nam cực kỳ kỳ tỉ mỉ và chính xác.
+Bạn sẽ nhận một tài liệu Markdown thô được trích xuất từ Đề án Tuyển sinh của một trường đại học.
+Nhiệm vụ của bạn là "lọc vàng" — chắt lọc ra MỌI quy tắc toán học, công thức tính điểm và điều kiện
+xét tuyển theo từng phương thức, đồng thời loại bỏ hoàn toàn những nội dung không liên quan.
 
-    start = stripped.find("{")
-    end = stripped.rfind("}")
-    if start == -1 or end == -1 or end < start:
-        return "{}"
+Kết quả cuối cùng phải là một file Markdown cực kỳ CÔ ĐỌNG, CÓ CẤU TRÚC RÕ RÀNG, và ĐẦY ĐỦ
+đến mức một AI Agent có thể đọc file này và TỰ TÍNH ĐƯỢC điểm xét tuyển của bất kỳ học sinh nào,
+ứng với BẤT KỲ phương thức nào mà trường đó áp dụng.
 
-    return stripped[start : end + 1]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚫 NGHIÊM CẤM TUYỆT ĐỐI (KHÔNG ĐƯA VÀO OUTPUT):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Điểm chuẩn của các năm trước (historical cutoff scores)
+- Học phí, chi phí đào tạo
+- Thống kê việc làm, tỷ lệ có việc sau tốt nghiệp
+- Danh sách giảng viên, bộ môn, thông tin hành chính
+- Thông tin liên hệ (email, điện thoại, địa chỉ)
+- Hệ vừa làm vừa học, văn bằng 2, đào tạo từ xa
+- Các câu văn mô tả, lời dẫn chung chung (chỉ giữ số liệu và quy tắc)
+- Câu mở đầu kiểu "Dưới đây là kết quả trích xuất..." hay "Theo tài liệu..."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ CẤU TRÚC BẮT BUỘC CỦA FILE OUTPUT (THEO THỨ TỰ NÀY):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# [TÊN TRƯỜNG] — Đề án Tuyển sinh [NĂM]
+
+---
+
+## 1. TỔNG QUAN PHƯƠNG THỨC XÉT TUYỂN
+
+Liệt kê TẤT CẢ các phương thức xét tuyển của trường dưới dạng bảng:
+
+| STT | Mã Phương thức | Tên Phương thức | Chỉ tiêu (%) | Đối tượng áp dụng |
+|---|---|---|---|---|
+| 1 | PT1 | ... | ...% | ... |
+| ... | ... | ... | ... | ... |
+
+> Ghi chú: Nếu chỉ tiêu theo số lượng (không phải %), ghi rõ số lượng.
+
+---
+
+## 2. ĐIỀU KIỆN TIÊN QUYẾT & NGƯỠNG ĐẢM BẢO CHẤT LƯỢNG ĐẦU VÀO
+
+Đây là các điều kiện BẮT BUỘC phải đáp ứng TRƯỚC KHI nộp hồ sơ xét tuyển:
+
+- **Ngưỡng điểm học bạ (GPA) sơ tuyển:** [Ghi rõ điều kiện điểm học bạ (GPA) BẮT BUỘC để được nộp hồ sơ xét tuyển cho TẤT CẢ phương thức (kể cả xét điểm thi THPT hay ĐGNL). Ưu tiên tìm các từ khóa như "TBC học tập", "điểm trung bình học tập đạt từ..."]
+- **Tốt nghiệp THPT:** Bắt buộc / Không bắt buộc (ghi rõ từng phương thức)
+- **Hạnh kiểm:** [Yêu cầu tối thiểu nếu có]
+- **Ngưỡng điểm sàn theo phương thức** (nếu trường tự quy định riêng, khác ngưỡng Bộ GD&ĐT):
+
+| Phương thức | Ngưỡng điểm sàn tối thiểu | Ghi chú |
+|---|---|---|
+| ... | ... | ... |
+
+---
+
+## 3. PHƯƠNG THỨC 1: XÉT TUYỂN TÀI NĂNG / ƯU TIÊN / THẲNG
+*(Bỏ qua section này nếu trường không có phương thức này)*
+
+### 3.1 Điều kiện đặc cách
+Liệt kê các trường hợp được xét tuyển thẳng hoặc ưu tiên xét tuyển:
+- Đối tượng 1: [Mô tả, ví dụ: Thủ khoa trường THPT, Giải Olympic quốc tế, ...]
+- Đối tượng 2: [...]
+
+### 3.2 Hồ sơ & quy trình (chỉ giữ thông tin cốt lõi, không lòng vòng)
+
+---
+
+## 4. PHƯƠNG THỨC 2: XÉT HỌC BẠ THPT
+*(Bỏ qua section này nếu trường không có phương thức này)*
+
+### 4.1 Công thức tính điểm xét tuyển học bạ
+
+> **CÔNG THỨC:** [Ghi rõ công thức, ví dụ: ĐXT = (Toán×hệ_số + Văn×hệ_số + Môn_3×hệ_số) / Tổng_hệ_số]
+
+Trong đó:
+- Điểm môn học = Trung bình cộng điểm môn đó qua [N] học kỳ / [N] năm
+- [Giải thích từng thành phần trong công thức]
+
+### 4.2 Tổ hợp môn xét tuyển (theo ngành)
+
+| Mã ngành | Tên ngành | Tổ hợp môn xét tuyển |
+|---|---|---|
+| ... | ... | A00, A01, ... |
+
+### 4.3 Điều kiện phụ (tie-breaker)
+- **Công thức/Quy tắc phụ:** [BẮT BUỘC diễn giải thành công thức toán học hoặc quy tắc logic tĩnh cụ thể. KHÔNG gạch đầu dòng chung chung. Ví dụ: "Tiêu chí 1: Điểm Toán > X. Tiêu chí 2: Tổng điểm 3 môn gốc không nhân hệ số > Y". Liệt kê rõ: Tiêu chí ưu tiên 1, Tiêu chí ưu tiên 2...]
+
+---
+
+## 5. PHƯƠNG THỨC 3: XÉT ĐIỂM THI TỐT NGHIỆP THPT QUỐC GIA (THPT QG)
+*(Bỏ qua section này nếu trường không có phương thức này)*
+
+### 5.1 Công thức tính điểm xét tuyển THPT QG
+
+**5.1.a — Công thức KHÔNG nhân hệ số môn chính:**
+> **ĐXT = Môn_1 + Môn_2 + Môn_3** (Thang 30)
+
+**5.1.b — Công thức CÓ nhân hệ số môn chính (nếu áp dụng):**
+> **ĐXT = Môn_1 + Môn_2 + (Môn_chính × Hệ_số)** → Quy về thang [X]
+> *Ví dụ: Hệ số 2 cho môn Toán trong khối A, hoặc hệ số nhân 2 rồi chia 4*
+
+**5.1.c — Điểm cộng ưu tiên:**
+> ĐXT_cuối = ĐXT + Điểm_ưu_tiên_đối_tượng + Điểm_ưu_tiên_khu_vực
+
+### 5.2 Tổ hợp môn xét tuyển (theo ngành)
+*(Giống cấu trúc bảng ở mục 4.2)*
+
+### 5.3 Điều kiện phụ (tie-breaker)
+- **Công thức/Quy tắc phụ:** [BẮT BUỘC diễn giải thành công thức toán học hoặc quy tắc logic tĩnh cụ thể. KHÔNG gạch đầu dòng chung chung. Ví dụ: "Tiêu chí 1: Tổng điểm 3 môn gốc không nhân hệ số". Liệt kê rõ: Tiêu chí ưu tiên 1, Tiêu chí ưu tiên 2...]
+
+---
+
+## 6. PHƯƠNG THỨC 4: XÉT KẾT QUẢ THI ĐÁNH GIÁ TƯ DUY (TSA — ĐH Bách Khoa)
+*(Bỏ qua section này nếu trường không có phương thức này)*
+
+### 6.1 Công thức tính điểm xét tuyển theo TSA
+
+> **ĐXT = (Điểm_TSA / Hệ_số_quy_đổi) + Điểm_môn_bổ_trợ × Hệ_số**
+> *Ghi rõ công thức chính xác từ tài liệu. Ghi rõ thang điểm TSA (150 hay 300?).*
+
+### 6.2 Tổ hợp & ngành áp dụng
+*(Giống cấu trúc bảng ở mục 4.2)*
+
+---
+
+## 7. PHƯƠNG THỨC 5: XÉT KẾT QUẢ THI ĐÁNH GIÁ NĂNG LỰC (ĐGNL)
+*(Bỏ qua section này nếu trường không có phương thức này)*
+
+### 7.1 Phân biệt loại bài thi ĐGNL
+> Trường chấp nhận bài thi ĐGNL nào? (Khoanh vào các loại áp dụng)
+- [ ] ĐGNL của ĐHQG Hà Nội (HSA) — Thang điểm: 150
+- [ ] ĐGNL của ĐHQG TP.HCM (APT) — Thang điểm: 1200
+- [ ] ĐGNL chung khác
+
+### 7.2 Công thức tính điểm xét tuyển theo ĐGNL
+
+**Nếu dùng HSA (thang 150):**
+> **ĐXT = Điểm_HSA / [Hệ_số_quy_đổi]** hoặc **ĐXT = Điểm_HSA × [Hệ_số_nhân]**
+
+**Nếu dùng APT (thang 1200):**
+> **ĐXT = Điểm_APT / [Hệ_số_quy_đổi]**
+
+*(Trích nguyên văn công thức từ tài liệu nếu khác với trên)*
+
+---
+
+## 8. PHƯƠNG THỨC 6: XÉT KHẾ HỢP CHỨNG CHỈ NGOẠI NGỮ QUỐC TẾ
+*(Bỏ qua section này nếu trường không có phương thức này)*
+
+Đây là phương thức KẾT HỢP điểm thi + chứng chỉ ngoại ngữ (IELTS/TOEFL/TOEIC...).
+
+### 8.1 Công thức tính điểm xét tuyển kết hợp
+
+> **ĐXT = Môn_1 + Môn_2 + Điểm_Ngoại_ngữ_quy_đổi_từ_chứng_chỉ**
+> *(Ghi rõ: môn nào được thay thế bởi chứng chỉ, thang điểm tổng là bao nhiêu?)*
+
+### 8.2 Bảng quy đổi điểm chứng chỉ Ngoại ngữ (TRỢ THAY THẾ môn Tiếng Anh THPT)
+
+> **Quy tắc sử dụng điểm quy đổi:** [BẮT BUỘC TRÍCH XUẤT: Có được cộng dồn điểm chứng chỉ với điểm thi môn Ngoại ngữ không? Hay CHỈ ĐƯỢC CHỌN 1 TRONG 2 (lấy điểm chứng chỉ hoặc điểm thi - điểm nào cao hơn thì lấy)? Chứng chỉ cần thay thế cho kỳ thi nào (THPT QG, ĐGNL, hay xét học bạ)?]
+
+| Chứng chỉ | Mức điểm chứng chỉ | Điểm Tiếng Anh quy đổi (thang 10) |
+|---|---|---|
+| IELTS | ... - ... | ... |
+| IELTS | ... - ... | ... |
+| TOEFL iBT | ... - ... | ... |
+| TOEIC | ... - ... | ... |
+| VSTEP | Bậc ... | ... |
+| Cambridge | Grade ... | ... |
+
+*(Ghi đầy đủ tất cả mức điểm từ thấp đến cao được liệt kê trong tài liệu)*
+
+### 8.3 Điểm THƯỞNG cho chứng chỉ Ngoại ngữ (nếu có, khác với điểm quy đổi)
+
+> **Quy tắc:** Điểm thưởng được cộng THÊM vào điểm xét tuyển THPT QG (không phải thay thế).
+
+| Chứng chỉ | Mức điểm | Điểm thưởng cộng thêm |
+|---|---|---|
+| IELTS | >= ... | + ... |
+| ... | ... | ... |
+
+*(Nếu trường vừa có quy đổi vừa có điểm thưởng, hãy làm rõ: hai loại này được dùng trong phương thức nào, không được dùng đồng thời)*
+
+---
+
+## 9. PHƯƠNG THỨC ĐẶC BIỆT KHÁC
+*(Bỏ qua section này nếu trường không có)*
+
+Mô tả ngắn gọn bất kỳ phương thức nào chưa được liệt kê trên, ví dụ:
+- Xét tuyển theo chứng chỉ quốc tế (SAT, ACT, A-Level, IB, v.v.)
+- Xét tuyển dành cho học sinh trường THPT chuyên / năng khiếu
+- Phỏng vấn / kiểm tra năng khiếu đặc thù (Kiến trúc, Mỹ thuật, Thể dục...)
+- Xét tuyển dành cho người tốt nghiệp nước ngoài
+
+Với mỗi phương thức đặc biệt, cần ghi rõ:
+- Điều kiện để nộp hồ sơ
+- Cách tính điểm (nếu có)
+- Ngành áp dụng
+
+---
+
+## 10. CHÚ Ý ĐẶC BIỆT THEO NGÀNH (nếu có)
+
+Một số ngành có quy định riêng biệt khác với quy định chung của trường:
+
+| Mã ngành | Tên ngành | Quy định/Điều kiện đặc thù |
+|---|---|---|
+| ... | ... | Ví dụ: Yêu cầu môn Vẽ, không áp dụng PT3, chỉ tiêu IELTS cao hơn... |
+
+---
+
+## 11. BẢNG TÓM TẮT NHANH CHO AI AGENT
+
+Phần này là bảng tổng hợp DÀNH RIÊNG để AI đọc và tính toán nhanh. Phải điền đầy đủ.
+
+| Thông tin | Giá trị |
+|---|---|
+| Tên trường | [Tên đầy đủ] |
+| Mã trường (TS247) | [Ví dụ: BKA] |
+| Năm Đề án | [Năm] |
+| Các phương thức xét tuyển | [PT1, PT2, PT3, ...] |
+| Thang điểm THPT QG | 30 |
+| Thang điểm ĐGNL HSA | 150 (nếu áp dụng) |
+| Thang điểm TSA | 150 hoặc 300 (nếu áp dụng) |
+| Có nhân hệ số môn chính? | Có / Không |
+| Có điểm thưởng ngoại ngữ? | Có / Không |
+| Có quy đổi chứng chỉ ngoại ngữ? | Có / Không |
+| Điểm sàn tối thiểu THPT QG | [Số điểm] |
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ HƯỚNG DẪN THỰC THI:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ TÀI LIỆU CÓ 2 PHẦN — ĐỌC CẢ HAI TRƯỚC KHI VIẾT OUTPUT:
+  • PART 1 (MarkItDown): Nguồn chính xác cho CÔNG THỨC và CHỮ. Bảng trong PART 1
+    có thể bị vỡ định dạng — KHÔNG dùng bảng từ PART 1.
+  • PART 2 (LlamaCloud): Nguồn chính xác cho BẢNG BIỂU. Dùng bảng từ PART 2 thay
+    thế cho bảng tương ứng trong PART 1. Nếu PART 2 trống → dùng bảng từ PART 1.
+
+1. Đọc TOÀN BỘ tài liệu (cả PART 1 lẫn PART 2) để nắm toàn bộ nội dung.
+2. Chỉ giữ lại section liên quan đến tuyển sinh. BỎ QUA section trống.
+3. Bảng biểu: LẤY TỪ PART 2 (LlamaCloud) — giữ nguyên tất cả rows, không lược bỏ.
+4. Công thức tính điểm: LẤY TỪ PART 1 (MarkItDown) — trích nguyên văn trước,
+   sau đó diễn giải bằng ký hiệu toán học.
+5. Nếu mâu thuẫn giữa PART 1 và PART 2: GHI CẢ HAI, đánh dấu ⚠️.
+6. Output bằng tiếng Việt. Không có câu dẫn. Bắt đầu thẳng vào `# [TÊN TRƯỜNG]...`.
+
+================================================================================
+NỘI DUNG TÀI LIỆU THÔ (BẮT ĐẦU TỪ ĐÂY):
+================================================================================
+"""
+
+SYSTEM_PROMPT = (
+    "Bạn là một Chuyên gia Phân tích Dữ liệu Tuyển sinh Đại học Việt Nam cực kỳ tỉ mỉ và chính xác. "
+    "Nhiệm vụ của bạn là chắt lọc quy tắc tuyển sinh từ tài liệu thô một cách có cấu trúc."
+)
+
+# Khởi tạo model với SYSTEM INSTRUCTION ngắn gọn để định hình vai trò
+model = genai.GenerativeModel(
+    "gemini-2.5-flash",
+    system_instruction=SYSTEM_PROMPT
+)
 
 
-def _safe_json_loads(value: str) -> dict[str, Any]:
-    try:
-        return json.loads(_extract_json_object(value))
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON from extractor: {exc}") from exc
+
+# ============================================================================
+# Markdown Normalizer (fixes Gemini single-line output)
+# ============================================================================
+
+import re
+
+def normalize_newlines(text: str) -> str:
+    """
+    Gemini API đôi khi trả về markdown không có ký tự newline chuẩn—
+    tất cả nội dung nằm trong 1 dòng dài. Hàm này phục hồi định dạng.
+    """
+    # Chuẩn hóa CRLF → LF
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Đảm bảo heading H1-H4 có blank line trước và sau
+    text = re.sub(r'(?<!\n)(#{1,4} )', r'\n\n\1', text)
+    text = re.sub(r'(#{1,4} .+?)(?=\n)', r'\1\n', text)
+
+    # Đã xóa dòng lệnh tự động thêm newline trước '|' vì nó phá nát bảng Markdown.
+
+    # Đảm bảo dấu phân tách --- có newline trước và sau
+    text = re.sub(r'(?<!\n)(---+)', r'\n\1', text)
+    text = re.sub(r'(---+)(?!\n)', r'\1\n', text)
+
+    # Đảm bảo dấu gạch ngang ━ (decorative divider) có newline
+    text = re.sub(r'(?<!\n)(━{3,})', r'\n\1', text)
+    text = re.sub(r'(━{3,})(?!\n)', r'\1\n', text)
+
+    # Bullet points phải có newline trước
+    text = re.sub(r'(?<!\n)(- )', r'\n\1', text)
+    text = re.sub(r'(?<!\n)(\d+\. )', r'\n\1', text)
+
+    # Dọn dẹp blank lines thừa (>2 blank lines → 2 blank lines)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text.strip() + "\n"
 
 
-def normalize_tuition_amount(value: Any) -> float | None:
-    if isinstance(value, (int, float)):
-        return float(value)
+# ============================================================================
+# Chunking Helpers
+# ============================================================================
 
-    if not isinstance(value, str):
-        return None
+# Kích thước tối đa mỗi chunk (ký tự). ~40K ký tự ≈ 10K tokens (an toàn)
+CHUNK_SIZE = 40_000
 
-    text = value.strip()
-    if not text:
-        return None
-
-    match = re.search(r"\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?|\d+(?:[.,]\d+)?", text)
-    if not match:
-        return None
-
-    number = match.group(0)
-
-    if "," in number and "." in number:
-        last_comma = number.rfind(",")
-        last_dot = number.rfind(".")
-        decimal_separator = "," if last_comma > last_dot else "."
-        thousand_separator = "." if decimal_separator == "," else ","
-        number = number.replace(thousand_separator, "")
-        number = number.replace(decimal_separator, ".")
-    elif "," in number:
-        parts = number.split(",")
-        if len(parts) > 1 and all(len(part) == 3 for part in parts[1:]):
-            number = "".join(parts)
-        else:
-            number = number.replace(",", ".")
-    elif "." in number:
-        parts = number.split(".")
-        if len(parts) > 1 and all(len(part) == 3 for part in parts[1:]):
-            number = "".join(parts)
-
-    try:
-        return float(number)
-    except ValueError:
-        return None
+# Nếu output < ngưỡng này → coi là lỗi, cần chạy lại
+MIN_OUTPUT_CHARS = 500
 
 
-def _normalize_method_code(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
+def split_into_chunks(text: str, chunk_size: int = CHUNK_SIZE) -> List[str]:
+    """
+    Chia text thành các chunks <= chunk_size ký tự.
+    Cố gắng cắt tại ranh giới dòng để tránh vỡ giữa bảng.
+    """
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        if end < len(text):
+            # Tìm newline gần nhất để cắt gọn
+            newline_pos = text.rfind("\n", start, end)
+            if newline_pos > start:
+                end = newline_pos + 1
+        chunks.append(text[start:end])
+        start = end
+    return chunks
 
 
-def _build_source_evidence(raw_value: Any) -> list[dict[str, Any]]:
-    if isinstance(raw_value, list):
-        evidence_list: list[dict[str, Any]] = []
-        for item in raw_value:
-            if isinstance(item, dict):
-                evidence_list.append(item)
-            elif isinstance(item, str) and item.strip():
-                evidence_list.append({"quote": item.strip()})
-        return evidence_list
+CHUNK_PROMPT_TEMPLATE = """\
+Bạn là chuyên gia trích xuất dữ liệu tuyển sinh đại học.
+Đây là PHẦN {chunk_idx}/{total_chunks} của tài liệu đề án tuyển sinh.
 
-    if isinstance(raw_value, str) and raw_value.strip():
-        return [{"quote": raw_value.strip()}]
+NHIỆM VỤ: Trích xuất TẤT CẢ thông tin tuyển sinh trong đoạn này ra định dạng Markdown cấu trúc.
+- Giữ NGUYÊN VẸN tất cả con số, tỷ lệ, điểm chuẩn, mã ngành, mã phương thức.
+- Giữ NGUYÊN VẸN tất cả bảng biểu (Markdown table format).
+- Giữ NGUYÊN VẸN tất cả công thức tính điểm.
+- KHÔNG thêm, KHÔNG bịa, KHÔNG lược bỏ dữ liệu.
+- Nếu đoạn này không chứa thông tin tuyển sinh (ví dụ: danh sách việc làm, cam kết chất lượng) → trả về chuỗi rỗng.
 
-    return []
+OUTPUT: Markdown thuần túy, tiếng Việt.
 
-
-def _extract_formula_bonus(expression: str) -> float | None:
-    text = _remove_accents(expression)
-
-    for token in FORMULA_BONUS_TOKENS:
-        match = re.search(rf"{token}\s*[:=]?\s*(\d+(?:[\.,]\d+)?)", text)
-        if match:
-            return normalize_tuition_amount(match.group(1))
-
-    return None
+NỘI DUNG CẦN TRÍCH XUẤT:
+================================================================================
+{chunk_content}
+================================================================================
+"""
 
 
-def _parse_formula_expression(
-    expression: str,
-) -> tuple[list[str], dict[str, float], float | None]:
-    if not isinstance(expression, str) or not expression.strip():
-        return [], {}, None
-
-    normalized_expr = _remove_accents(expression)
-    tokens = re.findall(r"[a-zA-ZÀ-ỹđĐ]+", expression)
-
-    subjects: list[str] = []
-    coefficients: dict[str, float] = {}
-
-    for token in tokens:
-        token_clean = token.strip()
-        token_ascii = _remove_accents(token_clean)
-
-        if token_ascii in {
-            "toan",
-            "van",
-            "anh",
-            "ly",
-            "hoa",
-            "sinh",
-            "su",
-            "dia",
-            "gdcd",
-            "tin",
-            "congnghe",
-        }:
-            canonical = token_clean.capitalize()
-            if canonical not in subjects:
-                subjects.append(canonical)
-
-    for subject in subjects:
-        subject_ascii = _remove_accents(subject)
-        match = re.search(
-            rf"{subject_ascii}\s*\*\s*(\d+(?:[\.,]\d+)?)", _remove_accents(expression)
-        )
-        if match:
-            coeff = normalize_tuition_amount(match.group(1))
-            coefficients[subject] = coeff if coeff is not None else 1.0
-        else:
-            coefficients[subject] = 1.0
-
-    bonus = _extract_formula_bonus(normalized_expr)
-    return subjects, coefficients, bonus
-
-
-def _normalize_formula_item(item: dict[str, Any]) -> dict[str, Any]:
-    normalized_item = dict(item)
-    expression = str(normalized_item.get("expression") or "").strip()
-    normalized_item["expression"] = expression
-
-    subjects, coefficients, bonus = _parse_formula_expression(expression)
-
-    if isinstance(normalized_item.get("subjects"), list):
-        subjects = [
-            str(s).strip()
-            for s in normalized_item.get("subjects", [])
-            if str(s).strip()
-        ] or subjects
-
-    if isinstance(normalized_item.get("coefficients"), dict):
-        parsed_coefficients: dict[str, float] = {}
-        for key, value in normalized_item["coefficients"].items():
-            parsed = normalize_tuition_amount(value)
-            if parsed is not None:
-                parsed_coefficients[str(key)] = parsed
-        if parsed_coefficients:
-            coefficients = parsed_coefficients
-
-    if isinstance(normalized_item.get("bonus"), (int, float, str)):
-        parsed_bonus = normalize_tuition_amount(normalized_item.get("bonus"))
-        bonus = parsed_bonus if parsed_bonus is not None else bonus
-
-    tie_breakers = normalized_item.get("tie_breakers")
-    if not isinstance(tie_breakers, list):
-        tie_breakers = []
-
-    if not tie_breakers:
-        expression_ascii = _remove_accents(expression)
-        if "neu bang diem" in expression_ascii and "toan" in expression_ascii:
-            tie_breakers = [{"condition": "equal_score", "priority_subject": "Toán"}]
-
-    source_evidence = _build_source_evidence(normalized_item.get("source_evidence"))
-
-    normalized_item["subjects"] = subjects
-    normalized_item["coefficients"] = coefficients
-    normalized_item["bonus"] = bonus
-    normalized_item["tie_breakers"] = tie_breakers
-    normalized_item["source_evidence"] = source_evidence
-
-    return normalized_item
-
-
-def normalize_structured_data(payload: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(payload)
-
-    methods = normalized.get("admission_methods")
-    if isinstance(methods, list):
-        for item in methods:
-            if not isinstance(item, dict):
-                continue
-            item["method_code"] = _normalize_method_code(item.get("method_code"))
-            item["source_evidence"] = _build_source_evidence(
-                item.get("source_evidence")
+def call_gemini_with_retry(prompt: str, retries: int = 2) -> str:
+    """Gọi Gemini với retry đơn giản nếu thất bại."""
+    for attempt in range(retries + 1):
+        try:
+            # Tắt toàn bộ Safety Filters để tránh bị chặn bởi các từ khóa chuyên ngành như "Kỹ thuật Hạt nhân"
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+            ]
+            response = model.generate_content(
+                prompt,
+                safety_settings=safety_settings,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.2,  # Tăng nhẹ để tránh bị kẹt output
+                ),
             )
-
-    formulas = normalized.get("formulas")
-    if isinstance(formulas, list):
-        normalized["formulas"] = [
-            _normalize_formula_item(item) if isinstance(item, dict) else item
-            for item in formulas
-        ]
-
-    tuition_facts = normalized.get("tuition_facts")
-    if isinstance(tuition_facts, list):
-        for item in tuition_facts:
-            if not isinstance(item, dict):
-                continue
-            item["amount"] = normalize_tuition_amount(item.get("amount"))
-            item["source_evidence"] = _build_source_evidence(
-                item.get("source_evidence")
-            )
-
-    tie_breakers = normalized.get("tie_breakers")
-    if isinstance(tie_breakers, list):
-        normalized_tie_breakers: list[dict[str, Any]] = []
-        for item in tie_breakers:
-            if not isinstance(item, dict):
-                continue
-            item_copy = dict(item)
-            item_copy["source_evidence"] = _build_source_evidence(
-                item_copy.get("source_evidence")
-            )
-            normalized_tie_breakers.append(item_copy)
-        normalized["tie_breakers"] = normalized_tie_breakers
-    else:
-        normalized["tie_breakers"] = []
-
-    source_evidence = normalized.get("source_evidence")
-    normalized["source_evidence"] = _build_source_evidence(source_evidence)
-
-    return normalized
-
-
-def _has_tuition_signal(raw_content: str) -> bool:
-    text = _remove_accents(raw_content)
-    return any(token in text for token in ("hoc phi", "trieu dong", "dong/nam", "vnd"))
-
-
-def _extract_method_codes_from_raw(raw_content: str) -> set[str]:
-    text = _remove_accents(raw_content)
-    candidates = re.findall(r"phuong thuc\s*(?:xet tuyen\s*)?(\d{3})", text)
-    return {candidate.strip() for candidate in candidates}
-
-
-def _has_formula_signal(raw_content: str) -> bool:
-    text = _remove_accents(raw_content)
-    return any(token in text for token in ("cong thuc", "tinh diem", "he so"))
-
-
-def validate_structured_data(raw_content: str, structured: dict[str, Any]) -> list[str]:
-    errors: list[str] = []
-
-    tuition_facts = structured.get("tuition_facts")
-    has_tuition_facts = isinstance(tuition_facts, list) and len(tuition_facts) > 0
-
-    top_level_tie_breakers = structured.get("tie_breakers")
-    has_tie_breakers = (
-        isinstance(top_level_tie_breakers, list) and len(top_level_tie_breakers) > 0
-    )
-
-    if _has_tuition_signal(raw_content) and not has_tuition_facts:
-        errors.append("Thiếu tuition_facts dù raw có tín hiệu học phí.")
-
-    if has_tuition_facts:
-        valid_amount_count = 0
-        for item in tuition_facts:
-            if isinstance(item, dict) and isinstance(item.get("amount"), (int, float)):
-                valid_amount_count += 1
-        if valid_amount_count == 0:
-            errors.append("tuition_facts có dữ liệu nhưng không có amount hợp lệ.")
-
-    raw_method_codes = _extract_method_codes_from_raw(raw_content)
-    structured_method_codes: set[str] = set()
-    methods = structured.get("admission_methods")
-    if isinstance(methods, list):
-        for item in methods:
-            if isinstance(item, dict):
-                method_code = _normalize_method_code(item.get("method_code"))
-                if method_code:
-                    structured_method_codes.add(method_code)
-
-    missing_method_codes = sorted(
-        code for code in raw_method_codes if code not in structured_method_codes
-    )
-    if missing_method_codes:
-        errors.append(
-            "Thiếu method_code trong structured so với raw: "
-            + ", ".join(missing_method_codes)
-        )
-
-    formulas = structured.get("formulas")
-    if _has_formula_signal(raw_content):
-        has_complete_formula = False
-        has_formula_tie_breakers = False
-        has_formula_source_evidence = False
-        if isinstance(formulas, list):
-            for item in formulas:
-                if not isinstance(item, dict):
+            try:
+                # Tránh lỗi ValueError khi parts rỗng
+                if response.candidates:
+                    first_candidate = response.candidates[0]
+                    
+                    if first_candidate.finish_reason != 1:
+                        print(f"   ⚠️  CẢNH BÁO: Gemini dừng bất thường (finish_reason={first_candidate.finish_reason}). "
+                              f"Có thể do bộ lọc Safety hoặc Max Tokens.")
+                              
+                    if not first_candidate.content.parts:
+                        print(f"   ⚠️  Lần {attempt+1} trả về kết quả rỗng (finish_reason={first_candidate.finish_reason}). Thử lại...")
+                        if attempt < retries:
+                            continue
+                        return ""
+                return response.text or ""
+            except ValueError as ve:
+                print(f"   ⚠️  Lần {attempt+1} lỗi trích xuất text: {ve}. Thử lại...")
+                if attempt < retries:
                     continue
-                expression = str(item.get("expression") or "").strip()
-                subjects = item.get("subjects")
-                coefficients = item.get("coefficients")
-                tie_breakers = item.get("tie_breakers")
-                source_evidence = item.get("source_evidence")
-
-                if (
-                    expression
-                    and isinstance(subjects, list)
-                    and isinstance(coefficients, dict)
-                    and subjects
-                    and coefficients
-                ):
-                    has_complete_formula = True
-                if isinstance(tie_breakers, list) and tie_breakers:
-                    has_formula_tie_breakers = True
-                if isinstance(source_evidence, list) and source_evidence:
-                    has_formula_source_evidence = True
-
-        if not has_complete_formula:
-            errors.append(
-                "Thiếu formula đầy đủ (expression/subjects/coefficients) dù raw có tín hiệu công thức."
-            )
-
-        raw_ascii = _remove_accents(raw_content)
-        if "neu bang diem" in raw_ascii and not (
-            has_formula_tie_breakers or has_tie_breakers
-        ):
-            errors.append(
-                "Raw có tín hiệu tie-breaker nhưng structured thiếu tie_breakers."
-            )
-
-        if not has_formula_source_evidence and not structured.get("source_evidence"):
-            errors.append("Thiếu source_evidence cho phần formulas.")
-
-    return errors
-
-
-def _render_list(items: list[Any], empty_text: str = "Không có dữ liệu.") -> list[str]:
-    if not items:
-        return [f"- {empty_text}"]
-    return [f"- {item}" for item in items]
-
-
-def render_clean_markdown(structured: dict[str, Any], source_name: str = "") -> str:
-    methods = structured.get("admission_methods") or []
-    prerequisites = structured.get("prerequisites") or []
-    formulas = structured.get("formulas") or []
-    conversions = structured.get("conversions") or []
-    tuition_facts = structured.get("tuition_facts") or []
-
-    lines: list[str] = ["# Quy tắc xét tuyển đã chuẩn hoá"]
-    if source_name:
-        lines.append("")
-        lines.append(f"Nguồn: {source_name}")
-
-    lines.extend(["", "## 1. Các phương thức xét tuyển"])
-    if methods:
-        for item in methods:
-            if isinstance(item, dict):
-                code = item.get("method_code") or ""
-                name = item.get("method_name") or ""
-                if code and name:
-                    lines.append(f"- [{code}] {name}")
-                elif name:
-                    lines.append(f"- {name}")
-                elif code:
-                    lines.append(f"- Mã phương thức: {code}")
-    else:
-        lines.append("- Không có dữ liệu.")
-
-    lines.extend(["", "## 2. Điều kiện tiên quyết"])
-    lines.extend(_render_list(prerequisites))
-
-    lines.extend(["", "## 3. Công thức tính điểm xét tuyển"])
-    if formulas:
-        for item in formulas:
-            if isinstance(item, dict):
-                name = item.get("name") or "Công thức"
-                expression = item.get("expression") or ""
-                lines.append(f"- {name}: {expression}".strip())
+                return ""
+        except Exception as e:
+            if attempt < retries:
+                print(f"   ⚠️  Lần {attempt+1} thất bại: {e}. Thử lại...")
             else:
-                lines.append(f"- {item}")
-    else:
-        lines.append("- Không có dữ liệu.")
-
-    lines.extend(["", "## 4. Bảng quy đổi chứng chỉ ngoại ngữ"])
-    if conversions:
-        for item in conversions:
-            if isinstance(item, dict):
-                from_value = item.get("from") or ""
-                to_value = item.get("to") or ""
-                lines.append(f"- {from_value} -> {to_value}".strip())
-            else:
-                lines.append(f"- {item}")
-    else:
-        lines.append("- Không có dữ liệu.")
-
-    lines.extend(["", "## 5. Học phí"])
-    if tuition_facts:
-        for item in tuition_facts:
-            if isinstance(item, dict):
-                program = item.get("program_name") or "Chương trình"
-                amount = item.get("amount")
-                unit = item.get("unit") or "triệu đồng/năm"
-                if isinstance(amount, (int, float)):
-                    lines.append(f"- {program}: {amount:g} {unit}")
-                else:
-                    lines.append(f"- {program}: {unit}")
-            else:
-                lines.append(f"- {item}")
-    else:
-        lines.append("- Không có dữ liệu.")
-
-    lines.append("")
-    return "\n".join(lines)
+                raise
+    return ""  # fallback
 
 
-def _build_step_prompt(
-    raw_filename: str, step_marker: str, instruction: str, raw_content: str
-) -> str:
-    return (
-        f"{step_marker}\n"
-        "Bạn là chuyên gia trích xuất dữ liệu đề án tuyển sinh.\n"
-        f"Tệp nguồn: {raw_filename}\n"
-        "Chỉ trả về JSON hợp lệ, không thêm giải thích.\n"
-        f"Yêu cầu: {instruction}\n"
-        f"{RAW_MARKER}\n\n"
-        f"{raw_content}"
-    )
+# ============================================================================
+# Main Logic
+# ============================================================================
 
+def clean_admission_rules(force_reprocess: bool = False):
+    base_dir = Path(__file__).parent.parent
+    processed_dir = base_dir / "data" / "processed_rules"
 
-def _step_instructions() -> list[tuple[str, str]]:
-    return [
-        (
-            STEP_METHODS_PREREQUISITES,
-            (
-                "Trích xuất admission_methods và prerequisites, kèm source_evidence nếu có. "
-                'JSON mẫu: {"admission_methods":[{"method_code":"409","method_name":"...","source_evidence":[{"quote":"..."}]}],"prerequisites":["..."],"source_evidence":[{"quote":"..."}]}'
-            ),
-        ),
-        (
-            STEP_FORMULAS,
-            (
-                "Trích xuất formulas và tie_breakers, kèm source_evidence nếu có. "
-                'JSON mẫu: {"formulas":[{"name":"THPT","expression":"(Toan+Van+Anh)/3","tie_breakers":[{"condition":"equal_score","priority_subject":"Toán"}],"source_evidence":[{"quote":"..."}]}],"tie_breakers":[{"condition":"equal_score","priority_subject":"Toán"}]}'
-            ),
-        ),
-        (
-            STEP_CONVERSIONS,
-            (
-                "Trích xuất conversions cho quy đổi chứng chỉ, kèm source_evidence nếu có. "
-                'JSON mẫu: {"conversions":[{"from":"IELTS 6.5","to":"9.5 điểm tiếng Anh","source_evidence":[{"quote":"..."}]}]}'
-            ),
-        ),
-        (
-            STEP_TUITION_FACTS,
-            (
-                "Trích xuất tuition_facts, kèm source_evidence nếu có. "
-                'JSON mẫu: {"tuition_facts":[{"program_name":"Ngôn ngữ Anh","amount":"22,9","unit":"triệu đồng/năm","source_evidence":[{"quote":"..."}]}]}'
-            ),
-        ),
-        (
-            STEP_TIE_BREAKERS,
-            (
-                "Trích xuất tie_breakers tổng quát của đề án. "
-                'JSON mẫu: {"tie_breakers":[{"condition":"equal_score","priority_subject":"Toán","source_evidence":[{"quote":"..."}]}]}'
-            ),
-        ),
-    ]
-
-
-def _get_default_extractor() -> ExtractorFn:
-    load_dotenv()
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        raise ValueError("Không tìm thấy GOOGLE_API_KEY trong file .env")
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
-
-    def _extract(prompt: str) -> str:
-        response = model.generate_content(prompt)
-        return getattr(response, "text", "") or ""
-
-    return _extract
-
-
-def extract_structured_data(
-    raw_filename: str, raw_content: str, extractor: ExtractorFn
-) -> dict[str, Any]:
-    result: dict[str, Any] = {
-        "admission_methods": [],
-        "prerequisites": [],
-        "formulas": [],
-        "conversions": [],
-        "tuition_facts": [],
-        "tie_breakers": [],
-        "source_evidence": [],
-    }
-
-    for marker, instruction in _step_instructions():
-        prompt = _build_step_prompt(raw_filename, marker, instruction, raw_content)
-        response_text = extractor(prompt)
-        payload = _safe_json_loads(response_text)
-
-        for key in result.keys():
-            value = payload.get(key)
-            if isinstance(value, list):
-                result[key].extend(value)
-
-    return result
-
-
-def compute_field_metrics(
-    gold_structured: dict[str, Any], predicted_structured: dict[str, Any]
-) -> dict[str, float]:
-    def _safe_div(numerator: float, denominator: float) -> float:
-        if denominator == 0:
-            return 0.0
-        return numerator / denominator
-
-    def _coverage_score(predicted_count: float, gold_count: float) -> float:
-        if gold_count == 0:
-            return 1.0 if predicted_count == 0 else 0.0
-        return min(1.0, _safe_div(predicted_count, gold_count))
-
-    gold_methods = {
-        code
-        for item in gold_structured.get("admission_methods", [])
-        if isinstance(item, dict)
-        for code in [_normalize_method_code(item.get("method_code"))]
-        if code
-    }
-    pred_methods = {
-        code
-        for item in predicted_structured.get("admission_methods", [])
-        if isinstance(item, dict)
-        for code in [_normalize_method_code(item.get("method_code"))]
-        if code
-    }
-
-    method_tp = float(len(gold_methods & pred_methods))
-    method_precision = _safe_div(method_tp, float(len(pred_methods)))
-    method_recall = _safe_div(method_tp, float(len(gold_methods)))
-    method_f1 = _safe_div(
-        2 * method_precision * method_recall, method_precision + method_recall
-    )
-
-    def _formula_complete_count(payload: dict[str, Any]) -> int:
-        formulas = payload.get("formulas")
-        if not isinstance(formulas, list):
-            return 0
-        count = 0
-        for item in formulas:
-            if not isinstance(item, dict):
-                continue
-            expression = str(item.get("expression") or "").strip()
-            subjects = item.get("subjects")
-            coefficients = item.get("coefficients")
-            if (
-                expression
-                and isinstance(subjects, list)
-                and subjects
-                and isinstance(coefficients, dict)
-                and coefficients
-            ):
-                count += 1
-        return count
-
-    gold_formula_total = float(len(gold_structured.get("formulas", []) or []))
-    pred_formula_complete = float(_formula_complete_count(predicted_structured))
-    formula_completeness_rate = _safe_div(pred_formula_complete, gold_formula_total)
-
-    gold_tie_breakers = float(len(gold_structured.get("tie_breakers", []) or []))
-    pred_tie_breakers = float(len(predicted_structured.get("tie_breakers", []) or []))
-    tie_breaker_coverage = _coverage_score(pred_tie_breakers, gold_tie_breakers)
-
-    gold_evidence = float(len(gold_structured.get("source_evidence", []) or []))
-    pred_evidence = float(len(predicted_structured.get("source_evidence", []) or []))
-    source_evidence_coverage = _coverage_score(pred_evidence, gold_evidence)
-
-    overall_score = (
-        method_f1
-        + formula_completeness_rate
-        + tie_breaker_coverage
-        + source_evidence_coverage
-    ) / 4.0
-
-    return {
-        "method_code_precision": method_precision,
-        "method_code_recall": method_recall,
-        "method_code_f1": method_f1,
-        "formula_completeness_rate": formula_completeness_rate,
-        "tie_breaker_coverage": tie_breaker_coverage,
-        "source_evidence_coverage": source_evidence_coverage,
-        "overall_score": overall_score,
-    }
-
-
-def process_raw_file(
-    raw_path: Path, extractor: ExtractorFn | None = None
-) -> tuple[Path, Path]:
-    extractor = extractor or _get_default_extractor()
-
-    raw_content = raw_path.read_text(encoding="utf-8")
-    structured = extract_structured_data(raw_path.name, raw_content, extractor)
-    structured = normalize_structured_data(structured)
-
-    errors = validate_structured_data(raw_content, structured)
-    if errors:
-        raise ValueError("; ".join(errors))
-
-    structured_path = raw_path.with_name(
-        raw_path.name.replace("_raw.md", "_structured.json")
-    )
-    clean_path = raw_path.with_name(raw_path.name.replace("_raw.md", "_clean.md"))
-
-    structured_path.write_text(
-        json.dumps(structured, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    clean_path.write_text(
-        render_clean_markdown(structured, source_name=raw_path.name), encoding="utf-8"
-    )
-
-    return structured_path, clean_path
-
-
-def clean_admission_rules(
-    processed_dir: Path | None = None, extractor: ExtractorFn | None = None
-) -> None:
-    if processed_dir is None:
-        base_dir = Path(__file__).parent.parent
-        processed_dir = base_dir / "data" / "processed_rules"
-
-    raw_files = sorted(processed_dir.glob("*_raw.md"))
-    if not raw_files:
-        print("Không tìm thấy file _raw.md nào để xử lý")
+    if not processed_dir.exists():
+        print(f"❌ Thư mục không tồn tại: {processed_dir}")
         return
 
-    print(f"Tìm thấy {len(raw_files)} file RAW. Bắt đầu extraction nhiều bước...")
+    # Hỗ trợ cả 2 naming convention:
+    # - Pipeline mới (ingest_pdf.py):     <UNI>_DeAn<YEAR>.md
+    # - Pipeline cũ (đặt tên _raw.md):   <UNI>_DeAn<YEAR>_raw.md
+    raw_files_new = [
+        f for f in processed_dir.glob("*.md")
+        if not f.name.endswith("_clean.md") and not f.name.endswith("_raw.md")
+    ]
+    raw_files_old = list(processed_dir.glob("*_raw.md"))
+    raw_files = raw_files_new + raw_files_old
 
-    for raw_path in raw_files:
-        structured_path = raw_path.with_name(
-            raw_path.name.replace("_raw.md", "_structured.json")
+    if not raw_files:
+        print(
+            "⚠️  Không tìm thấy file .md nào để xử lý!\n"
+            f"   Hãy chạy scripts/ingest_pdf.py trước để tạo file Markdown thô.\n"
+            f"   Thư mục kiểm tra: {processed_dir}"
         )
-        clean_path = raw_path.with_name(raw_path.name.replace("_raw.md", "_clean.md"))
+        return
 
-        if structured_path.exists() and clean_path.exists():
-            print(f"Bỏ qua {raw_path.name} vì đã có đủ clean + structured")
-            continue
+    print(f"🔍 Tìm thấy {len(raw_files)} file Markdown thô. Bắt đầu 'lọc vàng' bằng Gemini...")
+
+    for raw_path in sorted(raw_files):
+        # Tạo tên file output
+        if raw_path.name.endswith("_raw.md"):
+            clean_filename = raw_path.name.replace("_raw.md", "_clean.md")
+        else:
+            clean_filename = raw_path.stem + "_clean.md"
+
+        clean_path = processed_dir / clean_filename
+
+        # Kiểm tra file đã tồn tại và có nội dung hợp lệ
+        if clean_path.exists() and not force_reprocess:
+            existing_size = clean_path.stat().st_size
+            if existing_size >= MIN_OUTPUT_CHARS:
+                print(f"⏭️  File {clean_filename} đã tồn tại ({existing_size:,} bytes) → bỏ qua.")
+                continue
+            else:
+                print(f"♻️  File {clean_filename} tồn tại nhưng quá nhỏ ({existing_size} bytes) → xử lý lại.")
+
+        print(f"\n{'=' * 65}")
+        print(f"🤖 Đang xử lý: {raw_path.name}")
+        print(f"{'=' * 65}")
 
         try:
-            out_structured, out_clean = process_raw_file(raw_path, extractor=extractor)
-            print(f"Đã tạo: {out_structured.name} và {out_clean.name}")
-        except Exception as exc:
-            print(f"Lỗi khi xử lý {raw_path.name}: {exc}")
+            # Đọc nội dung thô
+            with open(raw_path, "r", encoding="utf-8") as f:
+                raw_content = f.read()
+
+            if not raw_content.strip():
+                print(f"⚠️  File {raw_path.name} rỗng — bỏ qua.")
+                continue
+
+            char_count = len(raw_content)
+            print(f"   📄 Kích thước: {char_count:,} ký tự (~{char_count // 4:,} tokens)")
+
+            # ── Chiến lược: Full-context trong 1 lần gọi Gemini ────────
+            # Gemini 2.5 Flash có context window 1M tokens.
+            # File 205K ký tự ≈ 51K tokens → nằm gọn trong context.
+            # KHÔNG chunk: để Gemini đọc cả PART 1 (công thức) + PART 2
+            # (bảng LlamaCloud) cùng lúc, sau đó merge thông minh.
+            # ──────────────────────────────────────────────────────────────
+            print(f"   ⚡ Gọi Gemini 1 lần với full context ({char_count:,} ký tự)...")
+            trigger_prompt = (
+                "\n\n================================================================================\n"
+                "KẾT THÚC TÀI LIỆU THÔ.\n\n"
+                "Dựa vào nội dung tài liệu thô cung cấp ở trên, HÃY BẮT ĐẦU TRÍCH XUẤT VÀ TRẢ VỀ TOÀN BỘ KẾT QUẢ DƯỚI ĐỊNH DẠNG "
+                "MARKDOWN CÓ CẤU TRÚC THEO ĐÚNG YÊU CẦU CỦA ĐOẠN 'MASTER PROMPT' Ở TRÊN NGAY BÂY GIỜ.\n"
+                "LƯU Ý ĐẶC BIỆT TRÁNH LỖI ĐỨT GÃY: BẠN PHẢI SINH TOÀN BỘ VĂN BẢN CHO ĐẾN KHI HOÀN THÀNH MỤC '11. BẢNG TÓM TẮT NHANH CHO AI AGENT'.\n"
+                "NẾU TÀI LIỆU BỊ THIẾU THÔNG TIN Ở BẤT KỲ MỤC/CỘT NÀO TRONG BẢNG, HÃY GHI 'Không có thông tin chi tiết' VÀ TIẾP TỤC, TUYỆT ĐỐI KHÔNG DỪNG LẠI GIỮA CHỪNG.\n"
+            )
+            data_section = "NỘI DUNG TÀI LIỆU THÔ (BẮT ĐẦU TỪ ĐÂY):\n================================================================================\n" + raw_content + trigger_prompt
+            
+            # Gộp MASTER_PROMPT và tài liệu thô vào user_prompt để tránh thất thoát chỉ thị
+            full_user_prompt = MASTER_PROMPT + "\n\n" + data_section
+            clean_content = normalize_newlines(call_gemini_with_retry(full_user_prompt))
+
+            # Kiểm tra output có hợp lệ không
+            out_chars = len(clean_content)
+            if out_chars < MIN_OUTPUT_CHARS:
+                print(f"   ❌ Output quá nhỏ ({out_chars} ký tự) — có thể Gemini gặp lỗi. Không lưu file.")
+                print(f"   👉 Nội dung Gemini trả về:\n{clean_content}\n")
+                debug_path = processed_dir / (raw_path.stem + "_debug_short.md")
+                with open(debug_path, "w", encoding="utf-8") as f:
+                    f.write(clean_content)
+                print(f"   (Đã lưu nội dung ngắn vào {debug_path.name})")
+                print(f"      Hãy kiểm tra GOOGLE_API_KEY và thử lại.")
+                continue
+
+            # Lưu file đã làm sạch
+            with open(clean_path, "w", encoding="utf-8") as f:
+                f.write(clean_content)
+
+            print(f"   ✅ Hoàn thành! Đã lưu: {clean_filename}")
+            print(f"      Input: {char_count:,} ký tự → Output: {out_chars:,} ký tự")
+            print(f"      Tỷ lệ nén: {(1 - out_chars/char_count)*100:.1f}%")
+
+        except Exception as e:
+            print(f"   ❌ Lỗi khi xử lý {raw_path.name}: {e}")
+            import traceback
+            traceback.print_exc()
+
+    print(f"\n{'=' * 65}")
+    print("🏁 Hoàn tất! Kiểm tra thư mục:")
+    print(f"   {processed_dir}")
+    print("   → Các file *_clean.md là input cho build_vector_db.py")
+    print(f"{'=' * 65}")
 
 
 if __name__ == "__main__":
-    clean_admission_rules()
+    # Thêm --force để ghi đè file đã tồn tại
+    import sys
+    force = "--force" in sys.argv
+    if force:
+        print("⚡ Chế độ FORCE: sẽ ghi đè tất cả file *_clean.md hiện có.")
+    clean_admission_rules(force_reprocess=force)

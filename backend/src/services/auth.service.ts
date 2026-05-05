@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'crypto';
 import { PublicUser, User, UserRole, toPublicUser } from '../model/user.model';
 import { PasswordResetTokenRepository } from '../repository/password-reset-token.repository';
 import { UserRepository as IUserRepository } from '../repository/user.repository';
+import { JWT_ALGORITHM, JWT_AUDIENCE, JWT_ISSUER } from '../config/auth';
 
 const MIN_PASSWORD_LENGTH = 8;
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -26,6 +27,12 @@ export interface ForgotPasswordInput {
 
 export interface ResetPasswordInput {
     token: string;
+    newPassword: string;
+}
+
+export interface ChangePasswordInput {
+    userId: number;
+    oldPassword: string;
     newPassword: string;
 }
 
@@ -53,6 +60,7 @@ export class AuthServiceError extends Error {
 interface AuthTokenPayload {
     userId: number;
     role: UserRole;
+    tokenVersion: number;
 }
 
 export class AuthService {
@@ -186,16 +194,51 @@ export class AuthService {
             throw new AuthServiceError('User not found for reset token', 400);
         }
 
+        const consumed = this.resetTokenRepository.markUsed(resetToken.id);
+        if (!consumed) {
+            throw new AuthServiceError('Reset token is invalid or expired', 400);
+        }
+
         const passwordHash = bcrypt.hashSync(newPassword, 10);
         const updated = this.userRepository.updatePassword(user.id, passwordHash);
         if (!updated) {
             throw new AuthServiceError('Unable to reset password', 500);
         }
 
-        this.resetTokenRepository.markUsed(resetToken.id);
         this.resetTokenRepository.invalidateUserTokens(user.id, resetToken.id);
 
         return { message: 'Password reset successful' };
+    }
+
+    async changePassword(input: ChangePasswordInput): Promise<{ message: string }> {
+        const oldPassword = input.oldPassword ?? '';
+        const newPassword = input.newPassword ?? '';
+
+        if (!oldPassword) {
+            throw new AuthServiceError('Current password is required', 400);
+        }
+
+        this.validatePassword(newPassword);
+
+        const user = this.userRepository.findById(input.userId);
+        if (!user) {
+            throw new AuthServiceError('User not found', 404);
+        }
+
+        const isOldPasswordValid = bcrypt.compareSync(oldPassword, user.password);
+        if (!isOldPasswordValid) {
+            throw new AuthServiceError('Current password is incorrect', 401);
+        }
+
+        const passwordHash = bcrypt.hashSync(newPassword, 10);
+        const updated = this.userRepository.updatePassword(user.id, passwordHash);
+        if (!updated) {
+            throw new AuthServiceError('Unable to change password', 500);
+        }
+
+        this.resetTokenRepository.invalidateUserTokens(user.id);
+
+        return { message: 'Password changed successfully' };
     }
 
     async getMe(userId: number): Promise<{ user: PublicUser }> {
@@ -207,11 +250,16 @@ export class AuthService {
         return { user: toPublicUser(user) };
     }
 
-    generateAccessToken(user: Pick<User, 'id' | 'role'>): string {
+    generateAccessToken(user: Pick<User, 'id' | 'role' | 'tokenVersion'>): string {
         const secret = this.getJwtSecret();
         const expiresIn = (process.env.JWT_ACCESS_EXPIRES_IN || '1d') as jwt.SignOptions['expiresIn'];
-        const payload: AuthTokenPayload = { userId: user.id, role: user.role };
-        return jwt.sign(payload, secret, { expiresIn });
+        const payload: AuthTokenPayload = { userId: user.id, role: user.role, tokenVersion: user.tokenVersion };
+        return jwt.sign(payload, secret, {
+            expiresIn,
+            algorithm: JWT_ALGORITHM,
+            issuer: JWT_ISSUER,
+            audience: JWT_AUDIENCE,
+        });
     }
 
     private getJwtSecret(): string {

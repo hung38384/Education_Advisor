@@ -18,7 +18,6 @@ from typing import cast
 
 # Load environment variables
 from dotenv import load_dotenv
-from google.api_core.exceptions import ResourceExhausted
 
 load_dotenv()
 
@@ -132,80 +131,28 @@ logger.info("✅ Graph compiled successfully")
 # 4. Test Execution
 # ============================================================================
 
-BKA_TEST_QUERY = (
-    "Năm 2024 ngành IT1 của Bách Khoa lấy bao nhiêu điểm? "
-    "Và nếu mình có IELTS 6.5 thì được quy đổi ra mấy điểm tiếng Anh thay cho môn thi THPT?"
-)
-
-TMU_TEST_QUERY = (
-    "Năm 2025 ngành TM34 của Đại học Thương mại lấy bao nhiêu điểm? "
-    "Và nếu mình có IELTS Academic 7.0 thì được quy đổi ra mấy điểm tiếng Anh thay cho môn thi THPT?"
-)
-
-CTU_TEST_QUERY = (
-    "Năm 2025 ngành 7340121 của Đại học Cần Thơ lấy bao nhiêu điểm? "
-    "Và nếu mình có học bạ hoặc V-SAT thì được xét tuyển như thế nào?"
-)
-
-TEST_SCENARIOS = [
-    ("BKA", BKA_TEST_QUERY),
-    ("TMU", TMU_TEST_QUERY),
-    ("CTU", CTU_TEST_QUERY),
-]
-
-
-def _is_quota_error(exc: Exception) -> bool:
-    text = str(exc).lower()
-    return (
-        isinstance(exc, ResourceExhausted)
-        or "quota exceeded" in text
-        or "resourceexhausted" in text
-        or "429" in text
-    )
-
-
-def _get_selected_scenarios() -> list[tuple[str, str]]:
+def test_graph():
     """
-    Select scenarios from env var GRAPH_TEST_SCENARIOS (comma-separated).
-    Example: GRAPH_TEST_SCENARIOS=BKA,TMU
-    """
-    selected_raw = os.getenv("GRAPH_TEST_SCENARIOS", "BKA")
-    selected_codes = {
-        code.strip().upper()
-        for code in selected_raw.split(",")
-        if code and code.strip()
-    }
-
-    if not selected_codes:
-        return [("BKA", BKA_TEST_QUERY)]
-
-    selected = [
-        (label, query)
-        for label, query in TEST_SCENARIOS
-        if label in selected_codes
-    ]
-    if selected:
-        return selected
-
-    logger.warning(
-        "No valid scenario in GRAPH_TEST_SCENARIOS=%s. Falling back to BKA.",
-        selected_raw,
-    )
-    return [("BKA", BKA_TEST_QUERY)]
-
-
-def _run_test_query(label: str, test_query: str) -> None:
-    """
-    Run one test scenario with the original BKA execution flow.
+    Test the graph with a multi-tool query.
+    
+    The query requires:
+    1. get_historical_scores tool: for admission scores
+    2. search_admission_rules tool: for IELTS conversion rules
     """
     logger.info("\n" + "=" * 80)
-    logger.info(f"🚀 Testing LangGraph Agent - {label}")
+    logger.info("🚀 Testing LangGraph Agent")
     logger.info("=" * 80)
-
+    
+    # Test query that requires both tools
+    test_query = (
+        "Năm 2024 ngành IT1 của Bách Khoa lấy bao nhiêu điểm? "
+        "Và nếu mình có IELTS 6.5 thì được quy đổi ra mấy điểm tiếng Anh thay cho môn thi THPT?"
+    )
+    
     logger.info(f"\n❓ User Query:\n{test_query}\n")
     print(f"\n{'=' * 80}")
-    print("USER QUERY:")
-    print(test_query)
+    print(f"USER QUERY:")
+    print(f"{test_query}")
     print(f"{'=' * 80}\n")
     
     try:
@@ -283,52 +230,13 @@ def _run_test_query(label: str, test_query: str) -> None:
         raise
 
 
-def test_graph() -> None:
-    """
-    Test the graph with the original BKA query.
-    """
-    _run_test_query("BKA", BKA_TEST_QUERY)
-
-
-def test_graph_extended() -> None:
-    """
-    Test the graph with BKA, TMU, and CTU using the same flow as the original BKA demo.
-    """
-    failed_scenarios = []
-
-    for label, test_query in _get_selected_scenarios():
-        try:
-            _run_test_query(label, test_query)
-        except Exception as e:
-            failed_scenarios.append((label, str(e)))
-            logger.error(f"❌ Scenario {label} failed: {e}")
-            if _is_quota_error(e):
-                logger.error(
-                    "Quota Gemini da vuot gioi han. Dung cac scenario con lai de tranh goi API them."
-                )
-                break
-
-    if failed_scenarios:
-        failed_labels = ", ".join(label for label, _ in failed_scenarios)
-        raise RuntimeError(f"Some scenarios failed: {failed_labels}")
-
-
 if __name__ == "__main__":
     logger.info("=" * 80)
     logger.info("🚀 LangGraph Multi-Agent Tool-Calling Workflow")
     logger.info("=" * 80)
-
+    
     try:
-        run_extended = os.getenv("GRAPH_RUN_EXTENDED", "0").strip() == "1"
-        if run_extended:
-            logger.info("Running selected scenarios in extended mode...")
-            test_graph_extended()
-        else:
-            logger.info(
-                "Running single BKA scenario by default to avoid hitting free-tier quota quickly. "
-                "Set GRAPH_RUN_EXTENDED=1 to run extended scenarios."
-            )
-            test_graph()
+        test_graph()
         logger.info("\n✅ All tests completed successfully!")
     except Exception as e:
         logger.error(f"\n❌ Test failed: {e}")

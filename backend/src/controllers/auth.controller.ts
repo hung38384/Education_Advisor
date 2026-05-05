@@ -67,6 +67,26 @@ export class AuthController {
         }
     }
 
+    public async changePassword(req: Request, res: Response): Promise<void> {
+        try {
+            if (!req.user?.userId) {
+                sendError(res, 'Unauthorized', 401);
+                return;
+            }
+
+            const body = await parseBody(req);
+            const result = await this.service.changePassword({
+                userId: req.user.userId,
+                oldPassword: body.oldPassword,
+                newPassword: body.newPassword,
+            });
+
+            sendSuccess(res, result);
+        } catch (error) {
+            this.handleError(res, error, 'Failed to change password');
+        }
+    }
+
     public async me(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {

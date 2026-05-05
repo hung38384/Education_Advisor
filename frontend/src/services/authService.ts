@@ -34,6 +34,11 @@ export interface ResetPasswordPayload {
     newPassword: string;
 }
 
+export interface ChangePasswordPayload {
+    oldPassword: string;
+    newPassword: string;
+}
+
 export interface RegisterResponse {
     message: string;
     user: AuthUser;
@@ -51,6 +56,10 @@ export interface ForgotPasswordResponse {
 }
 
 export interface ResetPasswordResponse {
+    message: string;
+}
+
+export interface ChangePasswordResponse {
     message: string;
 }
 
@@ -76,6 +85,11 @@ export const authService = {
 
     async resetPassword(payload: ResetPasswordPayload): Promise<ResetPasswordResponse> {
         const response = await api.post<ResetPasswordResponse>(API_ROUTES.AUTH.RESET_PASSWORD, payload);
+        return response.data;
+    },
+
+    async changePassword(payload: ChangePasswordPayload): Promise<ChangePasswordResponse> {
+        const response = await api.post<ChangePasswordResponse>(API_ROUTES.AUTH.CHANGE_PASSWORD, payload);
         return response.data;
     },
 

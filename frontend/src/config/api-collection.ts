@@ -4,14 +4,32 @@ export const API_ROUTES = {
         LOGIN: '/auth/login',
         FORGOT_PASSWORD: '/auth/forgot-password',
         RESET_PASSWORD: '/auth/reset-password',
+        CHANGE_PASSWORD: '/auth/change-password',
         ME: '/auth/me',
     },
-    PRODUCT: {
-        LIST: '/product',
-        CREATE: '/product',
-        GET: '/product/{id}',
-        UPDATE: '/product/{id}',
-        DELETE: '/product/{id}',
+    PROFILE: {
+        ME: '/profile/me',
+    },
+    PERSONALITY: {
+        QUESTIONS: '/personality/questions',
+        SUBMIT: '/personality/submit',
+        LATEST: '/personality/latest',
+    },
+    ASSESSMENT: {
+        RUN: '/review/run',
+        LATEST: '/review/latest',
+    },
+    QA: {
+        CONVERSATIONS: '/qa/conversations',
+        CONVERSATION_DELETE: '/qa/conversations/{id}',
+        MESSAGES: '/qa/messages',
+        ASK: '/qa/ask',
+    },
+    ADMISSIONS: {
+        CATALOG: '/admissions/catalog',
+        CART_LIST: '/admissions/cart',
+        CART_CREATE: '/admissions/cart',
+        CART_DELETE: '/admissions/cart/{id}',
     },
     ADMIN_USER: {
         LIST: '/admin/users',
