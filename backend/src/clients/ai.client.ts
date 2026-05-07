@@ -13,7 +13,7 @@ export interface AIQuestionContext {
     personality: {
         mbtiType: string;
     } | null;
-    assessment: {
+    review: {
         overallScore: number;
         summary: string;
     } | null;

@@ -15,7 +15,7 @@ export const API_ROUTES = {
         SUBMIT: '/personality/submit',
         LATEST: '/personality/latest',
     },
-    ASSESSMENT: {
+    REVIEW: {
         RUN: '/review/run',
         LATEST: '/review/latest',
     },

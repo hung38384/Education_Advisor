@@ -1,20 +1,20 @@
 import { Database } from 'better-sqlite3';
-import { AssessmentRecommendation, AssessmentResult } from '../model/assessment.model';
+import { ReviewRecommendation, ReviewResult } from '../model/review.model';
 
-export interface CreateAssessmentResultInput {
+export interface CreateReviewResultInput {
     userId: number;
     overallScore: number;
     summary: string;
-    recommendations: AssessmentRecommendation[];
+    recommendations: ReviewRecommendation[];
     inputSnapshot: Record<string, unknown>;
 }
 
-export interface AssessmentRepository {
-    create(input: CreateAssessmentResultInput): AssessmentResult | undefined;
-    findLatestByUserId(userId: number): AssessmentResult | undefined;
+export interface ReviewRepository {
+    create(input: CreateReviewResultInput): ReviewResult | undefined;
+    findLatestByUserId(userId: number): ReviewResult | undefined;
 }
 
-interface AssessmentResultRow {
+interface ReviewResultRow {
     id: number;
     userId: number;
     overallScore: number;
@@ -24,7 +24,7 @@ interface AssessmentResultRow {
     createdAt: string;
 }
 
-function parseRecommendations(rawValue: string): AssessmentRecommendation[] {
+function parseRecommendations(rawValue: string): ReviewRecommendation[] {
     try {
         const parsed = JSON.parse(rawValue);
         if (!Array.isArray(parsed)) {
@@ -34,7 +34,7 @@ function parseRecommendations(rawValue: string): AssessmentRecommendation[] {
         return parsed
             .filter((item) => item && typeof item === 'object')
             .map((item) => {
-                const value = item as Partial<AssessmentRecommendation>;
+                const value = item as Partial<ReviewRecommendation>;
                 return {
                     name: String(value.name ?? ''),
                     score: Number(value.score ?? 0),
@@ -59,7 +59,7 @@ function parseSnapshot(rawValue: string): Record<string, unknown> {
     }
 }
 
-function toModel(row: AssessmentResultRow): AssessmentResult {
+function toModel(row: ReviewResultRow): ReviewResult {
     return {
         id: row.id,
         userId: row.userId,
@@ -71,12 +71,12 @@ function toModel(row: AssessmentResultRow): AssessmentResult {
     };
 }
 
-export class SQLiteAssessmentRepository implements AssessmentRepository {
+export class SQLiteReviewRepository implements ReviewRepository {
     constructor(private db: Database) { }
 
-    create(input: CreateAssessmentResultInput): AssessmentResult | undefined {
+    create(input: CreateReviewResultInput): ReviewResult | undefined {
         const stmt = this.db.prepare(`
-            INSERT INTO assessment_result (userId, overallScore, summary, recommendations, inputSnapshot)
+            INSERT INTO review_result (userId, overallScore, summary, recommendations, inputSnapshot)
             VALUES (?, ?, ?, ?, ?)
         `);
 
@@ -88,8 +88,8 @@ export class SQLiteAssessmentRepository implements AssessmentRepository {
             JSON.stringify(input.inputSnapshot)
         );
 
-        const row = this.db.prepare('SELECT * FROM assessment_result WHERE id = ?')
-            .get(Number(result.lastInsertRowid)) as AssessmentResultRow | undefined;
+        const row = this.db.prepare('SELECT * FROM review_result WHERE id = ?')
+            .get(Number(result.lastInsertRowid)) as ReviewResultRow | undefined;
 
         if (!row) {
             return undefined;
@@ -98,16 +98,16 @@ export class SQLiteAssessmentRepository implements AssessmentRepository {
         return toModel(row);
     }
 
-    findLatestByUserId(userId: number): AssessmentResult | undefined {
+    findLatestByUserId(userId: number): ReviewResult | undefined {
         const stmt = this.db.prepare(`
             SELECT *
-            FROM assessment_result
+            FROM review_result
             WHERE userId = ?
             ORDER BY createdAt DESC, id DESC
             LIMIT 1
         `);
 
-        const row = stmt.get(userId) as AssessmentResultRow | undefined;
+        const row = stmt.get(userId) as ReviewResultRow | undefined;
         if (!row) {
             return undefined;
         }

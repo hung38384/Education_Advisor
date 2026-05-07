@@ -21,9 +21,9 @@ import { StudentProfileController } from './controllers/student-profile.controll
 import { SQLitePersonalityRepository } from './repository/personality.repository';
 import { PersonalityService } from './services/personality.service';
 import { PersonalityController } from './controllers/personality.controller';
-import { SQLiteAssessmentRepository } from './repository/assessment.repository';
-import { AssessmentService } from './services/assessment.service';
-import { AssessmentController } from './controllers/assessment.controller';
+import { SQLiteReviewRepository } from './repository/review.repository';
+import { ReviewService } from './services/review.service';
+import { ReviewController } from './controllers/review.controller';
 import { SQLiteQARepository } from './repository/qa.repository';
 import { QAService } from './services/qa.service';
 import { QAController } from './controllers/qa.controller';
@@ -39,7 +39,7 @@ export interface AppDependencies {
     adminUserController: AdminUserController;
     studentProfileController: StudentProfileController;
     personalityController: PersonalityController;
-    assessmentController: AssessmentController;
+    reviewController: ReviewController;
     qaController: QAController;
     admissionController: AdmissionController;
     userRepository: UserRepository;
@@ -72,13 +72,13 @@ export function createDependencies(
     const personalityService = new PersonalityService(personalityRepository);
     const personalityController = new PersonalityController(personalityService);
 
-    const assessmentRepository = new SQLiteAssessmentRepository(db);
-    const assessmentService = new AssessmentService(
-        assessmentRepository,
+    const reviewRepository = new SQLiteReviewRepository(db);
+    const reviewService = new ReviewService(
+        reviewRepository,
         studentProfileRepository,
         personalityRepository
     );
-    const assessmentController = new AssessmentController(assessmentService);
+    const reviewController = new ReviewController(reviewService);
 
     const qaRepository = new SQLiteQARepository(db);
     const qaInferenceClient = overrides.qaInferenceClient === undefined
@@ -88,7 +88,7 @@ export function createDependencies(
         qaRepository,
         studentProfileRepository,
         personalityRepository,
-        assessmentRepository,
+        reviewRepository,
         qaInferenceClient
     );
     const qaController = new QAController(qaService);
@@ -104,7 +104,7 @@ export function createDependencies(
         adminUserController,
         studentProfileController,
         personalityController,
-        assessmentController,
+        reviewController,
         qaController,
         admissionController,
         userRepository,
@@ -118,7 +118,7 @@ export function initServer({
     adminUserController,
     studentProfileController,
     personalityController,
-    assessmentController,
+    reviewController,
     qaController,
     admissionController,
     authenticateToken,
@@ -151,7 +151,7 @@ export function initServer({
         adminUserController,
         studentProfileController,
         personalityController,
-        assessmentController,
+        reviewController,
         qaController,
         admissionController,
         authenticateToken,

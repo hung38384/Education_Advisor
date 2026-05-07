@@ -34,7 +34,7 @@ class AIPersonalityContext(BaseModel):
     mbtiType: Optional[str] = Field(default=None)
 
 
-class AIAssessmentContext(BaseModel):
+class AIReviewContext(BaseModel):
     overallScore: Optional[float] = Field(default=None)
     summary: Optional[str] = Field(default=None)
 
@@ -42,7 +42,7 @@ class AIAssessmentContext(BaseModel):
 class AIQuestionContext(BaseModel):
     profile: Optional[AIProfileContext] = None
     personality: Optional[AIPersonalityContext] = None
-    assessment: Optional[AIAssessmentContext] = None
+    review: Optional[AIReviewContext] = None
     history: List[AIConversationMessage] = Field(default_factory=list)
 
 

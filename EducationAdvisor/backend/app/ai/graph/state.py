@@ -20,7 +20,7 @@ class AgentState(TypedDict):
         user_profile: Dictionary containing student information:
                      - mbti: MBTI personality type and description
                      - ielts: IELTS score (float)
-                     - transcript: Dict of subject::score for academic assessment
+                     - transcript: Dict of subject::score for academic review
                      - Add more fields as needed (hsCode, preferences, etc.)
         called_agents: List of agents that have already been called (tracks progress)
     """

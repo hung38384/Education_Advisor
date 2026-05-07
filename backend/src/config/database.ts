@@ -40,15 +40,37 @@ export function createDatabase(databasePath?: string) {
 
   db.pragma('foreign_keys = ON');
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS product (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      description TEXT,
-      price INTEGER NOT NULL,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+  const tableExists = (tableName: string): boolean => {
+    const stmt = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`);
+    return Boolean(stmt.get(tableName));
+  };
 
+  if (tableExists('assessment_result') && !tableExists('review_result')) {
+    const migrateAssessmentResultToReviewResult = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE review_result (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          overallScore INTEGER NOT NULL,
+          summary TEXT NOT NULL,
+          recommendations TEXT NOT NULL,
+          inputSnapshot TEXT NOT NULL,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (userId) REFERENCES "user"(id) ON DELETE CASCADE
+        );
+
+        INSERT INTO review_result (id, userId, overallScore, summary, recommendations, inputSnapshot, createdAt)
+        SELECT id, userId, overallScore, summary, recommendations, inputSnapshot, createdAt
+        FROM assessment_result;
+
+        DROP TABLE assessment_result;
+      `);
+    });
+
+    migrateAssessmentResultToReviewResult();
+  }
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS "user" (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT NOT NULL UNIQUE,
@@ -119,7 +141,7 @@ export function createDatabase(databasePath?: string) {
       UNIQUE(userId, schoolId, majorId, methodId)
     );
 
-    CREATE TABLE IF NOT EXISTS assessment_result (
+    CREATE TABLE IF NOT EXISTS review_result (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       userId INTEGER NOT NULL,
       overallScore INTEGER NOT NULL,
@@ -160,8 +182,8 @@ export function createDatabase(databasePath?: string) {
     CREATE INDEX IF NOT EXISTS idx_admission_cart_item_userId_createdAt
       ON admission_cart_item(userId, createdAt DESC);
 
-    CREATE INDEX IF NOT EXISTS idx_assessment_result_userId_createdAt
-      ON assessment_result(userId, createdAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_review_result_userId_createdAt
+      ON review_result(userId, createdAt DESC);
 
     CREATE INDEX IF NOT EXISTS idx_qa_message_userId_createdAt
       ON qa_message(userId, createdAt DESC);
@@ -169,11 +191,6 @@ export function createDatabase(databasePath?: string) {
     CREATE INDEX IF NOT EXISTS idx_qa_conversation_userId_updatedAt
       ON qa_conversation(userId, updatedAt DESC, createdAt DESC);
   `);
-
-  const tableExists = (tableName: string): boolean => {
-    const stmt = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`);
-    return Boolean(stmt.get(tableName));
-  };
 
   const columnExists = (tableName: string, columnName: string): boolean => {
     const stmt = db.prepare(`PRAGMA table_info("${tableName}")`);

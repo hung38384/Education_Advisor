@@ -234,7 +234,7 @@ class StandardizedTests(BaseModel):
         default=None,
         ge=0,
         le=100,
-        description="TSA (Thinking Skills Assessment) score (0-100)"
+        description="TSA score (0-100)"
     )
     apt_score: Optional[int] = Field(
         default=None,

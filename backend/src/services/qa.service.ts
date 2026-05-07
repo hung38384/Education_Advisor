@@ -1,5 +1,5 @@
 import { QAConversation, QAMessage } from '../model/qa.model';
-import { AssessmentRepository } from '../repository/assessment.repository';
+import { ReviewRepository } from '../repository/review.repository';
 import { PersonalityRepository } from '../repository/personality.repository';
 import { QARepository } from '../repository/qa.repository';
 import { StudentProfileRepository } from '../repository/student-profile.repository';
@@ -33,7 +33,7 @@ const DEFAULT_CONVERSATION_TITLE = 'Cuộc trò chuyện mới';
 interface QAAnswerContext {
     profile: ReturnType<StudentProfileRepository['findByUserId']>;
     personality: ReturnType<PersonalityRepository['findLatestByUserId']>;
-    latestAssessment: ReturnType<AssessmentRepository['findLatestByUserId']>;
+    latestReview: ReturnType<ReviewRepository['findLatestByUserId']>;
 }
 
 export class QAServiceError extends Error {
@@ -51,7 +51,7 @@ export class QAService {
         private qaRepository: QARepository,
         private profileRepository: StudentProfileRepository,
         private personalityRepository: PersonalityRepository,
-        private assessmentRepository: AssessmentRepository,
+        private reviewRepository: ReviewRepository,
         private qaInferenceClient: QAInferenceClient | null = null
     ) { }
 
@@ -159,7 +159,7 @@ export class QAService {
         return {
             profile: this.profileRepository.findByUserId(userId),
             personality: this.personalityRepository.findLatestByUserId(userId),
-            latestAssessment: this.assessmentRepository.findLatestByUserId(userId),
+            latestReview: this.reviewRepository.findLatestByUserId(userId),
         };
     }
 
@@ -259,10 +259,10 @@ export class QAService {
                         personality: context.personality
                             ? { mbtiType: context.personality.mbtiType }
                             : null,
-                        assessment: context.latestAssessment
+                        review: context.latestReview
                             ? {
-                                overallScore: context.latestAssessment.overallScore,
-                                summary: context.latestAssessment.summary,
+                                overallScore: context.latestReview.overallScore,
+                                summary: context.latestReview.summary,
                             }
                             : null,
                         history,
@@ -328,7 +328,7 @@ export class QAService {
     }
 
     private buildRuleBasedAnswer(question: string, context: QAAnswerContext): string {
-        const { profile, personality, latestAssessment } = context;
+        const { profile, personality, latestReview } = context;
 
         const studentName = profile?.fullName ?? 'bạn';
         const mbtiText = personality ? `MBTI gần nhất của bạn là ${personality.mbtiType}.` : 'Bạn chưa có kết quả MBTI.';
@@ -338,17 +338,17 @@ export class QAService {
         const profileTargetText = targetParts.length > 0
             ? `Mục tiêu hiện tại trong hồ sơ: ${targetParts.join(' - ')}.`
             : 'Bạn chưa cập nhật mục tiêu ngành/trường trong hồ sơ.';
-        const assessmentText = latestAssessment
-            ? `Kết quả đánh giá gần nhất: ${latestAssessment.summary}`
-            : 'Bạn chưa chạy đánh giá phù hợp.';
+        const reviewText = latestReview
+            ? `Kết quả review gần nhất: ${latestReview.summary}`
+            : 'Bạn chưa chạy review phù hợp.';
 
         return [
             `Chào ${studentName},`,
             `Mình đã nhận câu hỏi: "${question}".`,
             mbtiText,
             profileTargetText,
-            assessmentText,
-            'Để bước tiếp theo hiệu quả hơn, bạn nên cập nhật đầy đủ hồ sơ và chạy lại đánh giá sau mỗi thay đổi lớn.',
+            reviewText,
+            'Để bước tiếp theo hiệu quả hơn, bạn nên cập nhật đầy đủ hồ sơ và chạy lại review sau mỗi thay đổi lớn.',
         ].join(' ');
     }
 }

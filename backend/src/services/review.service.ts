@@ -1,19 +1,19 @@
-import { AssessmentRecommendation, AssessmentResult } from '../model/assessment.model';
-import { AssessmentRepository } from '../repository/assessment.repository';
+import { ReviewRecommendation, ReviewResult } from '../model/review.model';
+import { ReviewRepository } from '../repository/review.repository';
 import { PersonalityRepository } from '../repository/personality.repository';
 import { StudentProfileRepository } from '../repository/student-profile.repository';
 
-export interface AssessmentResultPayload {
-    result: AssessmentResult | null;
+export interface ReviewResultPayload {
+    result: ReviewResult | null;
 }
 
-export class AssessmentServiceError extends Error {
+export class ReviewServiceError extends Error {
     constructor(
         message: string,
         public statusCode: number = 400
     ) {
         super(message);
-        this.name = 'AssessmentServiceError';
+        this.name = 'ReviewServiceError';
     }
 }
 
@@ -30,15 +30,15 @@ interface RecommendationInput {
     priority: number;
 }
 
-export class AssessmentService {
+export class ReviewService {
     constructor(
-        private assessmentRepository: AssessmentRepository,
+        private reviewRepository: ReviewRepository,
         private profileRepository: StudentProfileRepository,
         private personalityRepository: PersonalityRepository
     ) { }
 
-    getLatest(userId: number): AssessmentResultPayload {
-        const result = this.assessmentRepository.findLatestByUserId(userId);
+    getLatest(userId: number): ReviewResultPayload {
+        const result = this.reviewRepository.findLatestByUserId(userId);
         if (!result) {
             return { result: null };
         }
@@ -46,15 +46,15 @@ export class AssessmentService {
         return { result };
     }
 
-    run(userId: number): AssessmentResultPayload {
+    run(userId: number): ReviewResultPayload {
         const profile = this.profileRepository.findByUserId(userId);
         if (!profile) {
-            throw new AssessmentServiceError('Profile is required before running assessment', 400);
+            throw new ReviewServiceError('Profile is required before running review', 400);
         }
 
         const personality = this.personalityRepository.findLatestByUserId(userId);
         if (!personality) {
-            throw new AssessmentServiceError('Personality test must be completed before assessment', 400);
+            throw new ReviewServiceError('Personality test must be completed before review', 400);
         }
 
         const recommendationTargets = this.buildFallbackTargets(profile.targetMajor, profile.targetUniversity, personality.mbtiType);
@@ -70,7 +70,7 @@ export class AssessmentService {
             : 6;
 
         const academicBase = (averageScore / 10) * 70;
-        const recommendations: AssessmentRecommendation[] = recommendationInputs.map((item) => {
+        const recommendations: ReviewRecommendation[] = recommendationInputs.map((item) => {
             const personalityBonus = this.getPersonalityBonus(item.name, personality.mbtiType);
             const priorityBonus = Math.max(0, 15 - (item.priority - 1) * 3);
             const score = clampScore(academicBase + personalityBonus + priorityBonus);
@@ -85,7 +85,7 @@ export class AssessmentService {
             .slice(0, 5);
 
         if (recommendations.length === 0) {
-            throw new AssessmentServiceError('Unable to generate recommendation targets', 500);
+            throw new ReviewServiceError('Unable to generate recommendation targets', 500);
         }
 
         const overallScore = clampScore(
@@ -94,7 +94,7 @@ export class AssessmentService {
 
         const summary = `Top recommendation: ${recommendations[0].name} (${recommendations[0].score}/100).`;
 
-        const result = this.assessmentRepository.create({
+        const result = this.reviewRepository.create({
             userId,
             overallScore,
             summary,
@@ -120,7 +120,7 @@ export class AssessmentService {
         });
 
         if (!result) {
-            throw new AssessmentServiceError('Unable to save assessment result', 500);
+            throw new ReviewServiceError('Unable to save review result', 500);
         }
 
         return { result };

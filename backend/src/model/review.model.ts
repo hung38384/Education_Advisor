@@ -1,15 +1,15 @@
-export interface AssessmentRecommendation {
+export interface ReviewRecommendation {
     name: string;
     score: number;
     reason: string;
 }
 
-export interface AssessmentResult {
+export interface ReviewResult {
     id: number;
     userId: number;
     overallScore: number;
     summary: string;
-    recommendations: AssessmentRecommendation[];
+    recommendations: ReviewRecommendation[];
     inputSnapshot: Record<string, unknown>;
     createdAt: string;
 }

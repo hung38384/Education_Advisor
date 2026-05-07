@@ -1,7 +1,7 @@
 import { RequestHandler, Router } from 'express';
-import { AssessmentController } from '../controllers/assessment.controller';
+import { ReviewController } from '../controllers/review.controller';
 
-export function createAssessmentRouter(controller: AssessmentController, authenticateToken: RequestHandler) {
+export function createReviewRouter(controller: ReviewController, authenticateToken: RequestHandler) {
     const router = Router();
 
     router.post('/api/review/run', authenticateToken, (req, res) => controller.run(req, res));

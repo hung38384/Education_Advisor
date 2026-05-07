@@ -1,13 +1,13 @@
 'use client';
 
 import { Button, Card } from '@/components/ui';
-import { useLatestAssessment, useRunAssessment } from '@/hooks/useAssessment';
+import { useLatestReview, useRunReview } from '@/hooks/useReview';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { useState } from 'react';
 
 export default function ReviewPage() {
-    const latestQuery = useLatestAssessment();
-    const runMutation = useRunAssessment();
+    const latestQuery = useLatestReview();
+    const runMutation = useRunReview();
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const result = latestQuery.data?.result ?? null;

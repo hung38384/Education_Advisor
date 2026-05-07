@@ -110,14 +110,14 @@ def _build_context_block(context: Dict[str, Any] | None) -> str:
         if mbti:
             lines.append(f"- MBTI: {mbti}")
 
-    assessment = context.get("assessment")
-    if isinstance(assessment, dict):
-        score = _to_text(assessment.get("overallScore"))
-        summary = _to_text(assessment.get("summary"))
+    review = context.get("review")
+    if isinstance(review, dict):
+        score = _to_text(review.get("overallScore"))
+        summary = _to_text(review.get("summary"))
         if score:
-            lines.append(f"- Điểm đánh giá gần nhất: {score}")
+            lines.append(f"- Điểm review gần nhất: {score}")
         if summary:
-            lines.append(f"- Tổng kết đánh giá: {summary}")
+            lines.append(f"- Tổng kết review: {summary}")
 
     history = context.get("history")
     if isinstance(history, list):

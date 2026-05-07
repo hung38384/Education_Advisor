@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import { sendError, sendSuccess } from '../utils/response';
-import { AssessmentService, AssessmentServiceError } from '../services/assessment.service';
+import { ReviewService, ReviewServiceError } from '../services/review.service';
 
-export class AssessmentController {
-    constructor(private service: AssessmentService) { }
+export class ReviewController {
+    constructor(private service: ReviewService) { }
 
     public async run(req: Request, res: Response): Promise<void> {
         try {
@@ -15,7 +15,7 @@ export class AssessmentController {
             const result = this.service.run(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to run assessment');
+            this.handleError(res, error, 'Failed to run review');
         }
     }
 
@@ -29,12 +29,12 @@ export class AssessmentController {
             const result = this.service.getLatest(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to get latest assessment');
+            this.handleError(res, error, 'Failed to get latest review');
         }
     }
 
     private handleError(res: Response, error: unknown, fallbackMessage: string): void {
-        if (error instanceof AssessmentServiceError) {
+        if (error instanceof ReviewServiceError) {
             sendError(res, error.message, error.statusCode);
             return;
         }
