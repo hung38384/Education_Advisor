@@ -26,24 +26,24 @@ export default function ForgotPasswordPage() {
             setDevResetToken(result.resetToken ?? null);
             setDevResetLink(result.resetLink ?? null);
         } catch (error) {
-            setMessage(getApiErrorMessage(error, 'Failed to submit forgot password request'));
+            setMessage(getApiErrorMessage(error, 'Không thể gửi yêu cầu đặt lại mật khẩu'));
         }
     };
 
     return (
         <main className="mx-auto mt-10 w-full max-w-[520px] px-4">
             <Card>
-                <h1 className="mb-4 text-2xl font-semibold text-slate-900">Forgot Password</h1>
+                <h1 className="mb-4 text-2xl font-semibold text-slate-900">Quên mật khẩu</h1>
                 <form onSubmit={handleSubmit} className="grid gap-3">
                     <Input
                         type="email"
-                        placeholder="Email"
+                        placeholder="Địa chỉ email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
                     />
                     <Button type="submit" disabled={forgotPasswordMutation.isPending} className="w-full">
-                        {forgotPasswordMutation.isPending ? 'Sending...' : 'Send reset request'}
+                        {forgotPasswordMutation.isPending ? 'Đang gửi...' : 'Gửi yêu cầu đặt lại mật khẩu'}
                     </Button>
                 </form>
 
@@ -52,11 +52,11 @@ export default function ForgotPasswordPage() {
                 {devResetToken && (
                     <Card className="mt-4 border-dashed">
                         <p className="break-all text-sm text-slate-800">
-                            <strong>Dev reset token:</strong> <code>{devResetToken}</code>
+                            <strong>Mã đặt lại mật khẩu thử nghiệm:</strong> <code>{devResetToken}</code>
                         </p>
                         <p className="mt-2 text-sm">
                             <Link className="underline" href={`/reset-password?token=${encodeURIComponent(devResetToken)}`}>
-                                Open reset page with token
+                                Mở trang đặt lại mật khẩu bằng mã này
                             </Link>
                         </p>
                         {devResetLink && (
@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
                 )}
 
                 <p className="mt-4 text-sm text-slate-700">
-                    <Link className="underline" href="/login">Back to login</Link>
+                    <Link className="underline" href="/login">Quay lại đăng nhập</Link>
                 </p>
             </Card>
         </main>

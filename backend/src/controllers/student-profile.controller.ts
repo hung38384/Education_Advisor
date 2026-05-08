@@ -9,21 +9,21 @@ export class StudentProfileController {
     public async getMyProfile(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const result = this.service.getMyProfile(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to get profile');
+            this.handleError(res, error, 'Không thể lấy hồ sơ');
         }
     }
 
     public async upsertMyProfile(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
@@ -46,7 +46,7 @@ export class StudentProfileController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to save profile');
+            this.handleError(res, error, 'Không thể lưu hồ sơ');
         }
     }
 

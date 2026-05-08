@@ -16,19 +16,19 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-    { href: '/', label: 'Home' },
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/profile', label: 'Profile' },
-    { href: '/personality', label: 'Personality' },
-    { href: '/admissions', label: 'Admissions' },
-    { href: '/admissions/cart', label: 'Admissions Cart' },
-    { href: '/review', label: 'Review' },
-    { href: '/qa', label: 'Q&A' },
-    { href: '/admin/users', label: 'Admin Users', roles: ['superadmin'] },
+    { href: '/', label: 'Trang chủ' },
+    { href: '/dashboard', label: 'Tổng quan' },
+    { href: '/profile', label: 'Hồ sơ cá nhân' },
+    { href: '/personality', label: 'Đánh giá tính cách' },
+    { href: '/admissions', label: 'Trường học' },
+    { href: '/admissions/favorites', label: 'Yêu thích xét tuyển' },
+    { href: '/review', label: 'Đánh giá độ phù hợp' },
+    { href: '/qa', label: 'Trợ lý AI' },
+    { href: '/admin/users', label: 'Quản trị người dùng', roles: ['superadmin'] },
 ];
 
 function isActive(pathname: string, href: string): boolean {
-    if (href === '/admissions' && pathname.startsWith('/admissions/cart')) {
+    if (href === '/admissions' && pathname.startsWith('/admissions/favorites')) {
         return false;
     }
 
@@ -42,7 +42,7 @@ export default function AppSidebar({ role, onNavigate }: AppSidebarProps) {
 
     return (
         <nav className="flex h-full flex-col p-4">
-            <div className="mb-4 px-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Navigation</div>
+            <div className="mb-4 px-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Điều hướng</div>
             <div className="grid gap-1">
                 {items.map((item) => {
                     const active = isActive(pathname, item.href);

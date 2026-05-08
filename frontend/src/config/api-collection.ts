@@ -27,9 +27,9 @@ export const API_ROUTES = {
     },
     ADMISSIONS: {
         CATALOG: '/admissions/catalog',
-        CART_LIST: '/admissions/cart',
-        CART_CREATE: '/admissions/cart',
-        CART_DELETE: '/admissions/cart/{id}',
+        FAVORITES_LIST: '/admissions/favorites',
+        FAVORITES_CREATE: '/admissions/favorites',
+        FAVORITES_DELETE: '/admissions/favorites/{id}',
     },
     ADMIN_USER: {
         LIST: '/admin/users',

@@ -9,21 +9,21 @@ export class QAController {
     public async listConversations(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const result = this.service.listConversations(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to list QA conversations');
+            this.handleError(res, error, 'Không thể lấy danh sách cuộc trò chuyện');
         }
     }
 
     public async createConversation(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
@@ -34,14 +34,14 @@ export class QAController {
             );
             sendSuccess(res, result, 201);
         } catch (error) {
-            this.handleError(res, error, 'Failed to create QA conversation');
+            this.handleError(res, error, 'Không thể tạo cuộc trò chuyện');
         }
     }
 
     public async deleteConversation(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
@@ -49,14 +49,14 @@ export class QAController {
             const result = this.service.deleteConversation(req.user.userId, conversationId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to delete QA conversation');
+            this.handleError(res, error, 'Không thể xóa cuộc trò chuyện');
         }
     }
 
     public async listMessages(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
@@ -64,14 +64,14 @@ export class QAController {
             const result = this.service.listMessages(req.user.userId, conversationId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to list QA messages');
+            this.handleError(res, error, 'Không thể lấy tin nhắn cuộc trò chuyện');
         }
     }
 
     public async ask(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
@@ -84,7 +84,7 @@ export class QAController {
             );
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to process QA question');
+            this.handleError(res, error, 'Không thể xử lý câu hỏi');
         }
     }
 
@@ -95,7 +95,7 @@ export class QAController {
 
         const parsed = Number(rawValue);
         if (!Number.isInteger(parsed) || parsed <= 0) {
-            throw new QAServiceError('Conversation id is invalid', 400);
+            throw new QAServiceError('Mã cuộc trò chuyện không hợp lệ', 400);
         }
 
         return parsed;

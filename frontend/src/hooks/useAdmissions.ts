@@ -1,8 +1,87 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { admissionService, type CreateAdmissionCartPayload } from '@/services/admissionService';
+import {
+    admissionService,
+    type AdmissionCartResponse,
+    type AdmissionCartViewItem,
+    type AdmissionCatalogResponse,
+    type CreateAdmissionCartPayload,
+} from '@/services/admissionService';
 
 export const ADMISSION_CATALOG_QUERY_KEY = ['admissions', 'catalog'] as const;
 export const ADMISSION_CART_QUERY_KEY = ['admissions', 'cart'] as const;
+
+let nextOptimisticCartItemId = -1;
+
+function createEmptyProfile(): AdmissionCartResponse['profile'] {
+    return {
+        fullName: null,
+        averageGrade: null,
+        favoriteSubjects: [],
+        targetMajor: null,
+        targetUniversity: null,
+    };
+}
+
+type AddAdmissionCartContext = {
+    previousCart?: AdmissionCartResponse;
+    optimisticId?: number;
+};
+
+function hasSelection(item: AdmissionCartViewItem, payload: CreateAdmissionCartPayload): boolean {
+    return item.school.id === payload.schoolId && item.major.id === payload.majorId && item.method.id === payload.methodId;
+}
+
+function createEmptyCart(): AdmissionCartResponse {
+    return {
+        profile: createEmptyProfile(),
+        items: [],
+    };
+}
+
+function createOptimisticCartItem(
+    payload: CreateAdmissionCartPayload,
+    catalog: AdmissionCatalogResponse | undefined
+): AdmissionCartViewItem | null {
+    const school = catalog?.schools.find((entry) => entry.id === payload.schoolId);
+    const major = school?.majors.find((entry) => entry.id === payload.majorId);
+    const method = major?.admissionMethods.find((entry) => entry.id === payload.methodId);
+
+    if (!school || !major || !method) {
+        return null;
+    }
+
+    const optimisticId = nextOptimisticCartItemId;
+    nextOptimisticCartItemId -= 1;
+
+    return {
+        id: optimisticId,
+        createdAt: new Date().toISOString(),
+        school: {
+            id: school.id,
+            name: school.name,
+            city: school.city,
+        },
+        major: {
+            id: major.id,
+            name: major.name,
+            field: major.field,
+        },
+        method: {
+            id: method.id,
+            name: method.name,
+            type: method.type,
+            requiredAverage: method.requiredAverage,
+            description: method.description,
+        },
+        evaluation: {
+            chanceScore: 0,
+            chanceLevel: 'medium',
+            comment: 'Đang cập nhật đánh giá xét tuyển.',
+        },
+        orientation: 'Đang cập nhật định hướng học tập.',
+        studyPlan: ['Đang cập nhật kế hoạch học tập.'],
+    };
+}
 
 export function useAdmissionCatalog() {
     return useQuery({
@@ -23,7 +102,54 @@ export function useAddAdmissionCartItem() {
 
     return useMutation({
         mutationFn: (payload: CreateAdmissionCartPayload) => admissionService.addToCart(payload),
-        onSuccess: () => {
+        onMutate: async (payload): Promise<AddAdmissionCartContext> => {
+            await queryClient.cancelQueries({ queryKey: ADMISSION_CART_QUERY_KEY });
+
+            const previousCart = queryClient.getQueryData<AdmissionCartResponse>(ADMISSION_CART_QUERY_KEY);
+            const catalog = queryClient.getQueryData<AdmissionCatalogResponse>(ADMISSION_CATALOG_QUERY_KEY);
+            const optimisticItem = createOptimisticCartItem(payload, catalog);
+            const baseCart = previousCart ?? createEmptyCart();
+
+            if (optimisticItem && !baseCart.items.some((item) => hasSelection(item, payload))) {
+                queryClient.setQueryData<AdmissionCartResponse>(ADMISSION_CART_QUERY_KEY, {
+                    ...baseCart,
+                    items: [...baseCart.items, optimisticItem],
+                });
+            }
+
+            return {
+                previousCart,
+                optimisticId: optimisticItem?.id,
+            };
+        },
+        onError: (_error, _payload, context) => {
+            if (context?.optimisticId !== undefined) {
+                queryClient.setQueryData<AdmissionCartResponse>(ADMISSION_CART_QUERY_KEY, (currentCart) => {
+                    if (!currentCart) {
+                        return context.previousCart;
+                    }
+
+                    return {
+                        ...currentCart,
+                        items: currentCart.items.filter((item) => item.id !== context.optimisticId),
+                    };
+                });
+            }
+        },
+        onSuccess: (result, payload, context) => {
+            queryClient.setQueryData<AdmissionCartResponse>(ADMISSION_CART_QUERY_KEY, (currentCart) => {
+                const baseCart = currentCart ?? context?.previousCart ?? createEmptyCart();
+                const items = baseCart.items.filter(
+                    (item) => item.id !== context?.optimisticId && !hasSelection(item, payload)
+                );
+
+                return {
+                    ...baseCart,
+                    items: [...items, result.item],
+                };
+            });
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ADMISSION_CART_QUERY_KEY });
         },
     });

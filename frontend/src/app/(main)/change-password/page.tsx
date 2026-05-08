@@ -30,18 +30,18 @@ export default function ChangePasswordPage() {
             setNewPassword('');
             setTimeout(() => router.push('/profile'), 800);
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'Unable to change password'));
+            setErrorMessage(getApiErrorMessage(error, 'Không thể đổi mật khẩu'));
         }
     };
 
     return (
         <main className="mx-auto mt-6 w-full max-w-[560px] px-4">
             <Card className="space-y-4">
-                <h1 className="text-2xl font-semibold text-slate-900">Change Password</h1>
+                <h1 className="text-2xl font-semibold text-slate-900">Đổi mật khẩu</h1>
                 <form onSubmit={handleSubmit} className="grid gap-3">
                     <Input
                         type="password"
-                        placeholder="Current password"
+                        placeholder="Mật khẩu hiện tại"
                         value={oldPassword}
                         onChange={(event) => setOldPassword(event.target.value)}
                         minLength={8}
@@ -49,14 +49,14 @@ export default function ChangePasswordPage() {
                     />
                     <Input
                         type="password"
-                        placeholder="New password (min 8 chars)"
+                        placeholder="Mật khẩu mới (tối thiểu 8 ký tự)"
                         value={newPassword}
                         onChange={(event) => setNewPassword(event.target.value)}
                         minLength={8}
                         required
                     />
                     <Button type="submit" disabled={changePasswordMutation.isPending}>
-                        {changePasswordMutation.isPending ? 'Updating...' : 'Update password'}
+                        {changePasswordMutation.isPending ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
                     </Button>
                 </form>
 

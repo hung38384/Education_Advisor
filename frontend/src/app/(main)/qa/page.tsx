@@ -40,7 +40,11 @@ function formatLatencyLabel(latencyMs: unknown): string | null {
         return null;
     }
 
-    return `${Math.round(latencyMs)}ms`;
+    return `${Math.round(latencyMs)} mili giây`;
+}
+
+function getMessageRoleLabel(role: string): string {
+    return role === 'assistant' ? 'Trợ lý' : 'Bạn';
 }
 
 function getToolsUsed(metadata: QAMessageMetadata | null): string[] {
@@ -160,7 +164,7 @@ export default function QAPage() {
 
     return (
         <main className="space-y-5">
-            <h1 className="text-2xl font-semibold text-slate-900">Q&A Assistant</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">Trợ lý AI</h1>
 
             <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
                 <Card className="space-y-3">
@@ -286,7 +290,7 @@ export default function QAPage() {
                                                 : 'bg-slate-900 text-white',
                                         ].join(' ')}
                                     >
-                                        <p className="mb-1 text-xs uppercase tracking-wide opacity-80">{item.role}</p>
+                                        <p className="mb-1 text-xs uppercase tracking-wide opacity-80">{getMessageRoleLabel(item.role)}</p>
                                         <p className="whitespace-pre-wrap break-words">{item.message}</p>
 
                                         {item.role === 'assistant' && hasMetadataDetails && (
@@ -294,58 +298,58 @@ export default function QAPage() {
                                                 <div className="flex flex-wrap gap-2">
                                                     {strategy && (
                                                         <span className="rounded bg-slate-200 px-2 py-0.5">
-                                                            strategy: {strategy}
+                                                            Chiến lược: {strategy}
                                                         </span>
                                                     )}
                                                     {provider && (
                                                         <span className="rounded bg-slate-200 px-2 py-0.5">
-                                                            provider: {provider}
+                                                            Nhà cung cấp: {provider}
                                                         </span>
                                                     )}
                                                     {model && (
                                                         <span className="rounded bg-slate-200 px-2 py-0.5">
-                                                            model: {model}
+                                                            Mô hình: {model}
                                                         </span>
                                                     )}
                                                     {latencyLabel && (
                                                         <span className="rounded bg-slate-200 px-2 py-0.5">
-                                                            latency: {latencyLabel}
+                                                            Độ trễ: {latencyLabel}
                                                         </span>
                                                     )}
                                                 </div>
 
                                                 {toolsUsed.length > 0 && (
                                                     <p>
-                                                        <span className="font-medium">Tools:</span>{' '}
+                                                        <span className="font-medium">Công cụ:</span>{' '}
                                                         {toolsUsed.join(', ')}
                                                     </p>
                                                 )}
 
                                                 {fallbackReason && (
                                                     <p>
-                                                        <span className="font-medium">Fallback reason:</span>{' '}
+                                                        <span className="font-medium">Lý do dùng phương án dự phòng:</span>{' '}
                                                         {fallbackReason}
                                                     </p>
                                                 )}
 
                                                 {mode && (
                                                     <p>
-                                                        <span className="font-medium">Mode:</span>{' '}
+                                                        <span className="font-medium">Chế độ:</span>{' '}
                                                         {mode}
                                                     </p>
                                                 )}
 
                                                 {unavailableReason && (
                                                     <p>
-                                                        <span className="font-medium">Unavailable reason:</span>{' '}
+                                                        <span className="font-medium">Lý do không khả dụng:</span>{' '}
                                                         {unavailableReason}
                                                     </p>
                                                 )}
 
                                                 {scoreRecoveryApplied && (
                                                     <p>
-                                                        <span className="font-medium">Score recovery:</span>{' '}
-                                                        Applied
+                                                        <span className="font-medium">Khôi phục điểm:</span>{' '}
+                                                        Đã áp dụng
                                                     </p>
                                                 )}
                                             </div>

@@ -27,7 +27,7 @@ export class StudentProfileService {
         const sanitized = this.sanitizeInput(input);
         const profile = this.repository.upsertByUserId(userId, sanitized);
         if (!profile) {
-            throw new StudentProfileServiceError('Unable to save profile', 500);
+            throw new StudentProfileServiceError('Không thể lưu hồ sơ', 500);
         }
 
         return { profile };
@@ -36,7 +36,7 @@ export class StudentProfileService {
     private sanitizeInput(input: UpsertStudentProfileInput): UpsertStudentProfileInput {
         const fullName = (input.fullName ?? '').trim();
         if (!fullName) {
-            throw new StudentProfileServiceError('Full name is required', 400);
+            throw new StudentProfileServiceError('Vui lòng nhập họ và tên', 400);
         }
 
         const grade10 = this.normalizeScore(input.grade10);
@@ -81,7 +81,7 @@ export class StudentProfileService {
 
         const normalized = Number(value);
         if (!Number.isFinite(normalized) || normalized < 0 || normalized > 10) {
-            throw new StudentProfileServiceError('Scores must be between 0 and 10', 400);
+            throw new StudentProfileServiceError('Điểm phải nằm trong khoảng từ 0 đến 10', 400);
         }
 
         return Number(normalized.toFixed(2));

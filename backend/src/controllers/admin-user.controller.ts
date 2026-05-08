@@ -11,7 +11,7 @@ export class AdminUserController {
             const result = this.service.listUsers();
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to list users');
+            this.handleError(res, error, 'Không thể lấy danh sách người dùng');
         }
     }
 
@@ -27,7 +27,7 @@ export class AdminUserController {
 
             sendCreated(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to create user');
+            this.handleError(res, error, 'Không thể tạo người dùng');
         }
     }
 
@@ -35,13 +35,13 @@ export class AdminUserController {
         try {
             const actorUserId = req.user?.userId;
             if (!actorUserId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const targetUserId = Number(req.params.id);
             if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
-                sendBadRequest(res, 'User id is invalid');
+                sendBadRequest(res, 'Mã người dùng không hợp lệ');
                 return;
             }
 
@@ -54,7 +54,7 @@ export class AdminUserController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to update role');
+            this.handleError(res, error, 'Không thể cập nhật vai trò');
         }
     }
 
@@ -62,13 +62,13 @@ export class AdminUserController {
         try {
             const actorUserId = req.user?.userId;
             if (!actorUserId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const targetUserId = Number(req.params.id);
             if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
-                sendBadRequest(res, 'User id is invalid');
+                sendBadRequest(res, 'Mã người dùng không hợp lệ');
                 return;
             }
 
@@ -81,7 +81,7 @@ export class AdminUserController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to update status');
+            this.handleError(res, error, 'Không thể cập nhật trạng thái');
         }
     }
 
@@ -89,13 +89,13 @@ export class AdminUserController {
         try {
             const actorUserId = req.user?.userId;
             if (!actorUserId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const targetUserId = Number(req.params.id);
             if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
-                sendBadRequest(res, 'User id is invalid');
+                sendBadRequest(res, 'Mã người dùng không hợp lệ');
                 return;
             }
 
@@ -106,7 +106,7 @@ export class AdminUserController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to delete user');
+            this.handleError(res, error, 'Không thể xóa người dùng');
         }
     }
 

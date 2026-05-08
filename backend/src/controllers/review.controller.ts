@@ -8,28 +8,28 @@ export class ReviewController {
     public async run(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const result = this.service.run(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to run review');
+            this.handleError(res, error, 'Không thể chạy đánh giá độ phù hợp');
         }
     }
 
     public async latest(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const result = this.service.getLatest(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to get latest review');
+            this.handleError(res, error, 'Không thể lấy kết quả đánh giá độ phù hợp mới nhất');
         }
     }
 

@@ -10,7 +10,7 @@ export class AuthController {
         try {
             const body = await parseBody(req);
             if (body && typeof body === 'object' && Object.prototype.hasOwnProperty.call(body, 'role')) {
-                sendBadRequest(res, 'Role field is not allowed for public registration');
+                sendBadRequest(res, 'Trường vai trò không được phép trong đăng ký công khai.');
                 return;
             }
 
@@ -22,7 +22,7 @@ export class AuthController {
 
             sendCreated(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to register');
+            this.handleError(res, error, 'Không thể đăng ký');
         }
     }
 
@@ -36,7 +36,7 @@ export class AuthController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to login');
+            this.handleError(res, error, 'Không thể đăng nhập');
         }
     }
 
@@ -49,7 +49,7 @@ export class AuthController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to process forgot password');
+            this.handleError(res, error, 'Không thể xử lý yêu cầu quên mật khẩu');
         }
     }
 
@@ -63,14 +63,14 @@ export class AuthController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to reset password');
+            this.handleError(res, error, 'Không thể đặt lại mật khẩu');
         }
     }
 
     public async changePassword(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
@@ -83,21 +83,21 @@ export class AuthController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to change password');
+            this.handleError(res, error, 'Không thể đổi mật khẩu');
         }
     }
 
     public async me(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const result = await this.service.getMe(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to get current user');
+            this.handleError(res, error, 'Không thể lấy thông tin người dùng hiện tại');
         }
     }
 

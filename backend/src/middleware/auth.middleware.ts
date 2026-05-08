@@ -20,13 +20,13 @@ export function createAuthenticateToken(userRepository: UserRepository) {
     return (req: Request, res: Response, next: NextFunction): void => {
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            sendError(res, 'Unauthorized', 401);
+            sendError(res, 'Phiên đăng nhập không hợp lệ', 401);
             return;
         }
 
         const token = authHeader.slice('Bearer '.length).trim();
         if (!token) {
-            sendError(res, 'Unauthorized', 401);
+            sendError(res, 'Phiên đăng nhập không hợp lệ', 401);
             return;
         }
 
@@ -41,7 +41,7 @@ export function createAuthenticateToken(userRepository: UserRepository) {
                 || typeof (decoded as JwtAccessPayload).userId !== 'number'
                 || typeof (decoded as JwtAccessPayload).tokenVersion !== 'number'
             ) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Phiên đăng nhập không hợp lệ', 401);
                 return;
             }
 
@@ -49,17 +49,17 @@ export function createAuthenticateToken(userRepository: UserRepository) {
             const tokenVersion = (decoded as JwtAccessPayload).tokenVersion;
             const user = userRepository.findByIdIncludingDeleted(userId);
             if (!user) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Phiên đăng nhập không hợp lệ', 401);
                 return;
             }
 
             if (user.deletedAt || user.accountStatus !== 'active') {
-                sendError(res, 'Forbidden', 403);
+                sendError(res, 'Bạn không có quyền thực hiện thao tác này', 403);
                 return;
             }
 
             if (user.tokenVersion !== tokenVersion) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Phiên đăng nhập không hợp lệ', 401);
                 return;
             }
 
@@ -69,7 +69,7 @@ export function createAuthenticateToken(userRepository: UserRepository) {
             };
             next();
         } catch (error) {
-            sendError(res, 'Unauthorized', 401);
+            sendError(res, 'Phiên đăng nhập không hợp lệ', 401);
         }
     };
 }

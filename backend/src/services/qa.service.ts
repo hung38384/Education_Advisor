@@ -69,7 +69,7 @@ export class QAService {
         });
 
         if (!conversation) {
-            throw new QAServiceError('Unable to create conversation', 500);
+            throw new QAServiceError('Không thể tạo cuộc trò chuyện', 500);
         }
 
         return { conversation };
@@ -78,15 +78,15 @@ export class QAService {
     deleteConversation(userId: number, conversationId: number): { message: string } {
         const existing = this.ensureConversationOwnership(userId, conversationId);
         if (!existing) {
-            throw new QAServiceError('Conversation not found', 404);
+            throw new QAServiceError('Không tìm thấy cuộc trò chuyện', 404);
         }
 
         const deleted = this.qaRepository.deleteConversation(userId, conversationId);
         if (!deleted) {
-            throw new QAServiceError('Unable to delete conversation', 500);
+            throw new QAServiceError('Không thể xóa cuộc trò chuyện', 500);
         }
 
-        return { message: 'Conversation deleted successfully' };
+        return { message: 'Đã xóa cuộc trò chuyện thành công' };
     }
 
     listMessages(userId: number, conversationId?: number): QAHistoryResult {
@@ -107,11 +107,11 @@ export class QAService {
     async ask(userId: number, question: string, conversationId?: number): Promise<AskQuestionResult> {
         const normalizedQuestion = question.trim();
         if (!normalizedQuestion) {
-            throw new QAServiceError('Question is required', 400);
+            throw new QAServiceError('Vui lòng nhập câu hỏi', 400);
         }
 
         if (normalizedQuestion.length > 1000) {
-            throw new QAServiceError('Question is too long', 400);
+            throw new QAServiceError('Câu hỏi quá dài', 400);
         }
 
         const resolvedConversationId = this.resolveConversationIdForAsk(userId, conversationId);
@@ -124,7 +124,7 @@ export class QAService {
         });
 
         if (!userMessage) {
-            throw new QAServiceError('Unable to save question', 500);
+            throw new QAServiceError('Không thể lưu câu hỏi', 500);
         }
 
         const context = this.buildContext(userId);
@@ -144,7 +144,7 @@ export class QAService {
         });
 
         if (!assistantMessage) {
-            throw new QAServiceError('Unable to save answer', 500);
+            throw new QAServiceError('Không thể lưu câu trả lời', 500);
         }
 
         return {
@@ -170,7 +170,7 @@ export class QAService {
         }
 
         if (normalized.length > CONVERSATION_TITLE_MAX_LENGTH) {
-            throw new QAServiceError('Conversation title is too long', 400);
+            throw new QAServiceError('Tiêu đề cuộc trò chuyện quá dài', 400);
         }
 
         return normalized;
@@ -178,7 +178,7 @@ export class QAService {
 
     private ensureConversationOwnership(userId: number, conversationId: number): QAConversation | null {
         if (!Number.isInteger(conversationId) || conversationId <= 0) {
-            throw new QAServiceError('Conversation id is invalid', 400);
+            throw new QAServiceError('Mã cuộc trò chuyện không hợp lệ', 400);
         }
 
         const conversation = this.qaRepository.findConversationById(userId, conversationId);
@@ -189,7 +189,7 @@ export class QAService {
         if (requestedConversationId !== undefined) {
             const conversation = this.ensureConversationOwnership(userId, requestedConversationId);
             if (!conversation) {
-                throw new QAServiceError('Conversation not found', 404);
+                throw new QAServiceError('Không tìm thấy cuộc trò chuyện', 404);
             }
 
             return conversation.id;
@@ -207,7 +207,7 @@ export class QAService {
         if (requestedConversationId !== undefined) {
             const conversation = this.ensureConversationOwnership(userId, requestedConversationId);
             if (!conversation) {
-                throw new QAServiceError('Conversation not found', 404);
+                throw new QAServiceError('Không tìm thấy cuộc trò chuyện', 404);
             }
 
             return conversation.id;
@@ -223,7 +223,7 @@ export class QAService {
             title: DEFAULT_CONVERSATION_TITLE,
         });
         if (!created) {
-            throw new QAServiceError('Unable to create conversation', 500);
+            throw new QAServiceError('Không thể tạo cuộc trò chuyện', 500);
         }
 
         return created.id;

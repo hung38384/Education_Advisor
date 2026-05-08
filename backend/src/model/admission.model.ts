@@ -13,6 +13,7 @@ export interface AdmissionMethod {
     requiredAverage: number;
     difficulty: number;
     description: string;
+    personalizedComment?: string;
 }
 
 export interface AdmissionMajor {

@@ -65,7 +65,7 @@ export class AdminUserService {
 
         const existingUser = this.userRepository.findByEmail(email);
         if (existingUser) {
-            throw new AdminUserServiceError('Email is already registered', 409);
+            throw new AdminUserServiceError('Email đã được đăng ký', 409);
         }
 
         const passwordHash = bcrypt.hashSync(password, 10);
@@ -80,18 +80,18 @@ export class AdminUserService {
             });
         } catch (error) {
             if (this.isUniqueEmailConstraintError(error)) {
-                throw new AdminUserServiceError('Email is already registered', 409);
+                throw new AdminUserServiceError('Email đã được đăng ký', 409);
             }
 
             throw error;
         }
 
         if (!user) {
-            throw new AdminUserServiceError('Unable to create user', 500);
+            throw new AdminUserServiceError('Không thể tạo người dùng', 500);
         }
 
         return {
-            message: 'User created successfully',
+            message: 'Tạo người dùng thành công',
             user: toPublicUser(user),
         };
     }
@@ -101,12 +101,12 @@ export class AdminUserService {
         const role = this.normalizeRole(input.role);
 
         if (actorUserId === targetUserId) {
-            throw new AdminUserServiceError('You cannot change your own role', 400);
+            throw new AdminUserServiceError('Bạn không thể tự thay đổi vai trò của mình', 400);
         }
 
         const targetUser = this.userRepository.findById(targetUserId);
         if (!targetUser) {
-            throw new AdminUserServiceError('User not found', 404);
+            throw new AdminUserServiceError('Không tìm thấy người dùng', 404);
         }
 
         if (targetUser.role === 'superadmin' && targetUser.accountStatus === 'active' && role !== 'superadmin') {
@@ -115,11 +115,11 @@ export class AdminUserService {
 
         const updatedUser = this.userRepository.updateRole(targetUserId, role);
         if (!updatedUser) {
-            throw new AdminUserServiceError('Unable to update role', 500);
+            throw new AdminUserServiceError('Không thể cập nhật vai trò', 500);
         }
 
         return {
-            message: 'User role updated successfully',
+            message: 'Cập nhật vai trò người dùng thành công',
             user: toPublicUser(updatedUser),
         };
     }
@@ -129,12 +129,12 @@ export class AdminUserService {
         const accountStatus = this.normalizeAccountStatus(input.accountStatus);
 
         if (actorUserId === targetUserId) {
-            throw new AdminUserServiceError('You cannot change your own status', 400);
+            throw new AdminUserServiceError('Bạn không thể tự thay đổi trạng thái của mình', 400);
         }
 
         const targetUser = this.userRepository.findById(targetUserId);
         if (!targetUser) {
-            throw new AdminUserServiceError('User not found', 404);
+            throw new AdminUserServiceError('Không tìm thấy người dùng', 404);
         }
 
         if (targetUser.role === 'superadmin' && targetUser.accountStatus === 'active' && accountStatus === 'disabled') {
@@ -143,11 +143,11 @@ export class AdminUserService {
 
         const updatedUser = this.userRepository.updateStatus(targetUserId, accountStatus);
         if (!updatedUser) {
-            throw new AdminUserServiceError('Unable to update status', 500);
+            throw new AdminUserServiceError('Không thể cập nhật trạng thái', 500);
         }
 
         return {
-            message: 'User status updated successfully',
+            message: 'Cập nhật trạng thái người dùng thành công',
             user: toPublicUser(updatedUser),
         };
     }
@@ -156,12 +156,12 @@ export class AdminUserService {
         const { actorUserId, targetUserId } = input;
 
         if (actorUserId === targetUserId) {
-            throw new AdminUserServiceError('You cannot delete your own account', 400);
+            throw new AdminUserServiceError('Bạn không thể tự xóa tài khoản của mình', 400);
         }
 
         const targetUser = this.userRepository.findById(targetUserId);
         if (!targetUser) {
-            throw new AdminUserServiceError('User not found', 404);
+            throw new AdminUserServiceError('Không tìm thấy người dùng', 404);
         }
 
         if (targetUser.role === 'superadmin' && targetUser.accountStatus === 'active') {
@@ -171,16 +171,16 @@ export class AdminUserService {
         const deletedAt = this.toSqliteDate(new Date());
         const deletedUser = this.userRepository.softDelete(targetUserId, deletedAt);
         if (!deletedUser) {
-            throw new AdminUserServiceError('Unable to delete user', 500);
+            throw new AdminUserServiceError('Không thể xóa người dùng', 500);
         }
 
-        return { message: 'User deleted successfully' };
+        return { message: 'Xóa người dùng thành công' };
     }
 
     private ensureNotLastSuperadmin(): void {
         const totalSuperadmin = this.userRepository.countActiveByRole('superadmin');
         if (totalSuperadmin <= 1) {
-            throw new AdminUserServiceError('Cannot modify the last active superadmin', 400);
+            throw new AdminUserServiceError('Không thể thay đổi siêu quản trị đang hoạt động cuối cùng', 400);
         }
     }
 
@@ -190,14 +190,14 @@ export class AdminUserService {
 
     private normalizeRole(role: UserRole | undefined): UserRole {
         if (!role || !USER_ROLES.includes(role)) {
-            throw new AdminUserServiceError('Role is invalid', 400);
+            throw new AdminUserServiceError('Vai trò không hợp lệ', 400);
         }
         return role;
     }
 
     private normalizeAccountStatus(accountStatus: AccountStatus | undefined): AccountStatus {
         if (!accountStatus || !ACCOUNT_STATUSES.includes(accountStatus)) {
-            throw new AdminUserServiceError('Account status is invalid', 400);
+            throw new AdminUserServiceError('Trạng thái tài khoản không hợp lệ', 400);
         }
         return accountStatus;
     }
@@ -205,19 +205,19 @@ export class AdminUserService {
     private validateEmail(email: string): void {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            throw new AdminUserServiceError('Email is invalid', 400);
+            throw new AdminUserServiceError('Email không hợp lệ', 400);
         }
     }
 
     private validatePassword(password: string): void {
         if (password.length < MIN_PASSWORD_LENGTH) {
-            throw new AdminUserServiceError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 400);
+            throw new AdminUserServiceError(`Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự`, 400);
         }
     }
 
     private validateName(name: string): void {
         if (!name) {
-            throw new AdminUserServiceError('Name is required', 400);
+            throw new AdminUserServiceError('Vui lòng nhập họ và tên', 400);
         }
     }
 

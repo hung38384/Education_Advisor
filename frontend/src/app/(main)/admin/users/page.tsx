@@ -24,7 +24,7 @@ export default function AdminUsersPage() {
             const result = await adminUserService.listUsers();
             setUsers(result.users);
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'Cannot load users'));
+            setErrorMessage(getApiErrorMessage(error, 'Không tải được danh sách người dùng'));
         } finally {
             setLoading(false);
         }
@@ -48,7 +48,7 @@ export default function AdminUsersPage() {
             setRole('admin');
             await loadUsers();
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'Cannot create user'));
+            setErrorMessage(getApiErrorMessage(error, 'Không tạo được người dùng'));
         }
     };
 
@@ -60,7 +60,7 @@ export default function AdminUsersPage() {
             setMessage(result.message);
             await loadUsers();
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'Cannot update role'));
+            setErrorMessage(getApiErrorMessage(error, 'Không cập nhật được vai trò'));
         }
     };
 
@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
             setMessage(result.message);
             await loadUsers();
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'Cannot update status'));
+            setErrorMessage(getApiErrorMessage(error, 'Không cập nhật được trạng thái'));
         }
     };
 
@@ -84,34 +84,34 @@ export default function AdminUsersPage() {
             setMessage(result.message);
             await loadUsers();
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'Cannot delete user'));
+            setErrorMessage(getApiErrorMessage(error, 'Không xóa được người dùng'));
         }
     };
 
     return (
         <main className="space-y-5 p-6">
-            <h1 className="text-2xl font-semibold text-slate-900">Admin User Management</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">Quản trị người dùng</h1>
 
             <Card className="space-y-4">
-                <h2 className="text-lg font-semibold text-slate-900">Create Admin / Superadmin</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Tạo quản trị viên / siêu quản trị</h2>
                 <form onSubmit={handleCreateUser} className="grid max-w-[420px] gap-3">
                     <Input
                         type="text"
-                        placeholder="Name"
+                        placeholder="Họ và tên"
                         value={name}
                         onChange={(event) => setName(event.target.value)}
                         required
                     />
                     <Input
                         type="email"
-                        placeholder="Email"
+                        placeholder="Địa chỉ email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
                     />
                     <Input
                         type="password"
-                        placeholder="Password (min 8 chars)"
+                        placeholder="Mật khẩu (tối thiểu 8 ký tự)"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         minLength={8}
@@ -122,11 +122,11 @@ export default function AdminUsersPage() {
                         value={role}
                         onChange={(event) => setRole(event.target.value as UserRole)}
                     >
-                        <option value="admin">admin</option>
-                        <option value="superadmin">superadmin</option>
+                        <option value="admin">Quản trị viên</option>
+                        <option value="superadmin">Siêu quản trị</option>
                     </select>
                     <Button type="submit" className="w-full sm:w-fit">
-                        Create
+                        Tạo người dùng
                     </Button>
                 </form>
             </Card>
@@ -135,20 +135,20 @@ export default function AdminUsersPage() {
             {errorMessage && <p className="text-sm text-red-700">{errorMessage}</p>}
 
             <Card className="space-y-4">
-                <h2 className="text-lg font-semibold text-slate-900">User List</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Danh sách người dùng</h2>
                 {loading ? (
-                    <p className="text-sm text-slate-700">Loading...</p>
+                    <p className="text-sm text-slate-700">Đang tải...</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="min-w-full border-collapse text-sm">
                             <thead>
                                 <tr>
-                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">ID</th>
-                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Name</th>
-                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Email</th>
-                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Role</th>
-                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Status</th>
-                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Actions</th>
+                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Mã</th>
+                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Họ và tên</th>
+                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Địa chỉ email</th>
+                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Vai trò</th>
+                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Trạng thái</th>
+                                    <th className="border-b border-slate-300 p-2 text-left font-semibold text-slate-700">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -165,8 +165,8 @@ export default function AdminUsersPage() {
                                                     void handleUpdateRole(user.id, event.target.value as UserRole);
                                                 }}
                                             >
-                                                <option value="admin">admin</option>
-                                                <option value="superadmin">superadmin</option>
+                                                <option value="admin">Quản trị viên</option>
+                                                <option value="superadmin">Siêu quản trị</option>
                                             </select>
                                         </td>
                                         <td className="border-b border-slate-200 p-2">
@@ -177,8 +177,8 @@ export default function AdminUsersPage() {
                                                     void handleUpdateStatus(user.id, event.target.value as AccountStatus);
                                                 }}
                                             >
-                                                <option value="active">active</option>
-                                                <option value="disabled">disabled</option>
+                                                <option value="active">Đang hoạt động</option>
+                                                <option value="disabled">Đã vô hiệu hóa</option>
                                             </select>
                                         </td>
                                         <td className="border-b border-slate-200 p-2">
@@ -187,7 +187,7 @@ export default function AdminUsersPage() {
                                                 variant="secondary"
                                                 onClick={() => void handleDelete(user.id)}
                                             >
-                                                Soft Delete
+                                                Xóa mềm
                                             </Button>
                                         </td>
                                     </tr>

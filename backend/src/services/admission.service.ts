@@ -19,60 +19,60 @@ import { StudentProfileRepository } from '../repository/student-profile.reposito
 const ADMISSION_CATALOG: AdmissionSchool[] = [
     {
         id: 'hust',
-        name: 'DH Bach Khoa Ha Noi',
-        city: 'Ha Noi',
+        name: 'Đại học Bách khoa Hà Nội',
+        city: 'Hà Nội',
         majors: [
             {
                 id: 'software-engineering',
-                name: 'Ky thuat phan mem',
+                name: 'Kỹ thuật phần mềm',
                 field: 'engineering',
                 admissionMethods: [
                     {
                         id: 'thpt-a00',
-                        name: 'THPT - Toan Ly Hoa',
+                        name: 'THPT - Toán Lý Hóa',
                         type: 'thpt',
                         requiredAverage: 8.6,
                         difficulty: 5,
-                        description: 'Can nen tang Toan va Ly on dinh trong cac ky thi tong hop.',
+                        description: 'Cần nền tảng Toán và Lý ổn định trong các kỳ thi tổng hợp.',
                     },
                     {
                         id: 'tsa',
-                        name: 'Danh gia tu duy',
+                        name: 'Đánh giá tư duy',
                         type: 'competency',
                         requiredAverage: 8.2,
                         difficulty: 4,
-                        description: 'Phu hop hoc sinh co tu duy logic va giai quyet van de.',
+                        description: 'Phù hợp học sinh có tư duy logic và khả năng giải quyết vấn đề.',
                     },
                     {
                         id: 'transcript-tech',
-                        name: 'Xet hoc ba',
+                        name: 'Xét học bạ',
                         type: 'transcript',
                         requiredAverage: 8.8,
                         difficulty: 5,
-                        description: 'Uu tien ket qua hoc tap on dinh trong 3 nam THPT.',
+                        description: 'Ưu tiên kết quả học tập ổn định trong 3 năm THPT.',
                     },
                 ],
             },
             {
                 id: 'data-science',
-                name: 'Khoa hoc du lieu',
+                name: 'Khoa học dữ liệu',
                 field: 'engineering',
                 admissionMethods: [
                     {
                         id: 'thpt-a01',
-                        name: 'THPT - Toan Ly Anh',
+                        name: 'THPT - Toán Lý Anh',
                         type: 'thpt',
                         requiredAverage: 8.5,
                         difficulty: 5,
-                        description: 'Can dong deu Toan va Tieng Anh de dap ung dau vao.',
+                        description: 'Cần học đều Toán và Tiếng Anh để đáp ứng yêu cầu đầu vào.',
                     },
                     {
                         id: 'tsa-data',
-                        name: 'Danh gia tu duy',
+                        name: 'Đánh giá tư duy',
                         type: 'competency',
                         requiredAverage: 8.1,
                         difficulty: 4,
-                        description: 'Nhanh voi bai toan logic, doc hieu va xu ly du lieu.',
+                        description: 'Nhanh với bài toán logic, đọc hiểu và xử lý dữ liệu.',
                     },
                 ],
             },
@@ -80,60 +80,60 @@ const ADMISSION_CATALOG: AdmissionSchool[] = [
     },
     {
         id: 'neu',
-        name: 'DH Kinh Te Quoc Dan',
-        city: 'Ha Noi',
+        name: 'Đại học Kinh tế Quốc dân',
+        city: 'Hà Nội',
         majors: [
             {
                 id: 'business-admin',
-                name: 'Quan tri kinh doanh',
+                name: 'Quản trị kinh doanh',
                 field: 'business',
                 admissionMethods: [
                     {
                         id: 'thpt-d01',
-                        name: 'THPT - Toan Van Anh',
+                        name: 'THPT - Toán Văn Anh',
                         type: 'thpt',
                         requiredAverage: 8.0,
                         difficulty: 4,
-                        description: 'Can kha nang tong hop Toan, Van va Tieng Anh.',
+                        description: 'Cần khả năng tổng hợp Toán, Văn và Tiếng Anh.',
                     },
                     {
                         id: 'transcript-business',
-                        name: 'Xet hoc ba',
+                        name: 'Xét học bạ',
                         type: 'transcript',
                         requiredAverage: 8.2,
                         difficulty: 3,
-                        description: 'Tap trung vao su on dinh va tien bo qua tung hoc ky.',
+                        description: 'Tập trung vào sự ổn định và tiến bộ qua từng học kỳ.',
                     },
                     {
                         id: 'competency-business',
-                        name: 'Danh gia nang luc',
+                        name: 'Đánh giá năng lực',
                         type: 'competency',
                         requiredAverage: 7.9,
                         difficulty: 3,
-                        description: 'Danh gia kha nang phan tich, lap luan va doc hieu.',
+                        description: 'Đánh giá khả năng phân tích, lập luận và đọc hiểu.',
                     },
                 ],
             },
             {
                 id: 'marketing',
-                name: 'Marketing',
+                name: 'Tiếp thị',
                 field: 'business',
                 admissionMethods: [
                     {
                         id: 'thpt-c00',
-                        name: 'THPT - Van Su Dia',
+                        name: 'THPT - Văn Sử Địa',
                         type: 'thpt',
                         requiredAverage: 7.8,
                         difficulty: 3,
-                        description: 'Phu hop hoc sinh co the manh giao tiep va xa hoi.',
+                        description: 'Phù hợp học sinh có thế mạnh giao tiếp và xã hội.',
                     },
                     {
                         id: 'transcript-marketing',
-                        name: 'Xet hoc ba',
+                        name: 'Xét học bạ',
                         type: 'transcript',
                         requiredAverage: 8.0,
                         difficulty: 3,
-                        description: 'Can bo ho so hoc tap va hoat dong ngoai khoa hop ly.',
+                        description: 'Cần bổ sung hồ sơ học tập và hoạt động ngoại khóa hợp lý.',
                     },
                 ],
             },
@@ -141,60 +141,60 @@ const ADMISSION_CATALOG: AdmissionSchool[] = [
     },
     {
         id: 'ftu',
-        name: 'DH Ngoai Thuong',
-        city: 'Ha Noi',
+        name: 'Đại học Ngoại thương',
+        city: 'Hà Nội',
         majors: [
             {
                 id: 'international-business',
-                name: 'Kinh doanh quoc te',
+                name: 'Kinh doanh quốc tế',
                 field: 'business',
                 admissionMethods: [
                     {
                         id: 'thpt-d07',
-                        name: 'THPT - Toan Hoa Anh',
+                        name: 'THPT - Toán Hóa Anh',
                         type: 'thpt',
                         requiredAverage: 8.4,
                         difficulty: 5,
-                        description: 'Can nen tang hoc thuat cao va Tieng Anh tot.',
+                        description: 'Cần nền tảng học thuật cao và Tiếng Anh tốt.',
                     },
                     {
                         id: 'transcript-ftu',
-                        name: 'Xet hoc ba ket hop',
+                        name: 'Xét học bạ kết hợp',
                         type: 'transcript',
                         requiredAverage: 8.6,
                         difficulty: 5,
-                        description: 'Thuong doi hoi hoc ba dep va minh chung nang luc bo sung.',
+                        description: 'Thường đòi hỏi học bạ đẹp và minh chứng năng lực bổ sung.',
                     },
                     {
                         id: 'direct-ftu',
-                        name: 'Tuyen thang ho so noi bat',
+                        name: 'Tuyển thẳng hồ sơ nổi bật',
                         type: 'direct',
                         requiredAverage: 8.7,
                         difficulty: 5,
-                        description: 'Can thanh tich hoc thuat va hoat dong vuot troi.',
+                        description: 'Cần thành tích học thuật và hoạt động vượt trội.',
                     },
                 ],
             },
             {
                 id: 'ecommerce',
-                name: 'Thuong mai dien tu',
+                name: 'Thương mại điện tử',
                 field: 'business',
                 admissionMethods: [
                     {
                         id: 'thpt-a01-ftu',
-                        name: 'THPT - Toan Ly Anh',
+                        name: 'THPT - Toán Lý Anh',
                         type: 'thpt',
                         requiredAverage: 8.2,
                         difficulty: 4,
-                        description: 'Can ket hop duoc tu duy dinh luong va ky nang ngon ngu.',
+                        description: 'Cần kết hợp được tư duy định lượng và kỹ năng ngôn ngữ.',
                     },
                     {
                         id: 'competency-ecommerce',
-                        name: 'Danh gia nang luc',
+                        name: 'Đánh giá năng lực',
                         type: 'competency',
                         requiredAverage: 8.0,
                         difficulty: 4,
-                        description: 'Uu tien kha nang phan tich tinh huong va giai quyet van de.',
+                        description: 'Ưu tiên khả năng phân tích tình huống và giải quyết vấn đề.',
                     },
                 ],
             },
@@ -263,11 +263,28 @@ export class AdmissionService {
         private profileRepository: StudentProfileRepository
     ) { }
 
-    listCatalog(): AdmissionCatalogResult {
-        return { schools: ADMISSION_CATALOG };
+    listCatalog(userId: number): AdmissionCatalogResult {
+        const profile = this.profileRepository.findByUserId(userId);
+        const schools = ADMISSION_CATALOG.map((school) => ({
+            ...school,
+            majors: school.majors.map((major) => ({
+                ...major,
+                name: this.resolveMajorDisplayName(major),
+                admissionMethods: major.admissionMethods.map((method) => ({
+                    ...method,
+                    personalizedComment: this.buildCatalogMethodComment(profile, {
+                        school,
+                        major,
+                        method,
+                    }),
+                })),
+            })),
+        }));
+
+        return { schools };
     }
 
-    listCart(userId: number): AdmissionCartResult {
+    listFavorites(userId: number): AdmissionCartResult {
         const profile = this.profileRepository.findByUserId(userId);
         const items = this.cartRepository
             .listByUserId(userId)
@@ -279,11 +296,11 @@ export class AdmissionService {
         };
     }
 
-    addToCart(userId: number, input: CreateAdmissionCartItemInput): AdmissionCartItemResult {
+    addToFavorites(userId: number, input: CreateAdmissionCartItemInput): AdmissionCartItemResult {
         const sanitized = this.sanitizeCreateInput(input);
         const option = this.findCatalogOption(sanitized.schoolId, sanitized.majorId, sanitized.methodId);
         if (!option) {
-            throw new AdmissionServiceError('School/major/admission method selection is invalid', 404);
+            throw new AdmissionServiceError('Lựa chọn trường, ngành hoặc phương thức xét tuyển không hợp lệ', 404);
         }
 
         const existing = this.cartRepository.findBySelection(
@@ -293,12 +310,12 @@ export class AdmissionService {
             option.method.id
         );
         if (existing) {
-            throw new AdmissionServiceError('This school-major-method is already in your cart', 409);
+            throw new AdmissionServiceError('Lựa chọn trường, ngành và phương thức này đã có trong danh sách yêu thích', 409);
         }
 
         const created = this.cartRepository.create(userId, sanitized);
         if (!created) {
-            throw new AdmissionServiceError('Unable to add item to admissions cart', 500);
+            throw new AdmissionServiceError('Không thể thêm lựa chọn vào danh sách yêu thích xét tuyển', 500);
         }
 
         const profile = this.profileRepository.findByUserId(userId);
@@ -307,13 +324,13 @@ export class AdmissionService {
         };
     }
 
-    removeFromCart(userId: number, id: number): { message: string } {
+    removeFromFavorites(userId: number, id: number): { message: string } {
         const deleted = this.cartRepository.delete(id, userId);
         if (!deleted) {
-            throw new AdmissionServiceError('Admissions cart item not found', 404);
+            throw new AdmissionServiceError('Không tìm thấy lựa chọn trong danh sách yêu thích xét tuyển', 404);
         }
 
-        return { message: 'Admissions cart item removed successfully' };
+        return { message: 'Đã xóa lựa chọn khỏi danh sách yêu thích xét tuyển' };
     }
 
     private sanitizeCreateInput(input: CreateAdmissionCartItemInput): CreateAdmissionCartItemInput {
@@ -322,7 +339,7 @@ export class AdmissionService {
         const methodId = (input.methodId ?? '').trim();
 
         if (!schoolId || !majorId || !methodId) {
-            throw new AdmissionServiceError('schoolId, majorId and methodId are required', 400);
+            throw new AdmissionServiceError('Cần chọn đầy đủ trường, ngành và phương thức xét tuyển', 400);
         }
 
         return {
@@ -351,7 +368,7 @@ export class AdmissionService {
                 school: {
                     id: item.schoolId,
                     name: item.schoolId,
-                    city: 'Unknown',
+                    city: 'Chưa xác định',
                 },
                 major: {
                     id: item.majorId,
@@ -363,17 +380,17 @@ export class AdmissionService {
                     name: item.methodId,
                     type: 'direct',
                     requiredAverage: 8.0,
-                    description: 'Catalog data changed. Please remove and re-add this option.',
+                    description: 'Dữ liệu danh mục đã thay đổi. Vui lòng xóa và thêm lại lựa chọn này.',
                 },
                 evaluation: {
                     chanceScore: 40,
                     chanceLevel: 'challenging',
-                    comment: 'Cannot evaluate this item because the catalog option no longer exists.',
+                    comment: 'Không thể đánh giá lựa chọn này vì thông tin trong danh mục không còn tồn tại.',
                 },
-                orientation: 'Please remove this outdated item and add a valid option from the current catalog.',
+                orientation: 'Vui lòng xóa lựa chọn đã cũ này và thêm một lựa chọn hợp lệ từ danh mục hiện tại.',
                 studyPlan: [
-                    'Update your cart with a valid school-major-method option.',
-                    'Re-run evaluation after refreshing your admissions cart.',
+                    'Cập nhật danh sách yêu thích bằng một lựa chọn trường, ngành và phương thức hợp lệ.',
+                    'Chạy lại đánh giá sau khi làm mới danh sách yêu thích xét tuyển.',
                 ],
             };
         }
@@ -389,7 +406,7 @@ export class AdmissionService {
             },
             major: {
                 id: option.major.id,
-                name: option.major.name,
+                name: this.resolveMajorDisplayName(option.major),
                 field: option.major.field,
             },
             method: {
@@ -431,20 +448,53 @@ export class AdmissionService {
         return undefined;
     }
 
+    private resolveMajorDisplayName(major: AdmissionMajor): string {
+        if (major.id === 'marketing') {
+            return 'Marketing';
+        }
+
+        return major.name;
+    }
+
+    private isTargetMajorMatched(targetMajor: string, major: AdmissionMajor): boolean {
+        const normalizedTarget = normalizeText(targetMajor);
+        const rawName = normalizeText(major.name);
+        const displayName = normalizeText(this.resolveMajorDisplayName(major));
+        return normalizedTarget.includes(rawName) || normalizedTarget.includes(displayName);
+    }
+
+    private buildCatalogMethodComment(profile: StudentProfile | undefined, option: ResolvedCatalogOption): string {
+        const majorName = this.resolveMajorDisplayName(option.major);
+        const averageGrade = toAverageGrade(profile);
+        const targetMajorMatched = profile?.targetMajor
+            ? this.isTargetMajorMatched(profile.targetMajor, option.major)
+            : false;
+
+        if (!profile || averageGrade === null) {
+            return `Phương thức ${option.method.name} phù hợp để tham khảo cho ngành ${majorName}; hãy cập nhật điểm để nhận nhận xét chính xác hơn.`;
+        }
+
+        const gap = averageGrade - option.method.requiredAverage;
+        const gapText = gap >= 0 ? 'đang khá phù hợp' : 'cần cải thiện thêm';
+        const targetText = targetMajorMatched ? ' và trùng mục tiêu ngành của bạn' : '';
+
+        return `Với mức điểm hiện tại, phương thức ${option.method.name} ${gapText} cho ngành ${majorName}${targetText}.`;
+    }
+
     private buildEvaluation(profile: StudentProfile | undefined, option: ResolvedCatalogOption) {
         const averageGrade = toAverageGrade(profile);
         if (!profile || averageGrade === null) {
             return {
                 chanceScore: 55,
                 chanceLevel: 'medium' as const,
-                comment: `Complete your profile grades to get a more accurate estimate for ${option.major.name}.`,
+                comment: `Cập nhật điểm trong hồ sơ để ước tính chính xác hơn cho ngành ${this.resolveMajorDisplayName(option.major)}.`,
             };
         }
 
         const baseScore = (averageGrade / 10) * 65;
         const benchmarkGapScore = (averageGrade - option.method.requiredAverage) * 12;
         const subjectBonus = this.calculateSubjectBonus(profile.favoriteSubjects, option.major.field);
-        const targetBonus = this.calculateTargetBonus(profile, option.major.name, option.school.name);
+        const targetBonus = this.calculateTargetBonus(profile, option.major, option.school.name);
         const methodBonus = this.getMethodBonus(option.method.type, profile);
         const difficultyPenalty = option.method.difficulty * 2;
 
@@ -461,44 +511,44 @@ export class AdmissionService {
         const chanceLevel = resolveChanceLevel(chanceScore);
         const comparison = averageGrade - option.method.requiredAverage;
         const comparisonText = comparison >= 0
-            ? `above reference by ${comparison.toFixed(2)}`
-            : `below reference by ${Math.abs(comparison).toFixed(2)}`;
+            ? `cao hơn mốc tham chiếu ${comparison.toFixed(2)} điểm`
+            : `thấp hơn mốc tham chiếu ${Math.abs(comparison).toFixed(2)} điểm`;
 
-        let commentTone = 'Your current profile is in the competitive zone for this option.';
+        let commentTone = 'Hồ sơ hiện tại của bạn đang ở vùng cạnh tranh tốt cho lựa chọn này.';
         if (chanceLevel === 'medium') {
-            commentTone = 'Your profile is close to the competitive threshold; consistent effort can improve your chance.';
+            commentTone = 'Hồ sơ của bạn gần đạt ngưỡng cạnh tranh; nỗ lực đều đặn có thể cải thiện cơ hội.';
         } else if (chanceLevel === 'challenging') {
-            commentTone = 'This is an ambitious option; focus on score improvement and add safer alternatives.';
+            commentTone = 'Đây là lựa chọn nhiều thử thách; hãy tập trung cải thiện điểm và thêm phương án an toàn hơn.';
         }
 
         return {
             chanceScore,
             chanceLevel,
-            comment: `Average grade ${averageGrade.toFixed(2)} is ${comparisonText} (${option.method.name}). ${commentTone}`,
+            comment: `Điểm trung bình ${averageGrade.toFixed(2)} ${comparisonText} (${option.method.name}). ${commentTone}`,
         };
     }
 
     private buildOrientation(profile: StudentProfile | undefined, option: ResolvedCatalogOption): string {
         const baseByField: Record<AdmissionMajor['field'], string> = {
-            engineering: 'Develop strong quantitative thinking, coding fundamentals, and project execution skills.',
-            business: 'Develop analytical business thinking, communication, and market problem-solving skills.',
-            health: 'Develop scientific rigor, discipline, and evidence-based learning habits.',
-            social: 'Develop communication, critical reading, and societal problem analysis skills.',
+            engineering: 'Phát triển tư duy định lượng, nền tảng lập trình và kỹ năng triển khai dự án.',
+            business: 'Phát triển tư duy phân tích kinh doanh, giao tiếp và giải quyết vấn đề thị trường.',
+            health: 'Rèn luyện tư duy khoa học, kỷ luật và thói quen học dựa trên bằng chứng.',
+            social: 'Phát triển giao tiếp, đọc hiểu phản biện và phân tích vấn đề xã hội.',
         };
 
         const baseText = baseByField[option.major.field];
         const parts = [baseText];
 
-        if (profile?.targetMajor && normalizeText(profile.targetMajor).includes(normalizeText(option.major.name))) {
-            parts.push('This major aligns directly with your declared target major.');
+        if (profile?.targetMajor && this.isTargetMajorMatched(profile.targetMajor, option.major)) {
+            parts.push('Ngành này khớp trực tiếp với ngành mục tiêu bạn đã khai báo.');
         }
 
         if (profile?.targetUniversity && normalizeText(profile.targetUniversity).includes(normalizeText(option.school.name))) {
-            parts.push('This school aligns with your declared target university.');
+            parts.push('Trường này khớp với trường mục tiêu bạn đã khai báo.');
         }
 
         if (profile && profile.favoriteSubjects.length > 0) {
-            parts.push(`Leverage your strengths in ${profile.favoriteSubjects.slice(0, 3).join(', ')}.`);
+            parts.push(`Tận dụng thế mạnh ở các môn ${profile.favoriteSubjects.slice(0, 3).join(', ')}.`);
         }
 
         return parts.join(' ');
@@ -510,24 +560,24 @@ export class AdmissionService {
         chanceLevel: AdmissionChanceLevel
     ): string[] {
         const averageGrade = toAverageGrade(profile);
-        const methodSpecificStep = this.getMethodSpecificStep(option.method.type, option.major.name);
+        const methodSpecificStep = this.getMethodSpecificStep(option.method.type, this.resolveMajorDisplayName(option.major));
         const scoreGap = averageGrade === null
             ? option.method.requiredAverage
             : Math.max(0, option.method.requiredAverage - averageGrade);
 
         const scoreFocus = scoreGap <= 0.1
-            ? 'Maintain current performance with weekly revision checkpoints.'
-            : `Increase your average by about ${scoreGap.toFixed(1)} through focused subject practice.`;
+            ? 'Duy trì kết quả hiện tại bằng các mốc ôn tập hằng tuần.'
+            : `Tăng điểm trung bình khoảng ${scoreGap.toFixed(1)} bằng cách luyện tập trọng tâm theo từng môn.`;
 
         const riskControl = chanceLevel === 'challenging'
-            ? 'Add 1-2 backup options with lower benchmark while keeping this aspiration target.'
-            : 'Keep at least one balanced backup option to reduce admission risk.';
+            ? 'Thêm 1-2 phương án dự phòng có mốc thấp hơn trong khi vẫn giữ mục tiêu tham vọng này.'
+            : 'Giữ ít nhất một phương án dự phòng cân bằng để giảm rủi ro xét tuyển.'
 
         return [
-            `Weeks 1-3: ${scoreFocus}`,
-            `Weeks 4-7: ${methodSpecificStep}`,
-            `Weeks 8-10: Build an application timeline and prepare required documents for ${option.school.name}.`,
-            `Weeks 11-12: Simulate final exam/admission conditions and review weak topics. ${riskControl}`,
+            `Tuần 1-3: ${scoreFocus}`,
+            `Tuần 4-7: ${methodSpecificStep}`,
+            `Tuần 8-10: Lập timeline nộp hồ sơ và chuẩn bị giấy tờ cần thiết cho ${option.school.name}.`,
+            `Tuần 11-12: Mô phỏng điều kiện thi/xét tuyển cuối cùng và ôn lại các phần còn yếu. ${riskControl}`,
         ];
     }
 
@@ -557,12 +607,12 @@ export class AdmissionService {
 
     private calculateTargetBonus(
         profile: StudentProfile,
-        majorName: string,
+        major: AdmissionMajor,
         schoolName: string
     ): number {
         let bonus = 0;
 
-        if (profile.targetMajor && normalizeText(profile.targetMajor).includes(normalizeText(majorName))) {
+        if (profile.targetMajor && this.isTargetMajorMatched(profile.targetMajor, major)) {
             bonus += 6;
         }
 
@@ -594,15 +644,15 @@ export class AdmissionService {
     private getMethodSpecificStep(methodType: AdmissionMethodType, majorName: string): string {
         switch (methodType) {
             case 'thpt':
-                return `Complete at least 3 full-length exam sets per week for the subject combination of ${majorName}.`;
+                return `Hoàn thành ít nhất 3 đề luyện thi đầy đủ mỗi tuần cho tổ hợp xét tuyển của ngành ${majorName}.`;
             case 'transcript':
-                return 'Keep every semester score stable, and organize certificates/activities as supporting evidence.';
+                return 'Giữ điểm từng học kỳ ổn định và sắp xếp chứng chỉ/hoạt động làm minh chứng bổ sung.';
             case 'competency':
-                return 'Practice logic, reading comprehension, and timed problem-solving drills 4 times each week.';
+                return 'Luyện logic, đọc hiểu và giải quyết bài có giới hạn thời gian 4 buổi mỗi tuần.';
             case 'direct':
-                return 'Prepare portfolio, personal statement, and highlight-impact extracurricular activities.';
+                return 'Chuẩn bị hồ sơ năng lực, bài giới thiệu bản thân và nhấn mạnh hoạt động ngoại khóa có tác động rõ ràng.';
             default:
-                return 'Practice consistent revision and weekly progress tracking.';
+                return 'Ôn tập đều đặn và theo dõi tiến độ hằng tuần.';
         }
     }
 }

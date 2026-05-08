@@ -8,7 +8,7 @@ import { JWT_ALGORITHM, JWT_AUDIENCE, JWT_ISSUER } from '../config/auth';
 
 const MIN_PASSWORD_LENGTH = 8;
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
-const GENERIC_FORGOT_PASSWORD_MESSAGE = 'If the email exists, reset instructions have been sent.';
+const GENERIC_FORGOT_PASSWORD_MESSAGE = 'Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.';
 
 export interface RegisterInput {
     email: string;
@@ -89,18 +89,18 @@ export class AuthService {
             });
         } catch (error) {
             if (this.isUniqueEmailConstraintError(error)) {
-                throw new AuthServiceError('Email is already registered', 409);
+                throw new AuthServiceError('Email đã được đăng ký', 409);
             }
 
             throw error;
         }
 
         if (!user) {
-            throw new AuthServiceError('Unable to create user', 500);
+            throw new AuthServiceError('Không thể tạo người dùng', 500);
         }
 
         return {
-            message: 'Register successful',
+            message: 'Đăng ký thành công',
             user: toPublicUser(user),
         };
     }
@@ -110,21 +110,21 @@ export class AuthService {
         const password = input.password ?? '';
 
         if (!email || !password) {
-            throw new AuthServiceError('Email and password are required', 400);
+            throw new AuthServiceError('Vui lòng nhập email và mật khẩu', 400);
         }
 
         const user = this.userRepository.findByEmail(email);
         if (!user) {
-            throw new AuthServiceError('Invalid email or password', 401);
+            throw new AuthServiceError('Email hoặc mật khẩu không đúng', 401);
         }
 
         const isPasswordValid = bcrypt.compareSync(password, user.password);
         if (!isPasswordValid) {
-            throw new AuthServiceError('Invalid email or password', 401);
+            throw new AuthServiceError('Email hoặc mật khẩu không đúng', 401);
         }
 
         if (user.accountStatus !== 'active') {
-            throw new AuthServiceError('Account is disabled', 403);
+            throw new AuthServiceError('Tài khoản đã bị vô hiệu hóa', 403);
         }
 
         const publicUser = toPublicUser(user);
@@ -137,7 +137,7 @@ export class AuthService {
     async forgotPassword(input: ForgotPasswordInput): Promise<ForgotPasswordResult> {
         const email = this.normalizeEmail(input.email);
         if (!email) {
-            throw new AuthServiceError('Email is required', 400);
+            throw new AuthServiceError('Vui lòng nhập email', 400);
         }
 
         this.validateEmail(email);
@@ -178,7 +178,7 @@ export class AuthService {
         const newPassword = input.newPassword ?? '';
 
         if (!token) {
-            throw new AuthServiceError('Reset token is required', 400);
+            throw new AuthServiceError('Cần có mã đặt lại mật khẩu', 400);
         }
 
         this.validatePassword(newPassword);
@@ -186,28 +186,28 @@ export class AuthService {
         const tokenHash = this.hashResetToken(token);
         const resetToken = this.resetTokenRepository.findValidByTokenHash(tokenHash);
         if (!resetToken) {
-            throw new AuthServiceError('Reset token is invalid or expired', 400);
+            throw new AuthServiceError('Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn', 400);
         }
 
         const user = this.userRepository.findById(resetToken.userId);
         if (!user) {
-            throw new AuthServiceError('User not found for reset token', 400);
+            throw new AuthServiceError('Không tìm thấy người dùng cho mã đặt lại mật khẩu', 400);
         }
 
         const consumed = this.resetTokenRepository.markUsed(resetToken.id);
         if (!consumed) {
-            throw new AuthServiceError('Reset token is invalid or expired', 400);
+            throw new AuthServiceError('Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn', 400);
         }
 
         const passwordHash = bcrypt.hashSync(newPassword, 10);
         const updated = this.userRepository.updatePassword(user.id, passwordHash);
         if (!updated) {
-            throw new AuthServiceError('Unable to reset password', 500);
+            throw new AuthServiceError('Không thể đặt lại mật khẩu', 500);
         }
 
         this.resetTokenRepository.invalidateUserTokens(user.id, resetToken.id);
 
-        return { message: 'Password reset successful' };
+        return { message: 'Đặt lại mật khẩu thành công' };
     }
 
     async changePassword(input: ChangePasswordInput): Promise<{ message: string }> {
@@ -215,36 +215,36 @@ export class AuthService {
         const newPassword = input.newPassword ?? '';
 
         if (!oldPassword) {
-            throw new AuthServiceError('Current password is required', 400);
+            throw new AuthServiceError('Vui lòng nhập mật khẩu hiện tại', 400);
         }
 
         this.validatePassword(newPassword);
 
         const user = this.userRepository.findById(input.userId);
         if (!user) {
-            throw new AuthServiceError('User not found', 404);
+            throw new AuthServiceError('Không tìm thấy người dùng', 404);
         }
 
         const isOldPasswordValid = bcrypt.compareSync(oldPassword, user.password);
         if (!isOldPasswordValid) {
-            throw new AuthServiceError('Current password is incorrect', 401);
+            throw new AuthServiceError('Mật khẩu hiện tại không đúng', 401);
         }
 
         const passwordHash = bcrypt.hashSync(newPassword, 10);
         const updated = this.userRepository.updatePassword(user.id, passwordHash);
         if (!updated) {
-            throw new AuthServiceError('Unable to change password', 500);
+            throw new AuthServiceError('Không thể đổi mật khẩu', 500);
         }
 
         this.resetTokenRepository.invalidateUserTokens(user.id);
 
-        return { message: 'Password changed successfully' };
+        return { message: 'Đổi mật khẩu thành công' };
     }
 
     async getMe(userId: number): Promise<{ user: PublicUser }> {
         const user = this.userRepository.findById(userId);
         if (!user) {
-            throw new AuthServiceError('User not found', 404);
+            throw new AuthServiceError('Không tìm thấy người dùng', 404);
         }
 
         return { user: toPublicUser(user) };
@@ -277,19 +277,19 @@ export class AuthService {
     private validateEmail(email: string): void {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            throw new AuthServiceError('Email is invalid', 400);
+            throw new AuthServiceError('Email không hợp lệ', 400);
         }
     }
 
     private validatePassword(password: string): void {
         if (password.length < MIN_PASSWORD_LENGTH) {
-            throw new AuthServiceError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 400);
+            throw new AuthServiceError(`Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự`, 400);
         }
     }
 
     private validateName(name: string): void {
         if (!name) {
-            throw new AuthServiceError('Name is required', 400);
+            throw new AuthServiceError('Vui lòng nhập họ và tên', 400);
         }
     }
 

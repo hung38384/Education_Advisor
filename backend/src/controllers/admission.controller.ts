@@ -9,40 +9,40 @@ export class AdmissionController {
     public async listCatalog(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
-            const result = this.service.listCatalog();
+            const result = this.service.listCatalog(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to list admissions catalog');
+            this.handleError(res, error, 'Không thể lấy danh mục xét tuyển');
         }
     }
 
-    public async listCart(req: Request, res: Response): Promise<void> {
+    public async listFavorites(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
-            const result = this.service.listCart(req.user.userId);
+            const result = this.service.listFavorites(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to list admissions cart');
+            this.handleError(res, error, 'Không thể lấy danh sách yêu thích xét tuyển');
         }
     }
 
-    public async addToCart(req: Request, res: Response): Promise<void> {
+    public async addToFavorites(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const body = await parseBody(req);
-            const result = this.service.addToCart(req.user.userId, {
+            const result = this.service.addToFavorites(req.user.userId, {
                 schoolId: body.schoolId,
                 majorId: body.majorId,
                 methodId: body.methodId,
@@ -50,27 +50,27 @@ export class AdmissionController {
 
             sendSuccess(res, result, 201);
         } catch (error) {
-            this.handleError(res, error, 'Failed to add admissions cart item');
+            this.handleError(res, error, 'Không thể thêm lựa chọn vào danh sách yêu thích xét tuyển');
         }
     }
 
-    public async removeFromCart(req: Request, res: Response): Promise<void> {
+    public async removeFromFavorites(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const id = Number(req.params.id);
             if (!Number.isInteger(id) || id <= 0) {
-                sendBadRequest(res, 'Admissions cart item id is invalid');
+                sendBadRequest(res, 'Mã mục yêu thích xét tuyển không hợp lệ');
                 return;
             }
 
-            const result = this.service.removeFromCart(req.user.userId, id);
+            const result = this.service.removeFromFavorites(req.user.userId, id);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to remove admissions cart item');
+            this.handleError(res, error, 'Không thể xóa lựa chọn khỏi danh sách yêu thích xét tuyển');
         }
     }
 

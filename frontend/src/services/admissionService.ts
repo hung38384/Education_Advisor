@@ -13,6 +13,7 @@ export interface AdmissionMethod {
     requiredAverage: number;
     difficulty: number;
     description: string;
+    personalizedComment?: string;
 }
 
 export interface AdmissionMajor {
@@ -92,17 +93,17 @@ export const admissionService = {
     },
 
     async listCart(): Promise<AdmissionCartResponse> {
-        const response = await api.get<AdmissionCartResponse>(API_ROUTES.ADMISSIONS.CART_LIST);
+        const response = await api.get<AdmissionCartResponse>(API_ROUTES.ADMISSIONS.FAVORITES_LIST);
         return response.data;
     },
 
     async addToCart(payload: CreateAdmissionCartPayload): Promise<AdmissionCartItemResponse> {
-        const response = await api.post<AdmissionCartItemResponse>(API_ROUTES.ADMISSIONS.CART_CREATE, payload);
+        const response = await api.post<AdmissionCartItemResponse>(API_ROUTES.ADMISSIONS.FAVORITES_CREATE, payload);
         return response.data;
     },
 
     async removeFromCart(id: number): Promise<{ message: string }> {
-        const route = replacePathParams(API_ROUTES.ADMISSIONS.CART_DELETE, { id });
+        const route = replacePathParams(API_ROUTES.ADMISSIONS.FAVORITES_DELETE, { id });
         const response = await api.delete<{ message: string }>(route);
         return response.data;
     },

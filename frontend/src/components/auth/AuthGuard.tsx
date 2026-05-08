@@ -31,15 +31,15 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     }, [initialized, accessToken, currentUser, isRoleAllowed, router]);
 
     if (!initialized) {
-        return <div style={{ padding: 24 }}>Checking login...</div>;
+        return <div style={{ padding: 24 }}>Đang kiểm tra đăng nhập...</div>;
     }
 
     if (!accessToken || !currentUser) {
-        return <div style={{ padding: 24 }}>Redirecting to login...</div>;
+        return <div style={{ padding: 24 }}>Đang chuyển đến trang đăng nhập...</div>;
     }
 
     if (!isRoleAllowed) {
-        return <div style={{ padding: 24 }}>You do not have permission to view this page.</div>;
+        return <div style={{ padding: 24 }}>Bạn không có quyền xem trang này.</div>;
     }
 
     return <>{children}</>;

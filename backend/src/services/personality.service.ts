@@ -10,59 +10,59 @@ import { PersonalityRepository } from '../repository/personality.repository';
 const QUESTIONS: PersonalityQuestion[] = [
     {
         id: 'q1',
-        prompt: 'In a group project, you usually take the lead to start discussions.',
+        prompt: 'Trong dự án nhóm, bạn thường chủ động bắt đầu cuộc thảo luận.',
         dimension: 'E/I',
-        optionA: 'Yes, I often start and keep the discussion active.',
-        optionB: 'No, I prefer to think first and speak after.',
+        optionA: 'Đúng, em thường khởi xướng và giữ cho cuộc thảo luận sôi nổi.',
+        optionB: 'Không, em thích suy nghĩ trước rồi mới phát biểu.',
     },
     {
         id: 'q2',
-        prompt: 'You recharge energy by spending time with many people.',
+        prompt: 'Bạn cảm thấy nạp lại năng lượng khi dành thời gian với nhiều người.',
         dimension: 'E/I',
-        optionA: 'True for me.',
-        optionB: 'I recharge better when I am alone.',
+        optionA: 'Đúng với em.',
+        optionB: 'Em nạp lại năng lượng tốt hơn khi ở một mình.',
     },
     {
         id: 'q3',
-        prompt: 'When learning, you trust concrete facts more than abstract ideas.',
+        prompt: 'Khi học tập, bạn tin vào dữ kiện cụ thể hơn là ý tưởng trừu tượng.',
         dimension: 'S/N',
-        optionA: 'Concrete facts are more important to me.',
-        optionB: 'I like patterns and abstract concepts.',
+        optionA: 'Dữ kiện cụ thể quan trọng hơn với em.',
+        optionB: 'Em thích nhận ra quy luật và các khái niệm trừu tượng.',
     },
     {
         id: 'q4',
-        prompt: 'You prefer practical examples over theories.',
+        prompt: 'Bạn thích ví dụ thực tế hơn là lý thuyết.',
         dimension: 'S/N',
-        optionA: 'Practical examples first.',
-        optionB: 'Theories and big-picture first.',
+        optionA: 'Em muốn xem ví dụ thực tế trước.',
+        optionB: 'Em muốn hiểu lý thuyết và bức tranh tổng thể trước.',
     },
     {
         id: 'q5',
-        prompt: 'When making decisions, you prioritize objective logic.',
+        prompt: 'Khi ra quyết định, bạn ưu tiên logic khách quan.',
         dimension: 'T/F',
-        optionA: 'Objective logic and consistency first.',
-        optionB: 'People impact and harmony first.',
+        optionA: 'Em ưu tiên logic khách quan và sự nhất quán.',
+        optionB: 'Em ưu tiên tác động đến con người và sự hài hòa.',
     },
     {
         id: 'q6',
-        prompt: 'In conflict, you are more likely to be direct than diplomatic.',
+        prompt: 'Khi có mâu thuẫn, bạn thường nói thẳng hơn là nói vòng vo.',
         dimension: 'T/F',
-        optionA: 'Direct and explicit.',
-        optionB: 'Diplomatic and empathetic.',
+        optionA: 'Em thích trao đổi trực tiếp và rõ ràng.',
+        optionB: 'Em thích trao đổi khéo léo và thấu cảm.',
     },
     {
         id: 'q7',
-        prompt: 'You like to make plans and follow clear structure.',
+        prompt: 'Bạn thích lập kế hoạch và làm theo cấu trúc rõ ràng.',
         dimension: 'J/P',
-        optionA: 'I prefer planning and fixed timelines.',
-        optionB: 'I prefer flexibility and adaptation.',
+        optionA: 'Em thích kế hoạch và mốc thời gian cố định.',
+        optionB: 'Em thích linh hoạt và thích nghi theo tình huống.',
     },
     {
         id: 'q8',
-        prompt: 'You finish tasks early rather than close to deadline.',
+        prompt: 'Bạn thường hoàn thành nhiệm vụ sớm thay vì sát hạn.',
         dimension: 'J/P',
-        optionA: 'Usually early and organized.',
-        optionB: 'Usually closer to deadline.',
+        optionA: 'Em thường hoàn thành sớm và có tổ chức.',
+        optionB: 'Em thường hoàn thành gần sát hạn.',
     },
 ];
 
@@ -117,7 +117,7 @@ export class PersonalityService {
         });
 
         if (!submission) {
-            throw new PersonalityServiceError('Unable to save personality submission', 500);
+            throw new PersonalityServiceError('Không thể lưu bài đánh giá tính cách', 500);
         }
 
         return { submission };
@@ -130,7 +130,7 @@ export class PersonalityService {
 
     private validateAnswers(input: Record<string, PersonalityAnswer> | undefined): Record<string, PersonalityAnswer> {
         if (!input || typeof input !== 'object' || Array.isArray(input)) {
-            throw new PersonalityServiceError('Answers are required', 400);
+            throw new PersonalityServiceError('Vui lòng trả lời đầy đủ câu hỏi', 400);
         }
 
         const answers: Record<string, PersonalityAnswer> = {};
@@ -138,7 +138,7 @@ export class PersonalityService {
         for (const question of QUESTIONS) {
             const answer = input[question.id];
             if (answer !== 'A' && answer !== 'B') {
-                throw new PersonalityServiceError(`Missing or invalid answer for ${question.id}`, 400);
+                throw new PersonalityServiceError(`Thiếu hoặc sai câu trả lời cho ${question.id}`, 400);
             }
 
             answers[question.id] = answer;

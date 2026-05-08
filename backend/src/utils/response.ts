@@ -16,7 +16,7 @@ export const sendError = (res: Response, message: string, statusCode = 500) => {
     sendJSON(res, statusCode, { message });
 };
 
-export const sendNotFound = (res: Response, message = 'Resource not found') => {
+export const sendNotFound = (res: Response, message = 'Không tìm thấy tài nguyên') => {
     sendJSON(res, 404, { message });
 };
 

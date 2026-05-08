@@ -11,14 +11,14 @@ export class PersonalityController {
             const result = this.service.getQuestions();
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to load personality questions');
+            this.handleError(res, error, 'Không thể tải câu hỏi đánh giá tính cách');
         }
     }
 
     public async submit(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
@@ -29,21 +29,21 @@ export class PersonalityController {
 
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to submit personality test');
+            this.handleError(res, error, 'Không thể nộp bài đánh giá tính cách');
         }
     }
 
     public async getLatest(req: Request, res: Response): Promise<void> {
         try {
             if (!req.user?.userId) {
-                sendError(res, 'Unauthorized', 401);
+                sendError(res, 'Chưa đăng nhập', 401);
                 return;
             }
 
             const result = this.service.getLatest(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
-            this.handleError(res, error, 'Failed to get latest personality result');
+            this.handleError(res, error, 'Không thể lấy kết quả đánh giá tính cách mới nhất');
         }
     }
 

@@ -49,12 +49,12 @@ export class ReviewService {
     run(userId: number): ReviewResultPayload {
         const profile = this.profileRepository.findByUserId(userId);
         if (!profile) {
-            throw new ReviewServiceError('Profile is required before running review', 400);
+            throw new ReviewServiceError('Cần cập nhật hồ sơ trước khi chạy đánh giá', 400);
         }
 
         const personality = this.personalityRepository.findLatestByUserId(userId);
         if (!personality) {
-            throw new ReviewServiceError('Personality test must be completed before review', 400);
+            throw new ReviewServiceError('Cần hoàn thành bài đánh giá tính cách trước khi chạy đánh giá', 400);
         }
 
         const recommendationTargets = this.buildFallbackTargets(profile.targetMajor, profile.targetUniversity, personality.mbtiType);
@@ -78,21 +78,21 @@ export class ReviewService {
             return {
                 name: item.name,
                 score,
-                reason: `Base academic score ${averageScore.toFixed(1)} with MBTI ${personality.mbtiType} and target priority ${item.priority}.`,
+                reason: `Điểm học tập nền tảng ${averageScore.toFixed(1)}, MBTI ${personality.mbtiType} và mức ưu tiên mục tiêu ${item.priority}.`,
             };
         })
             .sort((first, second) => second.score - first.score)
             .slice(0, 5);
 
         if (recommendations.length === 0) {
-            throw new ReviewServiceError('Unable to generate recommendation targets', 500);
+            throw new ReviewServiceError('Không thể tạo danh sách gợi ý phù hợp', 500);
         }
 
         const overallScore = clampScore(
             recommendations.reduce((sum, item) => sum + item.score, 0) / recommendations.length
         );
 
-        const summary = `Top recommendation: ${recommendations[0].name} (${recommendations[0].score}/100).`;
+        const summary = `Gợi ý phù hợp nhất: ${recommendations[0].name} (${recommendations[0].score}/100).`;
 
         const result = this.reviewRepository.create({
             userId,
@@ -120,7 +120,7 @@ export class ReviewService {
         });
 
         if (!result) {
-            throw new ReviewServiceError('Unable to save review result', 500);
+            throw new ReviewServiceError('Không thể lưu kết quả đánh giá', 500);
         }
 
         return { result };
@@ -140,13 +140,13 @@ export class ReviewService {
         }
 
         if (major && university) {
-            candidates.push(`${major} at ${university}`);
+            candidates.push(`${major} tại ${university}`);
         } else if (university) {
-            candidates.push(`Programs at ${university}`);
+            candidates.push(`Các chương trình tại ${university}`);
         }
 
         candidates.push(...this.getMbtiFallbackTargets(mbtiType));
-        candidates.push('Career Exploration Track');
+        candidates.push('Lộ trình khám phá nghề nghiệp');
 
         const deduped: string[] = [];
         const seen = new Set<string>();
@@ -176,19 +176,19 @@ export class ReviewService {
         const targets: string[] = [];
 
         if (upperMbti.includes('N') && upperMbti.includes('T')) {
-            targets.push('Software Engineering', 'Data Science', 'Computer Engineering');
+            targets.push('Kỹ thuật phần mềm', 'Khoa học dữ liệu', 'Kỹ thuật máy tính');
         }
 
         if (upperMbti.includes('F')) {
-            targets.push('Psychology', 'Education', 'Social Work');
+            targets.push('Tâm lý học', 'Giáo dục học', 'Công tác xã hội');
         }
 
         if (upperMbti.startsWith('E')) {
-            targets.push('Marketing', 'Business Administration', 'Communications');
+            targets.push('Tiếp thị', 'Quản trị kinh doanh', 'Truyền thông');
         }
 
         if (targets.length === 0) {
-            targets.push('Information Systems', 'Finance', 'Language Studies');
+            targets.push('Hệ thống thông tin', 'Tài chính', 'Ngôn ngữ học');
         }
 
         return targets;

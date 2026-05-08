@@ -3,7 +3,7 @@ import ResetPasswordClient from './reset-password-client';
 
 export default function ResetPasswordPage() {
     return (
-        <Suspense fallback={<main style={{ maxWidth: 520, margin: '40px auto', padding: 16 }}>Loading...</main>}>
+        <Suspense fallback={<main style={{ maxWidth: 520, margin: '40px auto', padding: 16 }}>Đang tải...</main>}>
             <ResetPasswordClient />
         </Suspense>
     );

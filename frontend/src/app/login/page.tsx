@@ -30,42 +30,42 @@ export default function LoginPage() {
             await loginMutation.mutateAsync({ email, password });
             router.push('/dashboard');
         } catch (error) {
-            setMessage(getApiErrorMessage(error, 'Login failed'));
+            setMessage(getApiErrorMessage(error, 'Đăng nhập thất bại'));
         }
     };
 
     if (!initialized) {
-        return <div className="p-6">Loading...</div>;
+        return <div className="p-6">Đang tải...</div>;
     }
 
     return (
         <main className="mx-auto mt-10 w-full max-w-[420px] px-4">
             <Card>
-                <h1 className="mb-4 text-2xl font-semibold text-slate-900">Login</h1>
+                <h1 className="mb-4 text-2xl font-semibold text-slate-900">Đăng nhập</h1>
                 <form onSubmit={handleSubmit} className="grid gap-3">
                     <Input
                         type="email"
-                        placeholder="Email"
+                        placeholder="Địa chỉ email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
                     />
                     <Input
                         type="password"
-                        placeholder="Password"
+                        placeholder="Mật khẩu"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         minLength={8}
                         required
                     />
                     <Button type="submit" disabled={loginMutation.isPending} className="w-full">
-                        {loginMutation.isPending ? 'Logging in...' : 'Login'}
+                        {loginMutation.isPending ? 'Đang đăng nhập...' : 'Đăng nhập'}
                     </Button>
                 </form>
                 {message && <p className="mt-3 text-sm text-red-700">{message}</p>}
                 <p className="mt-4 text-sm text-slate-700">
-                    <Link className="underline" href="/register">Register</Link> |{' '}
-                    <Link className="underline" href="/forgot-password">Forgot password?</Link>
+                    <Link className="underline" href="/register">Đăng ký</Link> |{' '}
+                    <Link className="underline" href="/forgot-password">Quên mật khẩu?</Link>
                 </p>
             </Card>
         </main>

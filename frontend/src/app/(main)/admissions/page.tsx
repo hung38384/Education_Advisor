@@ -1,17 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Button, Card } from '@/components/ui';
 import { useAddAdmissionCartItem, useAdmissionCart, useAdmissionCatalog } from '@/hooks/useAdmissions';
 import { getApiErrorMessage } from '@/lib/api-error';
-import type { AdmissionMethodType } from '@/services/admissionService';
+import type { AdmissionMajor, AdmissionMajorField, AdmissionMethodType, AdmissionSchool } from '@/services/admissionService';
 
 const METHOD_LABEL: Record<AdmissionMethodType, string> = {
-    thpt: 'THPT',
-    transcript: 'Transcript',
-    competency: 'Competency',
-    direct: 'Direct',
+    thpt: 'Thi THPT',
+    transcript: 'Học bạ',
+    competency: 'Đánh giá năng lực',
+    direct: 'Tuyển thẳng',
+};
+
+const FIELD_LABEL: Record<AdmissionMajorField, string> = {
+    engineering: 'Kỹ thuật - Công nghệ',
+    business: 'Kinh tế - Quản trị',
+    health: 'Sức khỏe',
+    social: 'Xã hội - Nhân văn',
+};
+
+type CatalogRow = {
+    key: string;
+    school: AdmissionSchool;
+    major: AdmissionMajor;
 };
 
 export default function AdmissionsPage() {
@@ -19,105 +32,178 @@ export default function AdmissionsPage() {
     const cartQuery = useAdmissionCart();
     const addMutation = useAddAdmissionCartItem();
 
+    const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    const cartProfile = cartQuery.data?.profile;
+    const cartItemsCount = cartQuery.data?.items.length ?? 0;
+    const schools = catalogQuery.data?.schools;
+
+    const rows = useMemo<CatalogRow[]>(
+        () =>
+            (schools ?? []).flatMap((school) =>
+                school.majors.map((major) => ({
+                    key: `${school.id}-${major.id}`,
+                    school,
+                    major,
+                }))
+            ),
+        [schools]
+    );
 
     const handleAdd = async (schoolId: string, majorId: string, methodId: string) => {
         setMessage(null);
         setErrorMessage(null);
+
         try {
             const result = await addMutation.mutateAsync({ schoolId, majorId, methodId });
-            setMessage(`Added to cart: ${result.item.school.name} - ${result.item.major.name}.`);
+            setMessage(`Đã thêm vào mục yêu thích: ${result.item.school.name} - ${result.item.major.name}.`);
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'Unable to add this option to cart'));
+            setErrorMessage(getApiErrorMessage(error, 'Không thể thêm lựa chọn này vào yêu thích'));
         }
     };
 
-    const cartProfile = cartQuery.data?.profile;
-    const cartItemsCount = cartQuery.data?.items.length ?? 0;
-    const schools = catalogQuery.data?.schools ?? [];
-
     return (
         <main className="space-y-5">
-            <h1 className="text-2xl font-semibold text-slate-900">Admissions Planner</h1>
+            <div className="space-y-1">
+                <h1 className="text-2xl font-semibold text-slate-900">Trường học</h1>
+                <p className="text-sm text-slate-600">
+                    Xem nhanh các trường và ngành học, sau đó mở phương thức xét tuyển phù hợp để thêm vào yêu thích.
+                </p>
+            </div>
 
-            <Card className="space-y-3">
-                <h2 className="text-lg font-semibold text-slate-900">Your profile snapshot</h2>
-                {cartQuery.isLoading ? (
-                    <p className="text-sm text-slate-700">Loading profile context...</p>
-                ) : (
-                    <>
-                        <p className="text-sm text-slate-700">
-                            Student: <strong>{cartProfile?.fullName ?? 'Not set'}</strong>
-                        </p>
-                        <p className="text-sm text-slate-700">
-                            Average grade: <strong>{cartProfile?.averageGrade?.toFixed(2) ?? 'Not available'}</strong>
-                        </p>
-                        <p className="text-sm text-slate-700">
-                            Favorite subjects: <strong>{cartProfile?.favoriteSubjects.join(', ') || 'Not set'}</strong>
-                        </p>
-                        {cartProfile?.averageGrade == null && (
-                            <p className="text-sm text-amber-700">
-                                Update Grade 10/11/12 in Profile to get a more accurate admission estimate.
+            <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="space-y-2">
+                    <h2 className="text-lg font-semibold text-slate-900">Thông tin hồ sơ</h2>
+                    {cartQuery.isLoading ? (
+                        <p className="text-sm text-slate-700">Đang tải thông tin hồ sơ...</p>
+                    ) : (
+                        <div className="grid gap-1 text-sm text-slate-700">
+                            <p>
+                                Học sinh: <strong>{cartProfile?.fullName ?? 'Chưa cập nhật'}</strong>
                             </p>
-                        )}
-                    </>
-                )}
-            </Card>
+                            <p>
+                                Điểm trung bình: <strong>{cartProfile?.averageGrade?.toFixed(2) ?? 'Chưa có'}</strong>
+                            </p>
+                            <p>
+                                Môn yêu thích:{' '}
+                                <strong>{cartProfile?.favoriteSubjects.join(', ') || 'Chưa cập nhật'}</strong>
+                            </p>
+                            {cartProfile?.averageGrade == null && (
+                                <p className="text-amber-700">
+                                    Cập nhật điểm lớp 10, 11, 12 trong Hồ sơ cá nhân để ước tính chính xác hơn.
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </Card>
 
-            <Card className="space-y-2">
-                <h2 className="text-lg font-semibold text-slate-900">Admissions cart</h2>
-                <p className="text-sm text-slate-700">
-                    You currently have <strong>{cartItemsCount}</strong> option(s) in cart.
-                </p>
-                <p className="text-sm text-slate-700">
-                    Open detailed list with admission estimate, study orientation and learning plan at{' '}
-                    <Link className="underline" href="/admissions/cart">Admissions Cart</Link>.
-                </p>
-            </Card>
+                <Card className="space-y-2">
+                    <h2 className="text-lg font-semibold text-slate-900">Yêu thích xét tuyển</h2>
+                    <p className="text-sm text-slate-700">
+                        Bạn đang có <strong>{cartItemsCount}</strong> lựa chọn trong mục yêu thích.
+                    </p>
+                    <Link className="text-sm font-medium text-slate-900 underline" href="/admissions/favorites">
+                        Mở mục yêu thích để xem đánh giá và kế hoạch học tập
+                    </Link>
+                </Card>
+            </div>
 
             <Card className="space-y-4">
-                <h2 className="text-lg font-semibold text-slate-900">School, major and admission methods</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold text-slate-900">Danh sách trường và ngành</h2>
+                    <p className="text-sm text-slate-600">{rows.length} ngành học</p>
+                </div>
+
                 {catalogQuery.isLoading ? (
-                    <p className="text-sm text-slate-700">Loading admissions catalog...</p>
-                ) : schools.length === 0 ? (
-                    <p className="text-sm text-slate-700">No admissions catalog data.</p>
+                    <p className="text-sm text-slate-700">Đang tải danh sách trường học...</p>
+                ) : catalogQuery.isError ? (
+                    <p className="text-sm text-red-700">Không tải được danh sách trường học.</p>
+                ) : rows.length === 0 ? (
+                    <p className="text-sm text-slate-700">Chưa có dữ liệu trường học.</p>
                 ) : (
-                    <div className="space-y-4">
-                        {schools.map((school) => (
-                            <div key={school.id} className="rounded-md border border-slate-200 p-4">
-                                <h3 className="text-base font-semibold text-slate-900">
-                                    {school.name} <span className="text-sm font-normal text-slate-500">({school.city})</span>
-                                </h3>
-                                <div className="mt-3 space-y-3">
-                                    {school.majors.map((major) => (
-                                        <div key={major.id} className="rounded-md border border-slate-100 bg-slate-50 p-3">
-                                            <p className="text-sm font-semibold text-slate-900">{major.name}</p>
-                                            <p className="text-xs text-slate-600">Field: {major.field}</p>
-                                            <div className="mt-3 grid gap-2 md:grid-cols-2">
-                                                {major.admissionMethods.map((method) => (
-                                                    <div key={method.id} className="rounded-md border border-slate-200 bg-white p-3">
-                                                        <p className="text-sm font-semibold text-slate-900">{method.name}</p>
-                                                        <p className="text-xs text-slate-600">
-                                                            Type: {METHOD_LABEL[method.type]} | Ref avg: {method.requiredAverage.toFixed(1)}
-                                                        </p>
-                                                        <p className="mt-1 text-sm text-slate-700">{method.description}</p>
-                                                        <Button
-                                                            type="button"
-                                                            className="mt-3 w-full sm:w-fit"
-                                                            disabled={addMutation.isPending}
-                                                            onClick={() => void handleAdd(school.id, major.id, method.id)}
-                                                        >
-                                                            {addMutation.isPending ? 'Adding...' : 'Add to cart'}
-                                                        </Button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                    <div className="overflow-x-auto rounded-md border border-slate-200">
+                        <table className="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <tr>
+                                    <th scope="col" className="px-4 py-3">Tên trường</th>
+                                    <th scope="col" className="px-4 py-3">Thành phố</th>
+                                    <th scope="col" className="px-4 py-3">Tên ngành</th>
+                                    <th scope="col" className="px-4 py-3">Khối ngành</th>
+                                    <th scope="col" className="px-4 py-3">Phương thức</th>
+                                    <th scope="col" className="px-4 py-3 text-right">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 bg-white">
+                                {rows.map((row) => {
+                                    const expanded = expandedRowKey === row.key;
+                                    return (
+                                        <Fragment key={row.key}>
+                                            <tr>
+                                                <td className="px-4 py-3 font-medium text-slate-900">{row.school.name}</td>
+                                                <td className="px-4 py-3 text-slate-700">{row.school.city}</td>
+                                                <td className="px-4 py-3 text-slate-900">{row.major.name}</td>
+                                                <td className="px-4 py-3 text-slate-700">{FIELD_LABEL[row.major.field]}</td>
+                                                <td className="px-4 py-3 text-slate-700">
+                                                    {row.major.admissionMethods.length} phương thức
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <Button
+                                                        type="button"
+                                                        variant="secondary"
+                                                        className="px-3 py-1.5 text-xs"
+                                                        aria-expanded={expanded}
+                                                        onClick={() => setExpandedRowKey(expanded ? null : row.key)}
+                                                    >
+                                                        {expanded ? 'Ẩn phương thức' : 'Xem phương thức'}
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                            {expanded && (
+                                                <tr>
+                                                    <td colSpan={6} className="bg-slate-50 px-4 py-4">
+                                                        <div className="grid gap-3 md:grid-cols-2">
+                                                            {row.major.admissionMethods.map((method) => (
+                                                                <div
+                                                                    key={method.id}
+                                                                    className="rounded-md border border-slate-200 bg-white p-3"
+                                                                >
+                                                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                                                        <div>
+                                                                            <p className="text-sm font-semibold text-slate-900">
+                                                                                {method.name}
+                                                                            </p>
+                                                                            <p className="mt-1 text-xs text-slate-600">
+                                                                                {METHOD_LABEL[method.type]} · Điểm tham chiếu{' '}
+                                                                                {method.requiredAverage.toFixed(1)}
+                                                                            </p>
+                                                                        </div>
+                                                                        <Button
+                                                                            type="button"
+                                                                            className="px-3 py-1.5 text-xs"
+                                                                            disabled={addMutation.isPending}
+                                                                            onClick={() =>
+                                                                                void handleAdd(row.school.id, row.major.id, method.id)
+                                                                            }
+                                                                        >
+                                                                            {addMutation.isPending ? 'Đang thêm...' : 'Thêm vào yêu thích'}
+                                                                        </Button>
+                                                                    </div>
+                                                                    <p className="mt-2 text-sm text-slate-700">
+                                                                        {method.personalizedComment ?? method.description}
+                                                                    </p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </Card>

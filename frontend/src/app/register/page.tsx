@@ -27,45 +27,45 @@ export default function RegisterPage() {
             setSuccessMessage(result.message);
             setTimeout(() => router.push('/login'), 800);
         } catch (error) {
-            setMessage(getApiErrorMessage(error, 'Register failed'));
+            setMessage(getApiErrorMessage(error, 'Đăng ký thất bại'));
         }
     };
 
     return (
         <main className="mx-auto mt-10 w-full max-w-[420px] px-4">
             <Card>
-                <h1 className="mb-4 text-2xl font-semibold text-slate-900">Register</h1>
+                <h1 className="mb-4 text-2xl font-semibold text-slate-900">Đăng ký</h1>
                 <form onSubmit={handleSubmit} className="grid gap-3">
                     <Input
                         type="text"
-                        placeholder="Name"
+                        placeholder="Họ và tên"
                         value={name}
                         onChange={(event) => setName(event.target.value)}
                         required
                     />
                     <Input
                         type="email"
-                        placeholder="Email"
+                        placeholder="Địa chỉ email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
                     />
                     <Input
                         type="password"
-                        placeholder="Password (min 8 chars)"
+                        placeholder="Mật khẩu (tối thiểu 8 ký tự)"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         minLength={8}
                         required
                     />
                     <Button type="submit" disabled={registerMutation.isPending} className="w-full">
-                        {registerMutation.isPending ? 'Registering...' : 'Register'}
+                        {registerMutation.isPending ? 'Đang đăng ký...' : 'Đăng ký'}
                     </Button>
                 </form>
                 {message && <p className="mt-3 text-sm text-red-700">{message}</p>}
                 {successMessage && <p className="mt-3 text-sm text-green-700">{successMessage}</p>}
                 <p className="mt-4 text-sm text-slate-700">
-                    <Link className="underline" href="/login">Back to login</Link>
+                    <Link className="underline" href="/login">Quay lại đăng nhập</Link>
                 </p>
             </Card>
         </main>
