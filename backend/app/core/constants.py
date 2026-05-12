@@ -50,7 +50,7 @@ TARGET_UNIVERSITIES = [
         "name": "Đại học Kinh tế TP.HCM",
     },
     {
-        "code": "TMA",
+        "code": "TMU",
         "school_id": 426,
         "name": "Đại học Thương mại",
     },
