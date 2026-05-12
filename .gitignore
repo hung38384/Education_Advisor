@@ -11,3 +11,4 @@ EducationAdvisor/.venv/
 # Bỏ qua thư mục cache của Python
 __pycache__/
 *.pyc
+.vscode/
