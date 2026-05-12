@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 # Configure logging
 logging.basicConfig(
@@ -205,7 +205,9 @@ def build_vector_database(documents: List[Document]) -> Chroma:
         logger.error("❌ No documents to process")
         return None
     
-    logger.info(f"\n🔨 Building vector database with {len(documents)} documents...")
+    # Filter out empty documents (prevents IndexError in ChromaDB)
+    documents = [doc for doc in documents if doc.page_content and doc.page_content.strip()]
+    logger.info(f"\n🔨 Building vector database with {len(documents)} non-empty documents...")
     
     # Ensure output directory exists
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -215,17 +217,47 @@ def build_vector_database(documents: List[Document]) -> Chroma:
         logger.info(f"🔄 Initializing embeddings (model: {EMBEDDING_MODEL})...")
         embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
         
-        # Create Chroma vector store with persistence
+        # Create empty Chroma collection
         logger.info(f"💾 Creating Chroma database at {OUTPUT_DIR}...")
-        vector_store = Chroma.from_documents(
-            documents=documents,
-            embedding=embeddings,
+        vector_store = Chroma(
+            embedding_function=embeddings,
             persist_directory=str(OUTPUT_DIR),
             collection_name="admission_rules",
         )
         
+        # Add documents one-by-one to avoid batching bugs in langchain_chroma
+        success_count = 0
+        skip_count = 0
+        for i, doc in enumerate(documents):
+            text = doc.page_content.strip()
+            if not text or len(text) < 10:  # Skip very short/empty chunks
+                skip_count += 1
+                continue
+            
+            # Auto-retry on Rate Limit Error
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    import time
+                    time.sleep(1.5)  # Throttle to avoid 100 RPM limit
+                    vector_store.add_texts(
+                        texts=[text],
+                        metadatas=[doc.metadata],
+                    )
+                    success_count += 1
+                    if (success_count % 10) == 0:
+                        logger.info(f"   ✅ Indexed {success_count} docs...")
+                    break  # Success
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"   ⚠️ Rate limit hit. Waiting 15s before retry... (Attempt {attempt+1})")
+                        time.sleep(15)
+                    else:
+                        logger.warning(f"   ⚠️ Skip doc {i} after {max_retries} attempts: {e}")
+                        skip_count += 1
+        
         logger.info(f"✅ Vector database created successfully")
-        logger.info(f"   Total documents indexed: {len(documents)}")
+        logger.info(f"   Indexed: {success_count} | Skipped: {skip_count}")
         logger.info(f"   Persist directory: {OUTPUT_DIR}")
         
         return vector_store

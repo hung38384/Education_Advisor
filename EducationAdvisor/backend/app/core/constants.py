@@ -95,7 +95,7 @@ TARGET_UNIVERSITIES = [
         "name": "Học viện Ngoại giao",
     },
     {
-        "code": "CTU",
+        "code": "TCT",
         "school_id": 318,
         "name": "Đại học Cần Thơ",
     },

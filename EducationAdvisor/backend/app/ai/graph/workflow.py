@@ -16,8 +16,15 @@ import os
 import sys
 import logging
 import time
+import datetime
 from pathlib import Path
 from typing import Literal
+
+# =============================================================================
+# TEMPORAL ANCHORING: "Đồng hồ sinh học" cho toàn bộ hệ thống Agent
+# Khi user không nhập năm, hệ thống tự neo vào năm hiện tại
+# =============================================================================
+CURRENT_YEAR: int = datetime.datetime.now().year
 
 # Tắt Telemetry của ChromaDB để tránh lỗi và nghẽn
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
@@ -48,10 +55,17 @@ from app.ai.prompts.system_prompts import (
     CAREER_PROFILER_PROMPT,
     ACADEMIC_EXPERT_PROMPT,
     DATA_STRATEGIST_PROMPT,
+    LOOKUP_AGENT_PROMPT,
 )
+
+# Import Receptionist Node (Entity Extraction & Disambiguation)
+from app.ai.nodes.receptionist import receptionist_node
 
 # Import ML Recommender (Hybrid AI - TabNet)
 from app.ai.ml.ml_recommender import get_recommender
+
+# Import University Registry (Multi-University Support)
+from app.ai.university_registry import get_university_info, get_university_name
 
 # Configure logging
 logging.basicConfig(
@@ -65,29 +79,48 @@ logger = logging.getLogger(__name__)
 # 1. Setup LLMs
 # ============================================================================
 
-logger.info("Initializing LLM Models...")
+logger.info("Initializing LLM Models (with Fallbacks)...")
 
-strict_llm = ChatGoogleGenerativeAI(
+strict_gemini = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0.0,
+    max_retries=3, # Tăng retry để tự động xử lý Rate Limit
 )
 
-creative_llm = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite-preview",
-    temperature=0.2,
+creative_gemini = ChatGoogleGenerativeAI(
+    model="gemini-3-flash-preview",
+    google_api_key=os.environ.get("GEMINI_API_KEY"),
+    temperature=0.7,
+    max_retries=3,
 )
 
-# Sử dụng Groq llama-3.3-70b cho Academic Expert (miễn phí, nhanh, thông minh)
 try:
-    groq_llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
+    groq_strict = ChatGroq(
+        model="llama-3.1-8b-instant",
         api_key=os.environ.get("GROQ_API_KEY"),
         temperature=0.0,
+        max_retries=3,
     )
-    logger.info("   ✅ Groq llama-3.3-70b-versatile initialized for Academic Expert")
+    groq_creative = ChatGroq(
+        model="llama-3.1-8b-instant",
+        api_key=os.environ.get("GROQ_API_KEY"),
+        temperature=0.7,
+        max_retries=3,
+    )
+    
+    # Bọc Fallback chéo: Gemini hỏng -> gọi Groq
+    strict_llm = strict_gemini.with_fallbacks([groq_strict])
+    creative_llm = creative_gemini.with_fallbacks([groq_creative])
+    
+    # Riêng Agents ReAct (nặng về Tool) ưu tiên Groq, hỏng -> gọi Gemini
+    groq_llm = groq_strict.with_fallbacks([strict_gemini])
+    
+    logger.info("   ✅ LLM Fallbacks configured successfully")
 except Exception as e:
-    logger.warning(f"Failed to load Groq: {e}. Falling back to strict_llm")
-    groq_llm = strict_llm
+    logger.warning(f"Failed to load Groq: {e}. Falling back to pure Gemini")
+    strict_llm = strict_gemini
+    creative_llm = creative_gemini
+    groq_llm = strict_gemini
 
 logger.info("✅ LLMs initialized")
 
@@ -108,7 +141,13 @@ def create_expert_agent(llm, tools, system_prompt):
     Returns:
         Function that acts as an agent node
     """
-    return create_react_agent(model=llm, tools=tools, state_modifier=system_prompt)
+    # FIX: Tắt parallel_tool_calls để tránh Groq gọi tool hàng chục lần song song
+    # Groq LLaMA mặc định bật parallel_tool_calls → gây loop 50+ lần → nổ token
+    if tools:
+        llm_with_tools = llm.bind_tools(tools, parallel_tool_calls=False)
+    else:
+        llm_with_tools = llm
+    return create_react_agent(model=llm_with_tools, tools=tools, state_modifier=system_prompt)
 
 
 # Career Profiler Agent (no tools, just analysis)
@@ -162,7 +201,7 @@ def career_profiler_node(state: AgentState) -> dict:
         dict cập nhật state: thêm AIMessage vào messages, cập nhật called_agents.
     """
     logger.info("🎯 Career Profiler [Hybrid AI]: Đang phân tích hồ sơ...")
-    time.sleep(1)  # Rate limiting — tránh vượt quota API
+    time.sleep(3)  # Rate limiting — tránh vượt quota API
 
     # -----------------------------------------------------------------------
     # Lấy câu hỏi gốc của người dùng từ lịch sử messages
@@ -312,10 +351,11 @@ Bắt đầu phân tích:"""
     return {"messages": [signed_msg], "called_agents": called_agents}
 
 
-def academic_expert_node(state: dict) -> dict: # Đổi AgentState thành dict nếu cần
+def academic_expert_node(state: dict) -> dict:
     import logging
     logger = logging.getLogger(__name__)
     logger.info("📚 Academic Expert: Retrieving context and analyzing...")
+    time.sleep(3)  # Rate limiting
     
     # 1. Trích xuất câu hỏi và hồ sơ
     query = ""
@@ -333,64 +373,77 @@ def academic_expert_node(state: dict) -> dict: # Đổi AgentState thành dict n
     user_profile = state.get("user_profile", {})
     user_profile_str = str(user_profile)
     
-    target_uni = user_profile.get("target_university", "BKA")
-    target_year = user_profile.get("target_year", "2024")
+    # =====================================================================
+    # 2. MULTI-UNIVERSITY: Lấy thông tin trường từ user_profile + registry
+    # =====================================================================
+    target_uni = str(user_profile.get("target_university", "BKA"))
+    # TEMPORAL ANCHORING: Nếu user không nhập năm → mặc định = năm hiện tại
+    target_year = str(user_profile.get("target_year", CURRENT_YEAR))
+    uni_info = get_university_info(target_uni)
+    uni_name = uni_info["name"]
+    
+    logger.info(f"   🏫 Target: {uni_name} ({target_uni}) - Năm {target_year} (system clock: {CURRENT_YEAR})")
 
     # =====================================================================
-    # 2. BƯỚC PRE-FETCHING (CƯỠNG CHẾ TÌM KIẾM BẰNG PYTHON)
+    # 3. BƯỚC PRE-FETCHING — Tự tay gọi ChromaDB (filter theo trường)
     # =====================================================================
-    # Nắn gân từ khóa: Thấy chữ TSA/IELTS là ép phải tìm đúng cái bảng ĐGTD
+    # Áp dụng vocabulary_map nếu có (VD: BKA: TSA → ĐGTD)
     optimized_query = query
-    query_upper = query.upper()
-    if ("TSA" in query_upper or "ĐGTD" in query_upper) and "IELTS" in query_upper:
-        optimized_query = "Điểm thưởng được cộng THÊM vào điểm xét tuyển ĐGTD VSTEP IELTS"
-        logger.info(f"🔧 Đã tối ưu hóa Query tìm kiếm thành: {optimized_query}")
+    vocab_map = uni_info.get("vocabulary_map", {})
+    for user_term, doc_term in vocab_map.items():
+        if user_term.upper() in query.upper():
+            optimized_query = query.replace(user_term, doc_term)
+            logger.info(f"   🔧 Vocabulary map: '{user_term}' → '{doc_term}'")
+            break
     
-    # Tự tay gọi tool Search (ChromaDB)
     retrieved_docs = search_admission_rules.invoke({
         "query": optimized_query, 
         "university": target_uni, 
         "year": target_year
     })
     
-    # IN RA MÀN HÌNH ĐỂ DEBUG (Bắt quả tang ChromaDB)
-    print("\n" + "="*60)
-    print("📥 [DEBUG] DỮ LIỆU TỪ CHROMADB TRẢ VỀ CHO AI:")
-    print(retrieved_docs)
-    print("="*60 + "\n")
+    # DEBUG log
+    print(f"\n{'='*60}")
+    print(f"📥 [DEBUG] DỮ LIỆU TỪ CHROMADB ({target_uni}) TRẢ VỀ CHO AI:")
+    print(retrieved_docs[:500] + "..." if len(retrieved_docs) > 500 else retrieved_docs)
+    print(f"{'='*60}\n")
 
     # =====================================================================
-    # 3. NHỒI DỮ LIỆU VÀO PROMPT CHO LLM
+    # 4. NHỒI DỮ LIỆU VÀO PROMPT CHO LLM (Generic cho mọi trường)
     # =====================================================================
-    # Tạo một context cực mạnh, khóa chặt đường lui của ảo giác
-    forced_context = f"""Hồ sơ học sinh:
+    forced_context = f"""THÔNG TIN HỆ THỐNG: Năm hiện tại là {CURRENT_YEAR}. Nếu người dùng không chỉ định năm cụ thể, hãy mặc định tư vấn dựa trên quy chế và dữ liệu tuyển sinh mới nhất (của năm {CURRENT_YEAR} hoặc năm gần nhất trước đó có dữ liệu).
+
+TRƯỜNG ĐÍCH: {uni_name} (Mã: {target_uni})
+NĂM XÉT TUYỂN MỤC TIÊU: {target_year}
+
+Hồ sơ học sinh:
 {user_profile_str}
 
 Câu hỏi: {query}
 
-[TÀI LIỆU QUY CHẾ ĐÃ ĐƯỢC HỆ THỐNG TRÍCH XUẤT]:
+[TÀI LIỆU QUY CHẾ CỦA TRƯỜNG {target_uni} NĂM {target_year} ĐÃ ĐƯỢC HỆ THỐNG TRÍCH XUẤT]:
 {retrieved_docs}
 
-LỆNH BẮT BUỘC: Bạn CHỈ ĐƯỢC PHÉP đọc [TÀI LIỆU QUY CHẾ] ở trên để trả lời. TUYỆT ĐỐI không dùng tool tìm kiếm nữa. Hãy tìm cái bảng điểm thưởng IELTS và ráp số vào tính toán!"""
+LỆNH BẮT BUỘC:
+1. Bạn CHỈ ĐƯỢC PHÉP đọc [TÀI LIỆU QUY CHẾ] ở trên để trả lời. TUYỆT ĐỐI không dùng tool tìm kiếm nữa.
+2. Chỉ sử dụng quy chế của NĂM {target_year}. TUYỆT ĐỐI KHÔNG dùng luật/công thức của năm khác.
+3. Hãy tìm công thức tính điểm và bảng quy đổi phù hợp, rồi ráp số vào tính toán!"""
 
     from langchain_core.messages import HumanMessage, AIMessage
     context_msg = HumanMessage(content=forced_context)
     
-    # 4. Gọi LLM
-    # Lưu ý: Nếu academic_agent của bạn đang bind_tools, nó có thể hơi bối rối. 
-    # Tốt nhất là nó chỉ là một LLM chain bình thường đọc prompt và trả lời.
+    # 5. Gọi LLM
     result = academic_agent.invoke({"messages": [context_msg]})
     
     final_msg = result["messages"][-1] if isinstance(result, dict) and "messages" in result else result
     
-    # KÝ TÊN VÀ ĐÁNH DẤU BÁO CÁO RÕ RÀNG CHO SUPERVISOR
+    # KÝ TÊN VÀ ĐÁNH DẤU BÁO CÁO
     signed_msg = AIMessage(
-        content=f"[Báo cáo từ AcademicExpert]:\n{final_msg.content}", 
+        content=f"[Báo cáo từ AcademicExpert — Trường {target_uni}]:\n{final_msg.content}", 
         name="AcademicExpert"
     )
-    logger.info("   ✅ Academic Expert response added")
+    logger.info(f"   ✅ Academic Expert response added ({target_uni})")
     
-    # Track this agent as called
     called_agents = state.get("called_agents", [])
     if "AcademicExpert" not in called_agents:
         called_agents = called_agents + ["AcademicExpert"]
@@ -400,9 +453,9 @@ LỆNH BẮT BUỘC: Bạn CHỈ ĐƯỢC PHÉP đọc [TÀI LIỆU QUY CHẾ] �
 
 def data_strategist_node(state: AgentState) -> dict:
     logger.info("📊 Data Strategist: Analyzing admission chances...")
-    time.sleep(1)  # Rate limiting
+    time.sleep(3)  # Rate limiting
     
-    # Extract ONLY the original query (not full history)
+    # Extract query
     query = ""
     for msg in state["messages"]:
         if isinstance(msg, tuple) and msg[0] == "user":
@@ -415,7 +468,58 @@ def data_strategist_node(state: AgentState) -> dict:
     if not query:
         query = state["messages"][-1].content if state["messages"] else ""
     
-    user_profile_str = str(state.get("user_profile", {}))
+    user_profile = state.get("user_profile", {})
+    user_profile_str = str(user_profile)
+    
+    # MULTI-UNIVERSITY: Inject university info
+    target_uni = user_profile.get("target_university", "TMU")
+    uni_info = get_university_info(target_uni)
+    uni_name = uni_info["name"]
+    
+    # TEMPORAL ANCHORING: Nếu user không nhập năm → mặc định = năm hiện tại
+    target_year = str(user_profile.get("target_year", CURRENT_YEAR))
+    logger.info(f"   📅 Temporal Lock: target_year={target_year} cho {target_uni} (system clock: {CURRENT_YEAR})")
+    
+    # Chuẩn hóa tham số: Lấy major_code
+    major_code = user_profile.get("target_major", "")
+    
+    # 🆕 LẤY ĐIỂM ĐÃ TÍNH TỪ SCORE CALCULATOR
+    calculated_details = state.get("calculated_details", {})
+    calculated_score = state.get("calculated_score")
+    
+    # =================================================================
+    # REFACTOR: Chuyển quyền quyết định 100% cho Taxonomy Engine
+    # Để đảm bảo khả năng scale lên 20+ trường, không hardcode "DGTD_TSA" hay "CHUNG_CHI_QUOC_TE".
+    # =================================================================
+    from app.utils.taxonomy_engine import get_standard_method_tag
+    confirmed_method_tag = get_standard_method_tag(query, target_uni)
+    logger.info(f"   🔍 Taxonomy Engine resolved method_tag: {confirmed_method_tag} cho trường {target_uni}")
+    
+    tsa = calculated_details.get("tsa_score")
+    ielts = calculated_details.get("ielts_score")
+    bonus = calculated_details.get("ielts_bonus", 0)
+    
+    # CẢNH BÁO DEBUG: Nếu hồ sơ có điểm thi đặc thù nhưng Taxonomy Engine lại trả về xét điểm thi phổ thông
+    if confirmed_method_tag == "THPT_QG" and ((tsa is not None and float(tsa) > 0) or (ielts is not None and float(ielts) > 0)):
+        logger.warning(
+            f"   ⚠️ LƯU Ý DEBUG: Taxonomy Engine trả về 'THPT_QG' nhưng hồ sơ "
+            f"có tsa={tsa} hoặc ielts={ielts}. Kiểm tra lại logic mapping của "
+            f"Taxonomy Engine cho trường {target_uni} nếu thấy bất thường."
+        )
+    
+    # Tóm tắt điểm đã tính (nếu có) — nằm NGOÀI việc resolve method_tag
+    calculation_summary = ""
+    if calculated_score is not None:
+        display_tsa = tsa if tsa is not None and str(tsa).strip() != "" else "Không có"
+        display_ielts = ielts if ielts is not None and str(ielts).strip() != "" else "Không có"
+        
+        calculation_summary = f"""
+[✅ ĐIỂM ĐÃ ĐƯỢC TÍNH TOÁN BỞI SCORE CALCULATOR]
+- Điểm TSA/ĐGTD gốc: {display_tsa}
+- Điểm IELTS: {display_ielts}
+- Phương thức xét tuyển: {confirmed_method_tag}
+- 🎯 TỔNG ĐIỂM CUỐI CÙNG (dùng để so sánh): {calculated_score}
+"""
     
     # Lấy báo cáo của Academic Expert
     academic_report = ""
@@ -425,22 +529,137 @@ def data_strategist_node(state: AgentState) -> dict:
         if msg_name == "AcademicExpert" or "[Báo cáo từ AcademicExpert]" in msg_content:
             academic_report = msg_content
             break
+    
+    # 🆕 Lấy báo cáo tính toán từ ScoreCalculator
+    score_calc_report = ""
+    for msg in reversed(state.get("messages", [])):
+        msg_name = getattr(msg, "name", "")
+        msg_content = getattr(msg, "content", str(msg))
+        if msg_name == "ScoreCalculator":
+            score_calc_report = msg_content
+            break
             
-    # Truyền context tối giản bao gồm Profile, Câu hỏi và Báo cáo Academic
-    full_content = f"Hồ sơ học sinh:\n{user_profile_str}\n\nCâu hỏi: {query}\n\n[BÁO CÁO TỪ ACADEMIC EXPERT - LẤY NGAY 1 SỐ TỔNG ĐIỂM XÉT TUYỂN Ở ĐÂY VÀ KHÔNG ĐƯỢC TỰ TÍNH]:\n{academic_report}"
+    # =================================================================
+    # FIX DOMAIN LOGIC: Gọi tool trực tiếp bằng Python, BỎ QUA LLM
+    # -----------------------------------------------------------------
+    # Trước đây: ReAct agent (LLM) tự gọi get_historical_scores
+    #   → LLM truyền sai method_tag (VD: THPT_QG thay vì DGTD_TSA)
+    #   → So sánh chéo thang: 83.0 (TSA/100) vs 28.53 (THPT/30) = "AN TOÀN" (SAI!)
+    # 
+    # Bây giờ: Python gọi tool trực tiếp với tham số chính xác từ Taxonomy Engine
+    #   → Đảm bảo 100% đúng method_tag, không hallucination
+    # =================================================================
+    import re
+    import json
     
-    context_msg = HumanMessage(content=full_content)
-    result = strategist_agent.invoke({"messages": [context_msg]})
+    logger.info(f"   🎯 [Direct Call] get_historical_scores(university='{target_uni}', major='{major_code}', year='{target_year}', method_tag='{confirmed_method_tag}')")
     
-    final_msg = result["messages"][-1]
-    # KÝ TÊN VÀ ĐÁNH DẤU BÁO CÁO RÕ RÀNG CHO SUPERVISOR
+    try:
+        tool_result = get_historical_scores.invoke({
+            "university": target_uni,
+            "major": major_code,
+            "year": target_year,
+            "method_tag": confirmed_method_tag,
+        })
+        logger.info(f"   📊 Tool result (first 300 chars): {str(tool_result)[:300]}")
+    except Exception as e:
+        logger.error(f"   ❌ Direct tool call failed: {e}")
+        tool_result = ""
+    
+    # Parse JSON từ kết quả tool (tool trả về text + JSON)
+    cutoff = None
+    json_match = re.search(r'\{[^{}]*"status"\s*:\s*"success"[^{}]*\}', str(tool_result), re.DOTALL)
+    if not json_match:
+        # Thử tìm JSON block hoàn chỉnh
+        json_match = re.search(r'(\{.*?"history".*?\].*?\})', str(tool_result), re.DOTALL)
+    
+    if json_match:
+        try:
+            data = json.loads(json_match.group())
+            if data.get("status") == "success" and data.get("history"):
+                cutoff = float(data["history"][0].get("score", 0))
+                logger.info(f"   ✅ Parsed cutoff_score = {cutoff} from JSON history")
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
+            logger.warning(f"   ⚠️ Failed to parse JSON history: {e}")
+    
+    # Fallback: thử regex số từ text output
+    if cutoff is None or cutoff == 0:
+        score_match = re.search(r'=\s*([\d.]+)\s*điểm', str(tool_result))
+        if score_match:
+            try:
+                cutoff = float(score_match.group(1))
+                logger.info(f"   ✅ Parsed cutoff_score = {cutoff} from text regex")
+            except ValueError:
+                pass
+    
+    # =================================================================
+    # SCALE MISMATCH GUARD: Phát hiện so sánh chéo thang điểm
+    # -----------------------------------------------------------------
+    # TSA/ĐGTD: thang 100 (điểm thường 50-95)
+    # THPT/Học bạ: thang 30 (điểm thường 15-30)
+    # Nếu calculated > 40 mà cutoff < 40 → chắc chắn sai thang!
+    # =================================================================
+    final_msg_content = ""
+    
+    if cutoff is not None and cutoff > 0 and calculated_score is not None:
+        # Guard: phát hiện sai thang điểm
+        is_scale_mismatch = (
+            (calculated_score > 40 and cutoff < 40) or  # TSA vs THPT
+            (calculated_score < 40 and cutoff > 40)      # THPT vs TSA
+        )
+        
+        if is_scale_mismatch:
+            logger.error(
+                f"   🚨 SCALE MISMATCH DETECTED! "
+                f"calculated={calculated_score} vs cutoff={cutoff} "
+                f"(method_tag={confirmed_method_tag})"
+            )
+            final_msg_content = (
+                f"⚠️ CẢNH BÁO: Hệ thống phát hiện sai lệch thang điểm!\n"
+                f"- Điểm xét tuyển của bạn: {calculated_score} (phương thức {confirmed_method_tag})\n"
+                f"- Điểm chuẩn truy xuất được: {cutoff}\n"
+                f"- Hai con số này có vẻ thuộc 2 thang điểm khác nhau.\n"
+                f"- Vui lòng kiểm tra lại phương thức xét tuyển và liên hệ bộ phận tuyển sinh."
+            )
+        else:
+            # So sánh hợp lệ — cùng thang điểm
+            diff = calculated_score - cutoff
+            
+            if diff >= 0:
+                label = "AN TOÀN"
+            elif diff >= -1.0:
+                label = "THỬ THÁCH"
+            else:
+                label = "TRƯỢT"
+                
+            final_msg_content = (
+                f"- Điểm xét tuyển của học sinh: {calculated_score}\n"
+                f"- Điểm chuẩn thực tế ({confirmed_method_tag}, năm {target_year}): {cutoff}\n"
+                f"- Chênh lệch: {diff:.2f}\n"
+                f"- Đánh giá cơ hội đỗ: BẮT BUỘC DÁN NHÃN **{label}**"
+            )
+            logger.info(f"   ✅ Comparison: {calculated_score} vs {cutoff} = {label} (diff={diff:.2f})")
+    
+    elif cutoff is None or cutoff == 0:
+        final_msg_content = (
+            f"Hệ thống không tìm thấy điểm chuẩn phương thức {confirmed_method_tag} "
+            f"năm {target_year} cho trường {target_uni} ngành {major_code}. "
+            f"Không thể đánh giá cơ hội đỗ."
+        )
+        logger.warning(f"   ⚠️ No cutoff found for {confirmed_method_tag}")
+    else:
+        # calculated_score is None — chưa có điểm tính toán
+        final_msg_content = (
+            f"Thông tin điểm chuẩn {confirmed_method_tag} năm {target_year}: {cutoff}\n"
+            f"(Chưa có điểm xét tuyển của học sinh để so sánh)"
+        )
+            
     signed_msg = AIMessage(
-        content=f"[Báo cáo từ DataStrategist]:\n{final_msg.content}", 
+        content=f"[Báo cáo từ DataStrategist — Trường {target_uni}]:\n{final_msg_content}", 
         name="DataStrategist"
     )
-    logger.info(f"   ✅ Data Strategist response added")
+    logger.info(f"   ✅ Data Strategist response added ({target_uni})")
     
-    # Track this agent as called
     called_agents = state.get("called_agents", [])
     if "DataStrategist" not in called_agents:
         called_agents = called_agents + ["DataStrategist"]
@@ -448,30 +667,336 @@ def data_strategist_node(state: AgentState) -> dict:
     return {"messages": [signed_msg], "called_agents": called_agents}
 
 
+class ScoreCalculationResult(BaseModel):
+    extracted_formula: str = Field(description="Công thức tính điểm được trích xuất từ quy chế. Ghi rõ các thành phần điểm và hệ số nếu có.")
+    conversion_details: str = Field(description="Chi tiết quy đổi điểm chứng chỉ quốc tế (IELTS) nếu có trong quy chế.")
+    math_steps: str = Field(description="Các bước tính toán chi tiết với số liệu thực tế của học sinh. Ví dụ: Toán 8.5 + Vật lý 7.0 + IELTS quy đổi 9.5")
+    total_score: float = Field(description="Tổng điểm xét tuyển cuối cùng bằng số thập phân (ví dụ: 25.0 hoặc 82.0)")
+
+def score_calculator_node(state: AgentState) -> dict:
+    """
+    🧮 Score Calculator Node - Dynamic Calculation Bridge using LLM Structured Output
+    
+    Trách nhiệm:
+    1. Trích xuất điểm từ hồ sơ học sinh
+    2. Tìm công thức xét tuyển từ ChromaDB dựa trên trường/phương thức
+    3. Trích xuất đúng bảng quy đổi IELTS từ ChromaDB
+    4. Dùng LLM ép kiểu JSON để tính toán tường minh từng bước (hạn chế ảo giác)
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("🧮 Score Calculator: Tính toán điểm xét tuyển...")
+    time.sleep(3)  # Rate limiting
+    
+    # 1. Trích xuất dữ liệu từ hồ sơ
+    user_profile = state.get("user_profile", {})
+    target_uni = str(user_profile.get("target_university", "BKA"))
+    target_year = str(user_profile.get("target_year", "2024"))
+    
+    # Prefer values provided in the user's latest question; fall back to profile
+    query_text = ""
+    for msg in reversed(state.get("messages", [])):
+        if isinstance(msg, tuple) and msg[0] == "user":
+            query_text = msg[1]
+            break
+        elif hasattr(msg, "type") and getattr(msg, "type", None) == "human":
+            query_text = msg.content
+            break
+
+    import re
+    tsa_from_query = None
+    ielts_from_query = None
+    if query_text:
+        # Try to extract TSA from explicit mention first
+        match = re.search(r"(?:TSA|ĐGTD|đánh giá tư duy)[^\d]*(\d+(?:\.\d+)?)", query_text, re.IGNORECASE)
+        if match:
+            try:
+                tsa_from_query = float(match.group(1))
+                logger.info(f"   📖 Trích xuất từ query: TSA = {tsa_from_query}")
+            except Exception:
+                tsa_from_query = None
+
+        # Extract IELTS if mentioned in query
+        match2 = re.search(r"(?:IELTS|ielts)[^\d]*(\d+(?:\.\d+)?)", query_text, re.IGNORECASE)
+        if match2:
+            try:
+                ielts_from_query = float(match2.group(1))
+                logger.info(f"   📖 Trích xuất từ query: IELTS = {ielts_from_query}")
+            except Exception:
+                ielts_from_query = None
+
+    # Prefer query values when present; otherwise use profile
+    if tsa_from_query is not None:
+        tsa_score = tsa_from_query
+        tsa_source = "query"
+    else:
+        tsa_score = user_profile.get("tsa_score")
+        tsa_source = "profile" if user_profile.get("tsa_score") is not None else "unknown"
+
+    if ielts_from_query is not None:
+        ielts_score = ielts_from_query
+        ielts_source = "query"
+    else:
+        ielts_score = user_profile.get("ielts")
+        ielts_source = "profile" if user_profile.get("ielts") is not None else "unknown"
+
+    logger.info(f"   📊 Dữ liệu học sinh: TSA={tsa_score} (from {tsa_source}), IELTS={ielts_score} (from {ielts_source})")
+    
+    # 2. Tìm công thức xét tuyển và bảng điểm IELTS từ ChromaDB
+    logger.info(f"   🔍 Tìm quy chế và bảng quy đổi điểm từ ChromaDB ({target_uni})...")
+    
+    formula_query = f"Công thức tính điểm xét tuyển của {target_uni} năm {target_year}"
+    formula_rules = search_admission_rules.invoke({
+        "query": formula_query,
+        "university": target_uni,
+        "year": target_year
+    })
+
+    ielts_query = f"Bảng quy đổi điểm thưởng chứng chỉ ngoại ngữ quốc tế IELTS của {target_uni} năm {target_year}"
+    ielts_rules = search_admission_rules.invoke({
+        "query": ielts_query,
+        "university": target_uni,
+        "year": target_year
+    })
+    
+    admission_rules = formula_rules + "\n\n--- THÔNG TIN QUY ĐỔI/THƯỞNG IELTS ---\n\n" + ielts_rules
+    
+    logger.info(f"   📋 Đã lấy tài liệu quy chế để tính toán")
+    
+    # Lấy báo cáo của Academic Expert để tránh ScoreCalculator bị ảo giác
+    academic_report = ""
+    for msg in reversed(state.get("messages", [])):
+        msg_name = getattr(msg, "name", "")
+        msg_content = getattr(msg, "content", str(msg))
+        if msg_name == "AcademicExpert" or "[Báo cáo từ AcademicExpert]" in msg_content:
+            academic_report = msg_content
+            break
+
+    prompt = f"""Bạn là Chuyên gia Tính Điểm Tuyển Sinh siêu cấp chính xác.
+Nhiệm vụ của bạn là tính điểm xét tuyển cuối cùng cho thí sinh dựa vào hồ sơ và quy chế. KHÔNG ĐƯỢC BỊA ĐẶT CÔNG THỨC.
+
+TRƯỜNG ĐÍCH: {target_uni} (Năm: {target_year})
+PHƯƠNG THỨC/NGÀNH: {user_profile.get('target_major', 'Không xác định')}
+
+[CÂU HỎI & BỔ SUNG CỦA THÍ SINH (ƯU TIÊN LẤY SỐ LIỆU TỪ ĐÂY)]
+{query_text}
+
+[HỒ SƠ THÍ SINH CƠ BẢN (CHỈ DÙNG NẾU CÂU HỎI KHÔNG NHẮC ĐẾN)]
+- Điểm TSA/ĐGTD: {tsa_score}
+- Điểm IELTS: {ielts_score}
+- Điểm THPT (Học bạ/Thi): {user_profile.get('transcript', dict())}
+
+[BÁO CÁO TỪ ACADEMIC EXPERT (ĐÃ PHÂN TÍCH QUY CHẾ VÀ TÌM CÔNG THỨC CHUẨN)]
+{academic_report}
+
+[QUY CHẾ TỪ CHROMADB (DÙNG ĐỂ TÌM THÊM BẢNG QUY ĐỔI NẾU CẦN)]
+{admission_rules}
+
+HƯỚNG DẪN BẮT BUỘC:
+1. LUÔN ƯU TIÊN SỬ DỤNG CÔNG THỨC TỪ [BÁO CÁO TỪ ACADEMIC EXPERT]. Chỉ khi nào báo cáo này thiếu công thức thì mới tự tìm trong ChromaDB.
+2. Lấy dữ liệu điểm từ [CÂU HỎI & BỔ SUNG CỦA THÍ SINH]. Nếu câu hỏi có cung cấp điểm môn học (ví dụ: Toán 8.5, Lý 7.0), điểm IELTS hay bài thi, BẮT BUỘC phải lấy số đó để tính toán (ghi đè hồ sơ cũ).
+3. Nếu hồ sơ/câu hỏi có IELTS, bạn PHẢI tìm BẢNG QUY ĐỔI hoặc ĐIỂM THƯỞNG tương ứng và quy đổi theo công thức.
+4. Thay các số liệu vào CÔNG THỨC.
+5. TÍNH TOÁN CẨN THẬN từng bước một (cộng/nhân/chia) và ghi vào `math_steps`.
+6. Đưa ra tổng điểm cuối cùng (kiểu float) vào `total_score`.
+"""
+
+    logger.info(f"   🤖 Đang gọi strict_llm để phân tích công thức và tính toán...")
+    try:
+        structured_llm = strict_llm.with_structured_output(ScoreCalculationResult)
+        result = structured_llm.invoke(prompt)
+        
+        total_score = result.total_score
+        calculation_report = f"""
+[📊 SCORE CALCULATION REPORT]
+Trường: {target_uni} - Năm: {target_year}
+
+📌 DỮ LIỆU ĐẦU VÀO:
+- TSA/ĐGTD: {tsa_score}
+- IELTS: {ielts_score}
+- Môn học: {user_profile.get('transcript', {})}
+
+🔧 CÔNG THỨC & QUY ĐỔI TỪ ĐỀ ÁN:
+- Công thức áp dụng: {result.extracted_formula}
+- Quy đổi IELTS: {result.conversion_details}
+
+🧮 CHI TIẾT TÍNH TOÁN:
+{result.math_steps}
+
+🎯 KẾT QUẢ TÍNH TOÁN:
+✅ Tổng điểm xét tuyển: {total_score}
+
+⚠️ LƯU Ý CHO DATA STRATEGIST:
+Dùng chính xác số {total_score} để so sánh với điểm chuẩn.
+"""
+        logger.info(f"   ✅ Calculation complete. Total: {total_score}")
+    except Exception as e:
+        logger.error(f"   ❌ Lỗi khi tính điểm bằng LLM: {e}", exc_info=True)
+        calculation_report = f"[📊 SCORE CALCULATION REPORT]\nLỗi tính điểm: {e}"
+        total_score = None
+
+    # 4. Lưu kết quả vào state
+    from langchain_core.messages import AIMessage
+    calculation_msg = AIMessage(
+        content=calculation_report,
+        name="ScoreCalculator"
+    )
+    
+    called_agents = state.get("called_agents", [])
+    if "ScoreCalculator" not in called_agents:
+        called_agents = called_agents + ["ScoreCalculator"]
+    
+    return {
+        "messages": [calculation_msg],
+        "called_agents": called_agents,
+        "calculated_score": total_score,
+        "calculated_details": {
+            "tsa_score": tsa_score,
+            "ielts_score": ielts_score,
+            "total_score": total_score,
+        }
+    }
+
+
 # ============================================================================
-# 4. Supervisor Node with Structured Output
+# 4. LookupAgent Node (Fast Lane)
+# ============================================================================
+
+def lookup_agent_node(state: AgentState) -> dict:
+    """
+    Node cho LookupAgent: trả lời nhanh các câu hỏi tra cứu đơn thuần.
+    Luồng này bỏ qua Synthesis và đi thẳng đến END.
+    """
+    logger.info("🔎 LookupAgent: Đang xử lý tra cứu nhanh...")
+    
+    # Dùng Gemini LLM để test (Groq gặp vấn đề HTTP 400)
+    tools = [search_admission_rules, get_historical_scores]
+    lookup_agent = create_expert_agent(
+        llm=strict_llm,  # Dùng Gemini thay vì Groq
+        tools=tools,
+        system_prompt=LOOKUP_AGENT_PROMPT,
+    )
+    
+    # Log query để debug - phải lấy từ state["messages"] đúng cách
+    user_query = ""
+    messages = state.get("messages", [])
+    
+    # Try to find user query - state["messages"] có thể là tuple hoặc BaseMessage
+    if messages:
+        if isinstance(messages[0], tuple) and messages[0][0] == "user":
+            user_query = messages[0][1]
+        elif hasattr(messages[0], "content"):
+            user_query = messages[0].content
+    
+    logger.info(f"   📝 Query: {user_query}")
+    logger.info(f"   🔧 Available tools: {[t.name for t in tools]}")
+    
+    result = lookup_agent.invoke({"messages": messages})
+    
+    # Log all messages to debug tool calls
+    if isinstance(result, dict) and "messages" in result:
+        logger.info(f"   📊 Agent trả về {len(result['messages'])} messages")
+        for i, msg in enumerate(result["messages"]):
+            msg_name = getattr(msg, "name", "")
+            msg_type = getattr(msg, "type", "")
+            logger.info(f"      [{i}] {msg_type} (name={msg_name})")
+    
+    final_msg = result["messages"][-1] if isinstance(result, dict) and "messages" in result else result
+    
+    from langchain_core.messages import AIMessage
+    
+    # In ra nội dung để debug
+    final_content = getattr(final_msg, "content", str(final_msg))
+    logger.info(f"   💬 Final response: {final_content[:200]}")
+    
+    signed_msg = AIMessage(
+        content=f"[Báo cáo từ LookupAgent]:\n{final_content}",
+        name="LookupAgent"
+    )
+    called_agents = state.get("called_agents", [])
+    if "LookupAgent" not in called_agents:
+        called_agents = called_agents + ["LookupAgent"]
+    
+    logger.info("   ✅ LookupAgent hoàn tất, đi thẳng đến END")
+    return {"messages": [signed_msg], "called_agents": called_agents}
+
+
+# ============================================================================
+# 5. Supervisor Node with Structured Output
 # ============================================================================
 
 class RouteResponse(BaseModel):
     """Supervisor's routing decision."""
-    next_agent: Literal["CareerProfiler", "AcademicExpert", "DataStrategist", "FINISH"] = Field(
+    next_agent: Literal["LookupAgent", "CareerProfiler", "AcademicExpert", "ScoreCalculator", "DataStrategist", "FINISH"] = Field(
         description="Which agent to route to next or FINISH if complete"
     )
 
 
 def supervisor_node(state: AgentState) -> dict:
     """
-    Supervisor node - Sequential routing to experts.
-    Routes: CareerProfiler → AcademicExpert → DataStrategist → FINISH
+    Supervisor node - Routes queries to appropriate agents.
+    
+    Routing Logic:
+    1. Detect simple factual lookups → LookupAgent (Fast Lane)
+    2. Otherwise → Sequential routing: CareerProfiler → AcademicExpert → ScoreCalculator → DataStrategist → FINISH (Slow Lane)
     """
     logger.info("🧑‍💼 Supervisor analyzing request...")
-    time.sleep(1)  # Rate limiting: 1 second delay
+    time.sleep(3)  # Rate limiting: 3 seconds delay
     
-    # Get agents that have already been called
+    # =========================================================================
+    # BƯỚC 1: PHÁT HIỆN CÂU HỎI TRA CỨU ĐƠN THUẦN (FAST LANE)
+    # =========================================================================
     called_agents = state.get("called_agents", [])
     
-    # Sequential routing: define the order
-    agent_sequence = ["CareerProfiler", "AcademicExpert", "DataStrategist"]
+    # Lấy câu hỏi gốc
+    user_query = ""
+    for msg in state.get("messages", []):
+        if isinstance(msg, tuple) and msg[0] == "user":
+            user_query = msg[1]
+            break
+        elif hasattr(msg, "type") and msg.type == "human":
+            user_query = msg.content
+            break
+    
+    # Nếu chưa gọi bất kỳ agent nào, kiểm tra xem là tra cứu hay tư vấn
+    if not called_agents and user_query:
+        # Keywords cho câu hỏi tra cứu đơn thuần (Factual Lookup)
+        lookup_keywords = [
+            "điểm chuẩn", "điểm chính thức", "điểm tối thiểu", "passing score",
+            "chỉ tiêu tuyển sinh", "quota", "năng lực", "capacity",
+            "ngành nào", "khối nào", "xét tuyển", "tuyển sinh",
+            "quy chế", "quy định", "regulation", "admission rules",
+            "hạn chót", "deadline", "deadline",
+            "yêu cầu", "requirement", "điều kiện", "condition"
+        ]
+        
+        # Dấu hiệu câu hỏi TƯ VẤN CÁ NHÂN HÓA (Personalized Counseling)
+        personalized_keywords = [
+            "tôi có", "em có", "học sinh có", "profile",
+            "IELTS", "TOEFL", "MBTI", "tính cách", "personality",
+            "điểm THPT", "transcript", "GPA", "hoạch định", "planning",
+            "tương lai", "future", "cho em", "cho tôi", "lựa chọn", "suggestion"
+        ]
+        
+        query_lower = user_query.lower()
+        
+        # Kiểm tra xem câu hỏi có phải TRA CỨU ĐƠN THUẦN không
+        is_lookup = any(kw in query_lower for kw in lookup_keywords)
+        is_personalized = any(kw in query_lower for kw in personalized_keywords)
+        
+        # Nếu là tra cứu đơn thuần VÀ KHÔNG phải tư vấn cá nhân hóa → LookupAgent
+        if is_lookup and not is_personalized:
+            logger.info(f"   🚀 Detected FACTUAL LOOKUP → Routing to LookupAgent (Fast Lane)")
+            logger.info(f"      Query: {user_query[:100]}...")
+            return {"next_agent": "LookupAgent"}
+    
+    # =========================================================================
+    # BƯỚC 2: TUẦN TỰ ĐỊNH TUYẾN (SLOW LANE)
+    # =========================================================================
+    logger.info(f"   🚀 Detected PERSONALIZED COUNSELING → Slow Lane")
+    
+    # Sequential routing: define the order (includes ScoreCalculator)
+    agent_sequence = ["CareerProfiler", "AcademicExpert", "ScoreCalculator", "DataStrategist"]
     
     # Find next agent to call
     next_agent = None
@@ -499,36 +1024,71 @@ def synthesis_node(state: AgentState) -> dict:
     Final synthesis node that compiles all expert responses into a coherent answer.
     """
     logger.info("✨ Synthesizing final response...")
-    time.sleep(1)  # Rate limiting
+    time.sleep(3)  # Rate limiting
     
-    expert_responses = []
-    # FIX BUG: msg bây giờ là Object (AIMessage), không phải Tuple.
-    # Ta sẽ tìm những tin nhắn có "chữ ký" của 3 chuyên gia.
+    # 1. Trích xuất câu hỏi gốc của người dùng để Synthesis Agent nắm bối cảnh
+    user_query = ""
     for msg in state.get("messages", []):
-        if hasattr(msg, "name") and msg.name in ["CareerProfiler", "AcademicExpert", "DataStrategist"]:
-            expert_responses.append(msg.content)
+        if isinstance(msg, tuple) and msg[0] == "user":
+            user_query = msg[1]
+            break
+        elif hasattr(msg, "type") and msg.type == "human":
+            user_query = msg.content
+            break
+            
+    if not user_query and state.get("messages"):
+        last_msg = state["messages"][0]
+        user_query = getattr(last_msg, "content", str(last_msg))
+
+    expert_responses = []
+    # 2. Collect messages from experts and label their sources clearly
+    for msg in state.get("messages", []):
+        if hasattr(msg, "name") and msg.name in ["CareerProfiler", "AcademicExpert", "ScoreCalculator", "DataStrategist"]:
+            expert_responses.append(f"--- BÁO CÁO TỪ {msg.name.upper()} ---\n{msg.content}")
             
     if not expert_responses:
-        final_response = "Xin lỗi, không thu thập được đủ báo cáo từ các chuyên gia để trả lời."
+        final_response = "Xin lỗi, hệ thống không thu thập được đủ báo cáo từ các chuyên gia để đưa ra câu trả lời."
     else:
-        # Combine expert responses
         combined_response = "\n\n".join(expert_responses)
         
-        # Use LLM to synthesize
-        synthesis_prompt = f"""Dựa vào các phần phân tích dưới đây từ các chuyên gia, hãy tổng hợp thành một câu trả lời toàn diện, thân thiện và dễ hiểu cho học sinh (Dùng định dạng Markdown cho đẹp).
-        
-        LƯU Ý CỰC KỲ QUAN TRỌNG CHỐNG ẢO GIÁC:
-        1. BẠN LÀ NGƯỜI TỔNG HỢP, TUYỆT ĐỐI KHÔNG ĐƯỢC BỊA ĐẶT THÊM SỐ LIỆU HAY ĐIỂM CHUẨN NÀO MÀ DATA STRATEGIST CHƯA NHẮC TỚI.
-        2. Nếu DataStrategist báo lỗi hoặc không đưa ra được điểm chuẩn thực tế, bạn BẮT BUỘC phải nói là "Hệ thống dữ liệu hiện không truy xuất được điểm chuẩn của phương thức này", tuyệt đối không tự "nhớ lại" và bịa ra con số như 83.97 hay bất kỳ số nào khác.
+        # 3. Prompt tổng hợp với Bố cục rõ ràng
+        synthesis_prompt = f"""Bạn là chuyên gia tư vấn tuyển sinh thân thiện, chuyên nghiệp và thấu cảm.
+Nhiệm vụ: Đọc câu hỏi của học sinh và tổng hợp các báo cáo chuyên gia thô cứng bên dưới thành MỘT bức thư tư vấn hoàn chỉnh, logic và dễ hiểu.
 
-PHẦN PHÂN TÍCH CỦA CÁC CHUYÊN GIA:
+CÂU HỎI CỦA HỌC SINH:
+"{user_query}"
+
+QUY TẮC BẮT BUỘC KHẮT KHE:
+1. NGÔN NGỮ TỰ NHIÊN: Khi nhận được kết quả phân loại từ Data Strategist, TUYỆT ĐỐI KHÔNG lặp lại các lệnh nội bộ như "BẮT BUỘC DÁN NHÃN". Hãy chuyển hóa thành lời khuyên thấu cảm:
+   - Nếu là AN TOÀN -> "Với mức điểm này, cơ hội đỗ của bạn ở ngưỡng **Rất An Toàn** 🎉. Bạn hoàn toàn có thể tự tin đặt nguyện vọng."
+   - Nếu là THỬ THÁCH -> "Đây là một lựa chọn **có tính cạnh tranh cao** ⚡. Điểm của bạn đang sát mức điểm chuẩn, hãy chuẩn bị thêm phương án dự phòng nhé."
+   - Nếu là TRƯỢT -> "Với mức điểm hiện tại, ngành này sẽ **rất khó khăn** 😥. Chênh lệch điểm khá lớn, bạn nên xem xét các phương thức khác hoặc tìm ngành thay thế."
+2. TÔN TRỌNG SỐ LIỆU TUYỆT ĐỐI: Dùng ĐÚNG số điểm xét tuyển (từ ScoreCalculator) và điểm chuẩn (từ DataStrategist). KHÔNG tự tính lại, KHÔNG làm tròn sai, KHÔNG tự bịa tỷ lệ phần trăm (%).
+3. XỬ LÝ THIẾU DỮ LIỆU: 
+   - NẾU Data Strategist cung cấp điểm chuẩn cụ thể (ví dụ 26.5): Hãy lấy số đó để so sánh. TUYỆT ĐỐI KHÔNG dùng câu "Hệ thống hiện chưa truy xuất được...".
+   - CHỈ KHI Data Strategist báo lỗi hoặc không có số liệu: MỚI ĐƯỢC phép nói "Hệ thống hiện chưa truy xuất được dữ liệu điểm chuẩn lịch sử của phương thức này để so sánh" và bỏ qua phần đánh giá cơ hội đỗ.
+4. TINH GỌN: Không copy y nguyên các phép tính dài dòng của Academic Expert. Chỉ lấy kết luận cuối cùng.
+
+5. NIỀM TIN TUYỆT ĐỐI VÀO PHƯƠNG THỨC: 
+   - Số liệu điểm chuẩn mà Data Strategist cung cấp CHÍNH LÀ của phương thức mà học sinh đang hỏi (hệ thống đã tự động map mã nội bộ như DGNL_HSA tương đương với phương thức kết hợp của trường). 
+   - TUYỆT ĐỐI KHÔNG ĐƯỢC bắt bẻ tên gọi phương thức. 
+   - TUYỆT ĐỐI KHÔNG ĐƯỢC tự ý kết luận "Hệ thống chưa tìm thấy thông tin điểm chuẩn" khi Data Strategist đã trả về một con số cụ thể.
+
+BỐ CỤC TRẢ LỜI YÊU CẦU (Bắt buộc dùng Markdown):
+Xin chào! Cảm ơn bạn đã tin tưởng hệ thống tư vấn AI...
+- 🎯 **Định hướng ngành nghề:** (Tóm tắt ngắn gọn top ngành phù hợp từ CareerProfiler)
+- 🧮 **Kết quả điểm xét tuyển:** (Cách quy đổi điểm và tổng điểm cuối cùng từ ScoreCalculator)
+- 📊 **Đánh giá cơ hội:** (So sánh điểm chuẩn và Kết luận dựa trên DataStrategist)
+
+DỮ LIỆU TỪ CÁC CHUYÊN GIA:
 {combined_response}
 
-Câu trả lời tổng hợp:"""
+Câu trả lời tư vấn:"""
+
+        # Gọi LLaMA (Groq) thay vì Gemini để tránh bị treo do quota/rate-limits
+        final_msg = groq_llm.invoke(synthesis_prompt)
         
-        final_msg = creative_llm.invoke(synthesis_prompt)
-        
-        # Xử lý trường hợp Gemini trả về list các dictionary thay vì string
+        # Xử lý trường hợp nội dung trả về
         if isinstance(final_msg.content, list):
             text_blocks = [item.get("text", "") for item in final_msg.content if isinstance(item, dict) and "text" in item]
             final_response = "\n".join(text_blocks) if text_blocks else str(final_msg.content)
@@ -555,19 +1115,43 @@ graph_builder = StateGraph(AgentState)
 
 # Add nodes
 logger.info("Adding nodes...")
+graph_builder.add_node("receptionist", receptionist_node)
 graph_builder.add_node("supervisor", supervisor_node)
 graph_builder.add_node("CareerProfiler", career_profiler_node)
 graph_builder.add_node("AcademicExpert", academic_expert_node)
+graph_builder.add_node("ScoreCalculator", score_calculator_node)
 graph_builder.add_node("DataStrategist", data_strategist_node)
+graph_builder.add_node("LookupAgent", lookup_agent_node)
 graph_builder.add_node("synthesis", synthesis_node)
 logger.info("   ✅ Nodes added")
 
 # Add edges
 logger.info("Adding edges...")
 
-# Start → Supervisor
-graph_builder.add_edge(START, "supervisor")
-logger.info("   ✅ START → supervisor")
+# Start → Receptionist (NEW: Entry point for entity extraction)
+graph_builder.add_edge(START, "receptionist")
+logger.info("   ✅ START → receptionist (Entity Extraction)")
+
+# Receptionist → Supervisor or END (conditional based on is_ambiguous)
+def route_from_receptionist(state: AgentState) -> str:
+    """
+    Route from receptionist node:
+    - If next_agent == "END": User question is ambiguous, need clarification
+    - If next_agent == "supervisor": Data is clear, proceed to main workflow
+    """
+    next_agent = state.get("next_agent", "supervisor")
+    return next_agent
+
+
+graph_builder.add_conditional_edges(
+    "receptionist",
+    route_from_receptionist,
+    {
+        "END": END,
+        "supervisor": "supervisor",
+    }
+)
+logger.info("   ✅ receptionist → [END if ambiguous, supervisor if clear]")
 
 # Supervisor → Expert agents (conditional)
 def route_to_agent(state: AgentState) -> str:
@@ -581,19 +1165,27 @@ graph_builder.add_conditional_edges(
     "supervisor",
     route_to_agent,
     {
+        "LookupAgent": "LookupAgent",
         "CareerProfiler": "CareerProfiler",
         "AcademicExpert": "AcademicExpert",
+        "ScoreCalculator": "ScoreCalculator",
         "DataStrategist": "DataStrategist",
         "FINISH": "synthesis",  # Route to synthesis node instead of END
     }
 )
-logger.info("   ✅ supervisor → [agents, synthesis]")
+logger.info("   ✅ supervisor → [agents, synthesis, LookupAgent]")
+
 
 # Experts → back to Supervisor
 graph_builder.add_edge("CareerProfiler", "supervisor")
 graph_builder.add_edge("AcademicExpert", "supervisor")
+graph_builder.add_edge("ScoreCalculator", "supervisor")
 graph_builder.add_edge("DataStrategist", "supervisor")
 logger.info("   ✅ [agents] → supervisor (loop)")
+
+# LookupAgent → END (bỏ qua Synthesis)
+graph_builder.add_edge("LookupAgent", END)
+logger.info("   ✅ LookupAgent → END (Fast Lane)")
 
 # Synthesis → END
 graph_builder.add_edge("synthesis", END)
@@ -605,132 +1197,161 @@ logger.info("\n✅ Graph compiled successfully!")
 
 
 # ============================================================================
-# 6. Test Execution
+# 6. Test Execution (Multi-University Support)
 # ============================================================================
 
-def test_workflow():
-    """
-    Test the multi-agent supervisor workflow with mock student data.
-    
-    Student profile:
-    - MBTI: INTJ (logical, tech-inclined)
-    - IELTS: 6.5
-    - Transcript: Strong in Math, Physics, Chemistry
-    - Target: BKA (Bach Khoa) IT1 major 2024
-    """
-    logger.info("\n" + "=" * 70)
-    logger.info("🚀 Testing Multi-Agent Supervisor Workflow")
-    logger.info("=" * 70)
-    
-    # MOCK PROFILE 1: Khối A1 + IELTS cao
-    mock_profile = {
-    "mbti": "INTJ - Thích phân tích logic, hợp công nghệ",
-    "ielts": 7.5,
-    "transcript": {
-        "Toán": 9.5,
-        "Lý": 8.0,
-        "Hóa": 8.0,
+# ---- Test Profiles & Queries ----
+TEST_CASES = {
+    "BKA": {
+        "profile": {
+            "mbti": "INTJ - Thích phân tích logic, hợp công nghệ",
+            "ielts": 7.5,
+            "transcript": {"Toán": 9.5, "Lý": 8.0, "Hóa": 8.0},
+            "tsa_score": 72.0,
+            "target_university": "BKA",
+            "target_major": "IT1",
+            "target_year": "2024",
+        },
+        "query": (
+            "Với hồ sơ có IELTS 7.5 và điểm thi Đánh giá tư duy (TSA) là 78 điểm, "
+            "em muốn xét tuyển vào ngành Khoa học máy tính (IT1) của Bách Khoa. "
+            "Hệ thống hãy trích xuất quy định cộng điểm thưởng IELTS vào phương thức "
+            "TSA của BKA, TỰ TÍNH TOÁN tổng điểm xét tuyển cho em và cho biết cơ hội "
+            "đỗ so với điểm chuẩn TSA thực tế năm 2024."
+        ),
     },
-    "tsa_score": 72.0, # Thêm điểm Đánh giá tư duy (Thang 100)
-    "target_university": "BKA",
-    "target_major": "IT1",
-    "target_year": "2024",
-    }
-    
-    # TEST QUERY 1: Ép tính toán và so sánh
-    test_query = (
-    "Với hồ sơ có IELTS 5.5 và điểm thi Đánh giá tư duy (TSA) là 78 điểm, em muốn xét tuyển "
-    "vào ngành Khoa học máy tính (IT1) của Bách Khoa. Hệ thống hãy trích xuất quy định "
-    "cộng điểm thưởng IELTS vào phương thức TSA của BKA, TỰ TÍNH TOÁN tổng điểm xét tuyển "
-    "cho em và cho biết cơ hội đỗ so với điểm chuẩn TSA thực tế năm 2024."
-)
-    
-    logger.info(f"\n📋 Mock Student Profile:\n{mock_profile}")
-    logger.info(f"\n❓ Test Query:\n{test_query}\n")
-    
+    "TMU": {
+        "profile": {
+            "mbti": "ESFJ - Thích giao tiếp, quan tâm người khác",
+            "ielts": 6.5,
+            "transcript": {"Toán": 8.5, "Văn": 7.0, "Anh": 8.0},
+            "target_university": "TMU",
+            "target_major": "TM04",
+            "target_year": "2024",
+        },
+        "query": (
+            "Em có IELTS 6.5 và muốn xét tuyển vào ngành Marketing (TM04) của "
+            "Trường Đại học Thương mại bằng phương thức kết hợp chứng chỉ quốc tế "
+            "với kết quả thi tốt nghiệp THPT (phương thức 409). Điểm thi THPT của em: "
+            "Toán 8.5, Vật lý 7.0. Hãy tính điểm xét tuyển cho em theo công thức "
+            "của TMU và cho biết cơ hội đỗ."
+        ),
+    },
+    "KHA": {
+        "profile": {
+            "mbti": "ENTJ - Quyết đoán, thích lãnh đạo, tư duy logic",
+            "ielts": 7.0,
+            "transcript": {"Toán": 9.0, "Văn": 7.5, "Anh": 8.0, "Lý": 8.5},
+            "tsa_score": 85.0,  # Điểm ĐGNL ĐHQGHN (HSA) - Quy đổi theo thang 150
+            "target_university": "KHA",
+           # "target_major": "7340101",  # Mã ngành Quản trị kinh doanh (NEU)
+            "target_major_name": "Quản trị kinh doanh",
+            "target_year": "2024",
+        },
+        "query": (
+            "Em có IELTS 7.0 và điểm thi Đánh giá năng lực của ĐHQGHN (HSA) đạt 85/150 điểm. "
+            "Ngoài ra điểm thi THPT môn Toán của em là 9.0. Em muốn xét tuyển vào ngành "
+            "Quản trị kinh doanh của Đại học Kinh tế Quốc dân (KHA) bằng "
+            "Phương thức xét tuyển kết hợp (Nhóm đối tượng 3: Chứng chỉ Tiếng Anh + Điểm ĐGNL/TSA). "
+            "Hệ thống hãy trích xuất đúng công thức quy đổi điểm IELTS và quy đổi điểm HSA sang thang 30 của KHA. "
+            "Sau đó tính tổng điểm xét tuyển và đánh giá cơ hội đỗ của em so với năm 2024."
+        ),
+    },
+    "LPH": {
+    "profile": {
+        "mbti": "ENTP - Thích tranh luận, tư duy phản biện, giao tiếp sắc bén",
+        "ielts": 6.5,  # Giữ thông tin nhưng không dùng để xét tuyển
+        "transcript": {"Toán": 8.0, "Văn": 8.5, "Anh": 7.0},  # Điểm thi THPTQG
+        "target_university": "LPH",
+        "target_year": "2024",
+    },
+    "query": (
+        "Em có điểm thi THPT Quốc gia 2024: Toán 8.0, Ngữ văn 8.5, Tiếng Anh 7.0. "
+        "Em muốn đăng ký xét tuyển vào ngành Luật Kinh tế của trường Đại học Luật Hà Nội (LPH) "
+        "theo phương thức xét học bạ kết hợp điểm thi THPTQG tổ hợp D01 (Toán, Văn, Anh). "
+        "Hệ thống hãy tính điểm xét tuyển theo quy định của LPH và dự đoán cơ hội đỗ của em."
+    ),
+},
+}
+
+
+def run_test(test_key: str):
+    """Run a single test case by key (BKA, TMU, etc.)."""
+    test_case = TEST_CASES.get(test_key.upper())
+    if not test_case:
+        print(f"❌ Unknown test case: {test_key}. Available: {list(TEST_CASES.keys())}")
+        return
+
+    profile = test_case["profile"]
+    query = test_case["query"]
+    uni_name = get_university_name(profile["target_university"])
+
     print("\n" + "=" * 80)
+    print(f"🚀 TEST: {uni_name} ({profile['target_university']})")
+    print("=" * 80)
     print("MOCK STUDENT PROFILE:")
     print("-" * 80)
-    for key, value in mock_profile.items():
+    for key, value in profile.items():
         print(f"  {key}: {value}")
-    print("\n" + "=" * 80)
-    print("TEST QUERY:")
+    print("\nTEST QUERY:")
     print("-" * 80)
-    print(f"  {test_query}")
+    print(f"  {query}")
     print("=" * 80 + "\n")
-    
-    try:
-        # Initialize state
-        initial_state = {
-            "messages": [("user", test_query)],
-            "next_agent": "supervisor",
-            "user_profile": mock_profile,
-            "called_agents": [],  # Track which agents have been called
-        }
-        
-        # Stream graph execution
-        logger.info("Starting graph execution (streaming)...\n")
-        print("WORKFLOW EXECUTION TRACE:")
-        print("-" * 80)
-        
-        event_count = 0
-        final_response = None
-        
-        for event in app_graph.stream(initial_state, stream_mode="values"):
-                    event_count += 1
-                    messages = event.get("messages", [])
-                    
-                    if messages:
-                        last_msg = messages[-1]
-                        
-                        # FIX BUG: Lấy thông tin từ Object BaseMessage
-                        role = getattr(last_msg, "type", "unknown")
-                        name = getattr(last_msg, "name", "")
-                        content = getattr(last_msg, "content", str(last_msg))
-                        
-                        # Bắt lấy tin nhắn cuối cùng từ Synthesis Node
-                        if name == "Synthesis":
-                            final_response = content
-                        
-                        # In log ra Terminal cho đẹp
-                        if role != "human":  # Bỏ qua tin nhắn gốc của user
-                            sender_name = name if name else role.upper()
-                            print(f"\n[Event {event_count}] 🤖 {sender_name}:")
-                            
-                            if len(str(content)) > 400:
-                                print(f"  {str(content)[:400]}...\n  [...Content truncated for display...]")
-                            else:
-                                print(f"  {content}")
-        
-        # Print final response prominently
-        if final_response:
-            print("\n" + "=" * 80)
-            print("💬 FINAL RESPONSE:")
-            print("=" * 80)
-            print(final_response)
-            print("=" * 80)
-        
-        print(f"\n{'-' * 80}")
-        print(f"✅ Workflow completed successfully!")
-        print(f"   Total events: {event_count}")
-        print("=" * 80 + "\n")
-        
-        logger.info(f"✅ Graph execution completed with {event_count} events")
-        
-    except Exception as e:
-        logger.error(f"❌ Error during workflow execution: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        print(f"\n❌ ERROR: {e}\n")
-        raise
+
+    initial_state = {
+        "messages": [("user", query)],
+        "next_agent": "receptionist",  # Start with receptionist node
+        "user_profile": profile,
+        "called_agents": [],
+        "calculated_score": None,
+        "calculated_details": {},
+    }
+
+    event_count = 0
+    final_response = None
+
+    for event in app_graph.stream(initial_state, stream_mode="values"):
+        event_count += 1
+        messages = event.get("messages", [])
+        if messages:
+            last_msg = messages[-1]
+            role = getattr(last_msg, "type", "unknown")
+            name = getattr(last_msg, "name", "")
+            content = getattr(last_msg, "content", str(last_msg))
+            if name == "Synthesis":
+                final_response = content
+            if role != "human":
+                sender = name if name else role.upper()
+                print(f"\n[Event {event_count}] 🤖 {sender}:")
+                preview = str(content)[:400] + "..." if len(str(content)) > 400 else str(content)
+                print(f"  {preview}")
+
+    if final_response:
+        print("\n" + "=" * 80)
+        print("💬 FINAL RESPONSE:")
+        print("=" * 80)
+        print(final_response)
+        print("=" * 80)
+
+    print(f"\n✅ Test {test_key} completed! Events: {event_count}\n")
+
+
+# Keep backward compatibility
+def test_workflow():
+    """Original test function — runs BKA test case."""
+    run_test("BKA")
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Test Multi-Agent Workflow")
+    parser.add_argument("--uni", default="BKA", help="University code: BKA, TMU, etc.")
+    args = parser.parse_args()
+
     try:
-        test_workflow()
-        logger.info("\n✅ All tests completed successfully!")
-        print("\n✅ All tests completed successfully!")
+        run_test(args.uni)
     except Exception as e:
         logger.error(f"\n❌ Test failed: {e}")
-        print(f"\n❌ Test failed: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)

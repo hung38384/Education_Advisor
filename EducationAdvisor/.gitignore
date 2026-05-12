@@ -48,18 +48,7 @@ data/local_files/
 htmlcov/
 
 # AI/ML related
-*.pkl
 *.joblib
 chroma/
-backend/data/chroma_db/
 langgraph/
-
-# Local AI assistant metadata
-.codex/
-.claude/
-AGENTS.md
-CLAUDE.md
-package-lock.json
-
-# Keep local vendor tools out of git
-vendor/
+backend/data/raw_pdfs/

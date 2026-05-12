@@ -9,6 +9,7 @@ Each tool is decorated with @tool for LangChain integration.
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import Optional, Any
 
@@ -16,12 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain.tools import tool
+from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-
-try:
-    from langchain_chroma import Chroma
-except Exception:
-    Chroma = None
 
 # Configure logging
 logging.basicConfig(
@@ -35,20 +32,43 @@ chroma_dir = Path(__file__).parent.parent.parent.parent / "data" / "chroma_db"
 
 logger.info(f"Initializing VectorDB from: {chroma_dir}")
 
-vectorstore = None
-if Chroma is not None:
-    try:
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2-preview")
-        vectorstore = Chroma(
-            persist_directory=str(chroma_dir),
-            embedding_function=embeddings,
-            collection_name="admission_rules",
-        )
-        logger.info("✅ VectorDB initialized successfully")
-    except Exception as e:
-        logger.warning(f"VectorDB disabled due to initialization error: {e}")
-else:
-    logger.info("VectorDB dependency not installed; running without Chroma")
+# Initialize embeddings with Google Gemini Embedding model
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2-preview")
+
+# Initialize Chroma vector store with persistence
+vectorstore = Chroma(
+    persist_directory=str(chroma_dir),
+    embedding_function=embeddings,
+    collection_name="admission_rules",
+)
+
+logger.info("✅ VectorDB initialized successfully")
+
+# =============================================================================
+# REFACTOR: MongoDB Connection Pooling — Global scope, maxPoolSize=50
+# Không mở/đóng kết nối mỗi lần gọi tool nữa → tái sử dụng pool
+# =============================================================================
+import os
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
+
+_MONGO_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+_MONGO_DB_NAME = os.getenv("MONGODB_DB_NAME", "admission_planner_db")
+
+try:
+    _mongo_client = MongoClient(
+        _MONGO_URL,
+        serverSelectionTimeoutMS=5000,
+        maxPoolSize=50,  # REFACTOR: Connection Pooling cho 20+ trường
+    )
+    _mongo_db = _mongo_client[_MONGO_DB_NAME]
+    _scores_collection = _mongo_db["admission_scores"]
+    logger.info(f"✅ MongoDB connection pool initialized (maxPoolSize=50) for tools")
+except Exception as e:
+    logger.error(f"❌ Failed to init MongoDB for tools: {e}")
+    _mongo_client = None
+    _mongo_db = None
+    _scores_collection = None
 
 
 @tool
@@ -84,29 +104,68 @@ def search_admission_rules(
         'Trường: BKA | Năm: 2024 | ...'
     """
     logger.info(f"🔍 Searching admission rules | Query: '{query}' | University: {university} | Year: {year}")
-
-    if vectorstore is None:
-        return "Tạm thời chưa truy cập được cơ sở dữ liệu luật xét tuyển (VectorDB). Vui lòng thử lại sau."
-
+    
     try:
-        # Build filter dictionary for metadata filtering
-        # Chroma requires filters in a specific format with $and operator for multiple conditions
-        filter_dict = None
-        if university or year:
-            filter_conditions = []
-            if university:
-                filter_conditions.append({"university": university})
-            if year:
-                filter_conditions.append({"year": year})
-            
-            # Use $and operator for multiple conditions
-            if len(filter_conditions) > 1:
-                filter_dict = {"$and": filter_conditions}
-            else:
-                filter_dict = filter_conditions[0]
-        
-        # Perform similarity search with filter
-        results = vectorstore.similarity_search(query, k=2, filter=filter_dict)
+        # Normalize parameters to strings
+        university = str(university).strip().upper() if university else None
+        year = str(year).strip() if year else None
+
+        # REFACTOR: Khử nhiễu mã trường do LLM sinh ra ("BBKA" -> "BKA")
+        if university:
+            university = re.sub(r'^(.)\1+', r'\1', university)
+
+        # =================================================================
+        # TEMPORAL ANCHORING: Chiến lược Fallback lùi năm
+        # -----------------------------------------------------------------
+        # ChromaDB YÊU CẦU: Khi filter có >= 2 điều kiện, phải dùng $and:
+        #   ✅ {"$and": [{"university": "BKA"}, {"year": "2024"}]}
+        #   ❌ {"university": "BKA", "year": "2024"}  ← sẽ bị lỗi!
+        # -----------------------------------------------------------------
+        # Bước 1: Thử search VỚI year filter (Strict Matching)
+        # Bước 2: Nếu rỗng → Fallback: search LẠI KHÔNG CÓ year filter
+        #         để lấy quy chế của năm gần nhất mà trường có dữ liệu
+        # =================================================================
+        def _build_chroma_filter(conditions: dict) -> dict:
+            """Xây dựng filter dict tương thích ChromaDB.
+            1 key → trả thẳng dict. >= 2 keys → bọc trong $and."""
+            if len(conditions) == 0:
+                return {}
+            if len(conditions) == 1:
+                return conditions
+            # ChromaDB $and syntax cho multi-key filter
+            return {"$and": [{k: v} for k, v in conditions.items()]}
+
+        # Bước 1: Thử tìm với year cụ thể
+        results = []
+        used_fallback = False
+
+        if year and university:
+            strict_conditions = {"university": university, "year": year}
+            strict_filter = _build_chroma_filter(strict_conditions)
+            results = vectorstore.similarity_search(query, k=3, filter=strict_filter)
+            logger.info(f"   🔎 [Strict] ChromaDB filter={strict_filter} → {len(results)} result(s)")
+
+            # Bước 2: Nếu rỗng → Fallback bỏ year, chỉ giữ university
+            if not results:
+                fallback_filter = {"university": university}
+                results = vectorstore.similarity_search(query, k=3, filter=fallback_filter)
+                used_fallback = True
+                logger.warning(
+                    f"   🔄 [Fallback] Year '{year}' không có dữ liệu → "
+                    f"tìm lại với filter={fallback_filter} → {len(results)} result(s)"
+                )
+        elif university:
+            # Chỉ có university, không có year
+            results = vectorstore.similarity_search(query, k=3, filter={"university": university})
+            logger.info(f"   🔎 ChromaDB filter={{university: {university}}} → {len(results)} result(s)")
+        elif year:
+            # Chỉ có year, không có university
+            results = vectorstore.similarity_search(query, k=3, filter={"year": year})
+            logger.info(f"   🔎 ChromaDB filter={{year: {year}}} → {len(results)} result(s)")
+        else:
+            # Không có filter nào → tìm tất cả
+            results = vectorstore.similarity_search(query, k=3)
+            logger.info(f"   🔎 ChromaDB (no filter) → {len(results)} result(s)")
         
         if not results:
             logger.info(f"   ⚠️  No results found for query: '{query}'")
@@ -117,6 +176,12 @@ def search_admission_rules(
         
         # Format results
         formatted_results = []
+        if used_fallback:
+            formatted_results.append(
+                f"⚠️ LƯU Ý: Không tìm thấy quy chế năm {year}. "
+                f"Kết quả dưới đây là quy chế gần nhất có sẵn của trường {university}.\n"
+            )
+        
         for idx, doc in enumerate(results, 1):
             metadata = doc.metadata
             content = doc.page_content
@@ -131,7 +196,7 @@ def search_admission_rules(
             formatted_results.append(formatted_result)
         
         final_result = "\n".join(formatted_results)
-        logger.info(f"   ✅ Found {len(results)} result(s)")
+        logger.info(f"   ✅ Found {len(results)} result(s){' (fallback)' if used_fallback else ''}")
         return final_result
     
     except Exception as e:
@@ -139,62 +204,103 @@ def search_admission_rules(
         return f"Lỗi khi tìm kiếm: {str(e)}"
 
 
+import difflib
+
+def extract_method_tag(text: str) -> str:
+    """
+    Fuzzy matching to correct method tag.
+    
+    Thứ tự ưu tiên (Priority):
+      1. Các phương thức "ngách" (chứng chỉ quốc tế, đánh giá tư duy, 409...) → kiểm tra ĐẦU TIÊN
+      2. Các từ khóa phổ thông (THPT, học bạ) → fallback CUỐI CÙNG
+    Điều này tránh bị "bẫy" khi câu hỏi dài chứa cả "THPT" lẫn từ khóa ngách.
+    """
+    if not text:
+        return None
+        
+    text_lower = text.lower()
+    
+    # ── ƯU TIÊN 1: PHƯƠNG THỨC NGÁCH (kiểm tra trước) ──────────────────
+    # 1a. Chứng chỉ quốc tế / Kết hợp / Phương thức 409
+    if "chứng chỉ quốc tế" in text_lower or "409" in text_lower or "ielts" in text_lower or "ccqt" in text_lower:
+        return "CHUNG_CHI_QUOC_TE"
+    # 1b. Đánh giá tư duy / TSA (Bách Khoa)
+    if "tsa" in text_lower or "đgtd" in text_lower or "đánh giá tư duy" in text_lower:
+        return "DGTD_TSA"
+    # 1c. Đánh giá năng lực / HSA (ĐHQG)
+    if "hsa" in text_lower or "đgnl" in text_lower or "đánh giá năng lực" in text_lower:
+        return "DGNL_HSA"
+    # 1d. Xét tuyển tài năng
+    if "tài năng" in text_lower or "xét tuyển tài năng" in text_lower:
+        return "XET_TUYEN_TAI_NANG"
+
+    # ── ƯU TIÊN 2: FALLBACK – TỪ KHÓA PHỔ THÔNG (kiểm tra cuối) ──────
+    # 2a. Học bạ
+    if "học bạ" in text_lower:
+        return "HOC_BA"
+    # 2b. THPT Quốc gia (chỉ khi không có từ khóa ngách nào ở trên match)
+    if "thpt" in text_lower or "tốt nghiệp" in text_lower:
+        return "THPT_QG"
+        
+    # 3. Fuzzy matching fallback cho các trường hợp còn lại
+    valid_tags = ["THPT_QG", "DGTD_TSA", "XET_TUYEN_TAI_NANG", "CHUNG_CHI_QUOC_TE", "HOC_BA", "DGNL_HSA"]
+    matches = difflib.get_close_matches(text.upper(), valid_tags, n=1, cutoff=0.5)
+    if matches:
+        return matches[0]
+        
+    return text.upper()
+
 @tool
 def get_historical_scores(
     university: str,
-    major: Optional[str] = None,
+    major: str,
     year: Optional[str] = None,
     method_tag: Optional[str] = None,
 ) -> str:
     """
     Truy vấn Điểm Chuẩn Lịch Sử từ MongoDB.
     
-    Tool này được sử dụng để cung cấp thông tin về điểm chuẩn (điểm tối thiểu để được đăng ký nguyện vọng) 
-    của các trường đại học trong các năm xét tuyển khác nhau, bao gồm:
-    - Điểm chuẩn theo ngành học/chuyên ngành
-    - Điểm chuẩn theo phương pháp xét tuyển (THPT, TSA, IELTS, HSA, APT, v.v.)
-    - Dữ liệu lịch sử so sánh giữa các năm
-    - Xu hướng tăng/giảm điểm qua các năm
+    Tool này được sử dụng để cung cấp thông tin về điểm chuẩn của các trường đại học:
+    - Nếu có `year`: Trả về điểm chuẩn của đúng năm đó (để so sánh chính xác).
+    - Nếu KHÔNG có `year`: Trả về điểm chuẩn của 3 năm gần nhất (để phân tích xu hướng).
     
-    Kết quả trả về các điểm chuẩn được lưu trữ trong MongoDB, giúp agent trả lời các câu hỏi 
-    về ngưỡng điểm vào trường, dự báo xu hướng, và so sánh điểm giữa các trường/năm.
+    Kết quả được trả về dưới dạng JSON có cấu trúc:
+    - `status`: "success" hoặc "not_found"
+    - `history`: Danh sách điểm chuẩn theo từng năm (sắp xếp giảm dần)
     
     Args:
         university: Mã trường đại học (Bắt buộc, VD: "BKA", "QHI", "BVH")
-        major: Mã ngành học hoặc tên ngành (Tùy chọn, VD: "IT1", "NK", "C01")
-        year: Năm xét tuyển (Tùy chọn, VD: "2023", "2024", "2025")
-        method_tag: Tên tag phương thức (Tùy chọn, BẮT BUỘC map vào 1 trong 3: "THPT_QG", "DGTD_TSA", "XET_TUYEN_TAI_NANG")
+        major: Mã ngành học (BẮT BUỘC phải truyền mã ngành, VD: "IT1", "TM04". Nếu không có, truyền "")
+        year: Năm xét tuyển (Tùy chọn). Nếu có → filter đúng năm. Nếu None → lấy 3 năm gần nhất.
+        method_tag: Tên tag phương thức (VD: "THPT_QG", "DGTD_TSA", "CHUNG_CHI_QUOC_TE")
     
     Returns:
-        Chuỗi văn bản chứa thông tin điểm chuẩn lịch sử được định dạng.
-        Bao gồm trường, năm, ngành, và các điểm chuẩn tương ứng.
+        Chuỗi JSON có cấu trúc {status, history} hoặc thông báo lỗi.
     
     Example:
         >>> get_historical_scores("BKA", major="IT1", year="2024", method_tag="DGTD_TSA")
-        'Kết quả tra cứu điểm chuẩn trường BKA...'
+        '{"status": "success", "history": [{"year": 2024, "score": 83.82, ...}]}'
     """
-    import os
-    from pymongo import MongoClient
-    from pymongo.errors import PyMongoError
+    import json as json_lib
     
-    logger.info(f"📊 Fetching historical scores | University: {university} | Major: {major} | Year: {year} | Method: {method_tag}")
+    # Process method_tag using fuzzy matching
+    processed_method_tag = extract_method_tag(method_tag) if method_tag else None
     
-    client = None
+    logger.info(f"📊 Fetching historical scores | University: {university} | Major: {major} | Year: {year} | Method: {processed_method_tag} (Original: {method_tag})")
+    
+    # REFACTOR: Normalize + Regex khử nhiễu mã trường do LLM sinh ra
+    # Ví dụ: "BBKA" -> "BKA", "TTMU" -> "TMU", "QQHI" -> "QHI"
+    university = str(university).strip().upper() if university else None
+    if university:
+        university = re.sub(r'^(.)\1+', r'\1', university)
+    major = str(major).strip() if major else None
+    
     try:
-        # Get MongoDB connection parameters from environment
-        mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-        mongodb_db_name = os.getenv("MONGODB_DB_NAME", "admission_planner_db")
+        # REFACTOR: Dùng global MongoDB pool thay vì tạo client mới mỗi lần
+        if _scores_collection is None:
+            return "Lỗi: MongoDB connection không được khởi tạo. Kiểm tra lại cấu hình."
         
-        logger.info(f"   Connecting to MongoDB: {mongodb_url}")
-        
-        # Create MongoDB client (synchronous)
-        client = MongoClient(mongodb_url, serverSelectionTimeoutMS=5000)
-        db = client[mongodb_db_name]
-        collection = db["admission_scores"]
-        
-        # Verify connection
-        client.admin.command("ping")
-        logger.info(f"   ✅ Connected to MongoDB database: {mongodb_db_name}")
+        collection = _scores_collection
         
         # Build query filter
         query_filter = {"university_code": university}
@@ -202,8 +308,8 @@ def get_historical_scores(
         if major:
             query_filter["major_code"] = major
             
-        if method_tag:
-            query_filter["method_tag"] = method_tag
+        if processed_method_tag:
+            query_filter["method_tag"] = processed_method_tag
         
         if year:
             # Convert year to int if provided as string for proper querying
@@ -215,11 +321,13 @@ def get_historical_scores(
         
         logger.info(f"   Query filter: {query_filter}")
         
-        # Query MongoDB with limit and sort by year descending
+        # TEMPORAL: Query logic
+        # - Nếu có year: filter đúng năm đó (Strict Matching)
+        # - Nếu không có year: lấy 3 năm gần nhất (Trend Analysis)
         results = list(
             collection.find(query_filter)
             .sort("year", -1)
-            .limit(20)
+            .limit(3 if not year else 5)  # Khi có year cụ thể cho limit cao hơn để đa phương thức
         )
         
         if not results:
@@ -231,43 +339,33 @@ def get_historical_scores(
                 f"Vui lòng kiểm tra lại mã trường hoặc thử tìm kiếm với thông tin khác."
             )
         
-        # Format results for LLM
-        result_parts = [f"📊 Kết quả tra cứu điểm chuẩn lịch sử trường {university}:\n"]
-        
-        # Group results by year and major for better readability
-        grouped = {}
+        # TEMPORAL: Format kết quả dạng JSON gọn gàng cho DataStrategist
+        # RÚT GỌN: Chỉ lấy những field cần thiết để tránh vượt quá token limit
+        history_items = []
         for record in results:
-            key = (record.get("year"), record.get("major_code"), record.get("major_name"))
-            if key not in grouped:
-                grouped[key] = []
-            grouped[key].append(record)
+            score_val = record.get("score", 0)
+            history_items.append({
+                "year": record.get("year"),
+                "major_code": record.get("major_code"),
+                "method_tag": record.get("method_tag", "N/A"),
+                "score": float(score_val) if isinstance(score_val, (int, float)) else 0,
+            })
         
-        # Format grouped results
-        for (result_year, major_code, major_name), records in sorted(grouped.items(), reverse=True):
-            result_parts.append(f"\n📅 Năm {result_year} - Ngành {major_code} ({major_name}):")
-            
-            for record in records:
-                method_type = record.get("method_type", "N/A")
-                method_name = record.get("method_name", "N/A")
-                score = record.get("score", "N/A")
-                
-                # Format score nicely
-                if isinstance(score, (int, float)):
-                    score_str = f"{score:.2f}"
-                else:
-                    score_str = str(score)
-                
-                result_parts.append(
-                    f"  • Phương thức {method_type} ({method_name}): {score_str} điểm"
-                )
-                
-                # Add subject combinations if available
-                subjects = record.get("subject_combinations", [])
-                if subjects:
-                    subjects_str = ", ".join(subjects)
-                    result_parts.append(f"    Tổ hợp môn: {subjects_str}")
+        json_result = json_lib.dumps(
+            {"status": "success", "university": university, "total_records": len(results), "history": history_items},
+            ensure_ascii=False,
+            indent=2,
+        )
         
-        final_result = "\n".join(result_parts)
+        # Kèm thêm bản text RỨT GỌN dễ đọc cho LLM (không cần major_name dài dòng)
+        text_parts = [f"📊 Điểm chuẩn lịch sử - Trường {university}, Ngành {major if major else '(toàn bộ)'}:"]
+        for item in history_items:
+            score_str = f"{item['score']:.2f}" if item['score'] else "N/A"
+            text_parts.append(
+                f"  Năm {item['year']}: {item['method_tag']} = {score_str} điểm"
+            )
+        
+        final_result = "\n".join(text_parts) + "\n\n" + json_result
         logger.info(f"   ✅ Retrieved {len(results)} score record(s)")
         return final_result
     
@@ -278,15 +376,6 @@ def get_historical_scores(
     except Exception as e:
         logger.error(f"   ❌ Error fetching historical scores: {e}")
         return f"Lỗi khi tra cứu điểm chuẩn: {str(e)}"
-    
-    finally:
-        # Always close the MongoDB connection
-        if client:
-            try:
-                client.close()
-                logger.info("   ✅ MongoDB connection closed")
-            except Exception as e:
-                logger.error(f"   Error closing MongoDB connection: {e}")
 
 
 if __name__ == "__main__":
