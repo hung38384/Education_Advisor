@@ -28,21 +28,29 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Setup VectorDB Connection
-chroma_dir = Path(__file__).parent.parent.parent.parent / "data" / "chroma_db"
+_vectorstore = None
 
-logger.info(f"Initializing VectorDB from: {chroma_dir}")
+def get_vectorstore():
+    """Lazily initialize Chroma only when an AI request/tool needs it."""
+    global _vectorstore
 
-# Initialize embeddings with Google Gemini Embedding model
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2-preview")
+    if _vectorstore is None:
+        chroma_dir = Path(__file__).parent.parent.parent.parent / "data" / "chroma_db"
+        logger.info(f"Initializing VectorDB from: {chroma_dir}")
 
-# Initialize Chroma vector store with persistence
-vectorstore = Chroma(
-    persist_directory=str(chroma_dir),
-    embedding_function=embeddings,
-    collection_name="admission_rules",
-)
+        # Initialize embeddings with Google Gemini Embedding model
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2-preview")
 
-logger.info("✅ VectorDB initialized successfully")
+        # Initialize Chroma vector store with persistence
+        _vectorstore = Chroma(
+            persist_directory=str(chroma_dir),
+            embedding_function=embeddings,
+            collection_name="admission_rules",
+        )
+
+        logger.info("VectorDB initialized successfully")
+
+    return _vectorstore
 
 # =============================================================================
 # REFACTOR: MongoDB Connection Pooling — Global scope, maxPoolSize=50
@@ -55,20 +63,39 @@ from pymongo.errors import PyMongoError
 _MONGO_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
 _MONGO_DB_NAME = os.getenv("MONGODB_DB_NAME", "admission_planner_db")
 
-try:
-    _mongo_client = MongoClient(
-        _MONGO_URL,
-        serverSelectionTimeoutMS=5000,
-        maxPoolSize=50,  # REFACTOR: Connection Pooling cho 20+ trường
-    )
-    _mongo_db = _mongo_client[_MONGO_DB_NAME]
-    _scores_collection = _mongo_db["admission_scores"]
-    logger.info(f"✅ MongoDB connection pool initialized (maxPoolSize=50) for tools")
-except Exception as e:
-    logger.error(f"❌ Failed to init MongoDB for tools: {e}")
-    _mongo_client = None
-    _mongo_db = None
-    _scores_collection = None
+_mongo_client = None
+_mongo_db = None
+_scores_collection = None
+
+
+def get_scores_collection():
+    """
+    Lazily initialize MongoDB connection pooling.
+
+    This keeps FastAPI imports from touching MongoDB, while still reusing the
+    same pool after the first tool call.
+    """
+    global _mongo_client, _mongo_db, _scores_collection
+
+    if _scores_collection is not None:
+        return _scores_collection
+
+    try:
+        _mongo_client = MongoClient(
+            _MONGO_URL,
+            serverSelectionTimeoutMS=5000,
+            maxPoolSize=50,  # REFACTOR: Connection Pooling cho 20+ trường
+        )
+        _mongo_db = _mongo_client[_MONGO_DB_NAME]
+        _scores_collection = _mongo_db["admission_scores"]
+        logger.info("MongoDB connection pool initialized (maxPoolSize=50) for tools")
+    except Exception as e:
+        logger.error(f"Failed to init MongoDB for tools: {e}")
+        _mongo_client = None
+        _mongo_db = None
+        _scores_collection = None
+
+    return _scores_collection
 
 
 @tool
@@ -106,6 +133,8 @@ def search_admission_rules(
     logger.info(f"🔍 Searching admission rules | Query: '{query}' | University: {university} | Year: {year}")
     
     try:
+        vectorstore = get_vectorstore()
+
         # Normalize parameters to strings
         university = str(university).strip().upper() if university else None
         year = str(year).strip() if year else None
@@ -219,20 +248,31 @@ def extract_method_tag(text: str) -> str:
         return None
         
     text_lower = text.lower()
+
+    pt_match = re.search(r"\bpt\s*(\d{3}[a-z]?)\b", text_lower)
+    if not pt_match:
+        pt_match = re.search(r"\bphương thức\s*(\d{3}[a-z]?)\b", text_lower)
+    if pt_match:
+        from app.utils.taxonomy_engine import normalize_method_tag
+        return normalize_method_tag(f"PT{pt_match.group(1).upper()}")
     
     # ── ƯU TIÊN 1: PHƯƠNG THỨC NGÁCH (kiểm tra trước) ──────────────────
     # 1a. Chứng chỉ quốc tế / Kết hợp / Phương thức 409
-    if "chứng chỉ quốc tế" in text_lower or "409" in text_lower or "ielts" in text_lower or "ccqt" in text_lower:
+    if "chứng chỉ quốc tế" in text_lower or "409" in text_lower or "ccqt" in text_lower:
         return "CHUNG_CHI_QUOC_TE"
     # 1b. Đánh giá tư duy / TSA (Bách Khoa)
     if "tsa" in text_lower or "đgtd" in text_lower or "đánh giá tư duy" in text_lower:
         return "DGTD_TSA"
+    if "hcm" in text_lower and ("đgnl" in text_lower or "đánh giá năng lực" in text_lower):
+        return "DGNL_CHUNG"
     # 1c. Đánh giá năng lực / HSA (ĐHQG)
-    if "hsa" in text_lower or "đgnl" in text_lower or "đánh giá năng lực" in text_lower:
+    if "hsa" in text_lower:
         return "DGNL_HSA"
+    if "v-sat" in text_lower or "vsat" in text_lower or "v sat" in text_lower or "thi riêng" in text_lower:
+        return "KY_THI_RIENG"
     # 1d. Xét tuyển tài năng
     if "tài năng" in text_lower or "xét tuyển tài năng" in text_lower:
-        return "XET_TUYEN_TAI_NANG"
+        return "KY_THI_RIENG"
 
     # ── ƯU TIÊN 2: FALLBACK – TỪ KHÓA PHỔ THÔNG (kiểm tra cuối) ──────
     # 2a. Học bạ
@@ -243,12 +283,24 @@ def extract_method_tag(text: str) -> str:
         return "THPT_QG"
         
     # 3. Fuzzy matching fallback cho các trường hợp còn lại
-    valid_tags = ["THPT_QG", "DGTD_TSA", "XET_TUYEN_TAI_NANG", "CHUNG_CHI_QUOC_TE", "HOC_BA", "DGNL_HSA"]
+    valid_tags = [
+        "CHUNG_CHI_QUOC_TE",
+        "DGNL_APT",
+        "DGNL_CHUNG",
+        "DGNL_HSA",
+        "DGTD_TSA",
+        "HOC_BA",
+        "KY_THI_RIENG",
+        "NGOAI_NGU_KET_HOP",
+        "THPT_QG",
+        "TOT_NGHIEP_QUOC_TE",
+    ]
     matches = difflib.get_close_matches(text.upper(), valid_tags, n=1, cutoff=0.5)
     if matches:
         return matches[0]
         
-    return text.upper()
+    from app.utils.taxonomy_engine import normalize_method_tag
+    return normalize_method_tag(text)
 
 @tool
 def get_historical_scores(
@@ -285,6 +337,8 @@ def get_historical_scores(
     
     # Process method_tag using fuzzy matching
     processed_method_tag = extract_method_tag(method_tag) if method_tag else None
+    from app.utils.taxonomy_engine import get_method_aliases
+    method_aliases = get_method_aliases(processed_method_tag) if processed_method_tag else []
     
     logger.info(f"📊 Fetching historical scores | University: {university} | Major: {major} | Year: {year} | Method: {processed_method_tag} (Original: {method_tag})")
     
@@ -294,31 +348,48 @@ def get_historical_scores(
     if university:
         university = re.sub(r'^(.)\1+', r'\1', university)
     major = str(major).strip() if major else None
+
+    if not major:
+        return (
+            "Không thể tra cứu điểm chuẩn: thiếu mã ngành. "
+            "Cần truyền major_code cụ thể để tránh lấy nhầm điểm của ngành khác."
+        )
+
+    if not processed_method_tag:
+        return (
+            "Không thể tra cứu điểm chuẩn: thiếu phương thức xét tuyển. "
+            "Cần truyền method_tag cụ thể để tránh so sánh nhầm phương thức."
+        )
     
     try:
         # REFACTOR: Dùng global MongoDB pool thay vì tạo client mới mỗi lần
-        if _scores_collection is None:
+        collection = get_scores_collection()
+        if collection is None:
             return "Lỗi: MongoDB connection không được khởi tạo. Kiểm tra lại cấu hình."
         
-        collection = _scores_collection
-        
         # Build query filter
-        query_filter = {"university_code": university}
+        base_filter = {"university_code": university}
         
         if major:
-            query_filter["major_code"] = major
+            base_filter["major_code"] = major
             
-        if processed_method_tag:
-            query_filter["method_tag"] = processed_method_tag
-        
         if year:
             # Convert year to int if provided as string for proper querying
             try:
                 year_int = int(year)
-                query_filter["year"] = year_int
+                base_filter["year"] = year_int
             except (ValueError, TypeError):
                 logger.warning(f"   ⚠️  Invalid year format: {year}, ignoring year filter")
         
+        method_conditions = [{"method_tag": processed_method_tag}]
+        if method_aliases:
+            method_conditions.append({"method_alias": {"$in": method_aliases}})
+
+        if len(method_conditions) == 1:
+            query_filter = {**base_filter, **method_conditions[0]}
+        else:
+            query_filter = {"$and": [base_filter, {"$or": method_conditions}]}
+
         logger.info(f"   Query filter: {query_filter}")
         
         # TEMPORAL: Query logic
@@ -348,6 +419,7 @@ def get_historical_scores(
                 "year": record.get("year"),
                 "major_code": record.get("major_code"),
                 "method_tag": record.get("method_tag", "N/A"),
+                "method_alias": record.get("method_alias"),
                 "score": float(score_val) if isinstance(score_val, (int, float)) else 0,
             })
         

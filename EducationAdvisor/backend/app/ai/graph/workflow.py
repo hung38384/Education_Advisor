@@ -17,6 +17,7 @@ import sys
 import logging
 import time
 import datetime
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -76,54 +77,67 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# 1. Setup LLMs
+# 1. Lazy AI Runtime Initialization
 # ============================================================================
 
-logger.info("Initializing LLM Models (with Fallbacks)...")
+_llm_bundle = None
+_expert_agents = None
+_ai_workflow = None
 
-strict_gemini = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.0,
-    max_retries=3, # Tăng retry để tự động xử lý Rate Limit
-)
 
-creative_gemini = ChatGoogleGenerativeAI(
-    model="gemini-3-flash-preview",
-    google_api_key=os.environ.get("GEMINI_API_KEY"),
-    temperature=0.7,
-    max_retries=3,
-)
+def get_llms():
+    """Initialize LLM clients lazily so FastAPI can import this module safely."""
+    global _llm_bundle
 
-try:
-    groq_strict = ChatGroq(
-        model="llama-3.1-8b-instant",
-        api_key=os.environ.get("GROQ_API_KEY"),
+    if _llm_bundle is not None:
+        return _llm_bundle
+
+    logger.info("Initializing LLM Models (with Fallbacks)...")
+
+    strict_gemini = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
         temperature=0.0,
         max_retries=3,
     )
-    groq_creative = ChatGroq(
-        model="llama-3.1-8b-instant",
-        api_key=os.environ.get("GROQ_API_KEY"),
+
+    creative_gemini = ChatGoogleGenerativeAI(
+        model="gemini-3-flash-preview",
+        google_api_key=os.environ.get("GEMINI_API_KEY"),
         temperature=0.7,
         max_retries=3,
     )
-    
-    # Bọc Fallback chéo: Gemini hỏng -> gọi Groq
-    strict_llm = strict_gemini.with_fallbacks([groq_strict])
-    creative_llm = creative_gemini.with_fallbacks([groq_creative])
-    
-    # Riêng Agents ReAct (nặng về Tool) ưu tiên Groq, hỏng -> gọi Gemini
-    groq_llm = groq_strict.with_fallbacks([strict_gemini])
-    
-    logger.info("   ✅ LLM Fallbacks configured successfully")
-except Exception as e:
-    logger.warning(f"Failed to load Groq: {e}. Falling back to pure Gemini")
-    strict_llm = strict_gemini
-    creative_llm = creative_gemini
-    groq_llm = strict_gemini
 
-logger.info("✅ LLMs initialized")
+    try:
+        groq_strict = ChatGroq(
+            model="llama-3.1-8b-instant",
+            api_key=os.environ.get("GROQ_API_KEY"),
+            temperature=0.0,
+            max_retries=3,
+        )
+        groq_creative = ChatGroq(
+            model="llama-3.1-8b-instant",
+            api_key=os.environ.get("GROQ_API_KEY"),
+            temperature=0.7,
+            max_retries=3,
+        )
 
+        strict_llm = strict_gemini.with_fallbacks([groq_strict])
+        creative_llm = creative_gemini.with_fallbacks([groq_creative])
+        groq_llm = groq_strict.with_fallbacks([strict_gemini])
+        logger.info("LLM fallbacks configured successfully")
+    except Exception as e:
+        logger.warning(f"Failed to load Groq: {e}. Falling back to pure Gemini")
+        strict_llm = strict_gemini
+        creative_llm = creative_gemini
+        groq_llm = strict_gemini
+
+    _llm_bundle = {
+        "strict_llm": strict_llm,
+        "creative_llm": creative_llm,
+        "groq_llm": groq_llm,
+    }
+    logger.info("LLMs initialized")
+    return _llm_bundle
 
 # ============================================================================
 # 2. Create Expert Agents with Proper System Prompts
@@ -150,35 +164,47 @@ def create_expert_agent(llm, tools, system_prompt):
     return create_react_agent(model=llm_with_tools, tools=tools, state_modifier=system_prompt)
 
 
-# Career Profiler Agent (no tools, just analysis)
-logger.info("Creating Career Profiler Agent...")
-career_agent = create_expert_agent(
-    llm=groq_llm,
-    tools=[],  # No external tools needed
-    system_prompt=CAREER_PROFILER_PROMPT,
-)
-logger.info("✅ Career Profiler Agent (Groq llama-3.3-70b) created")
 
+def get_expert_agents():
+    """Create and cache ReAct agents only when the workflow first runs."""
+    global _expert_agents
 
-# Academic Expert Agent (uses search_admission_rules)
-logger.info("Creating Academic Expert Agent...")
-academic_agent = create_expert_agent(
-    llm=groq_llm,
-    tools=[search_admission_rules],
-    system_prompt=ACADEMIC_EXPERT_PROMPT,
-)
-logger.info("✅ Academic Expert Agent (Groq llama-3.3-70b) created")
+    if _expert_agents is not None:
+        return _expert_agents
 
+    llms = get_llms()
+    groq_llm = llms["groq_llm"]
 
-# Data Strategist Agent (uses get_historical_scores)
-logger.info("Creating Data Strategist Agent...")
-strategist_agent = create_expert_agent(
-    llm=groq_llm,
-    tools=[get_historical_scores],
-    system_prompt=DATA_STRATEGIST_PROMPT,
-)
-logger.info("✅ Data Strategist Agent (Groq llama-3.3-70b) created")
+    logger.info("Creating Career Profiler Agent...")
+    career_agent = create_expert_agent(
+        llm=groq_llm,
+        tools=[],
+        system_prompt=CAREER_PROFILER_PROMPT,
+    )
+    logger.info("Career Profiler Agent created")
 
+    logger.info("Creating Academic Expert Agent...")
+    academic_agent = create_expert_agent(
+        llm=groq_llm,
+        tools=[search_admission_rules],
+        system_prompt=ACADEMIC_EXPERT_PROMPT,
+    )
+    logger.info("Academic Expert Agent created")
+
+    logger.info("Creating Data Strategist Agent...")
+    strategist_agent = create_expert_agent(
+        llm=groq_llm,
+        tools=[get_historical_scores],
+        system_prompt=DATA_STRATEGIST_PROMPT,
+    )
+    logger.info("Data Strategist Agent created")
+
+    _expert_agents = {
+        "career_agent": career_agent,
+        "academic_agent": academic_agent,
+        "strategist_agent": strategist_agent,
+    }
+    return _expert_agents
 
 # ============================================================================
 # 3. Node Wrappers - Inject user_profile into system message
@@ -310,7 +336,7 @@ Bắt đầu phân tích:"""
     try:
         context_msg = HumanMessage(content=hybrid_prompt)
         # Dùng career_agent (creative_llm, temperature=0.2) đã được khởi tạo bên trên
-        llm_result = career_agent.invoke({"messages": [context_msg]})
+        llm_result = get_expert_agents()["career_agent"].invoke({"messages": [context_msg]})
         llm_response_text = llm_result["messages"][-1].content
         logger.info("   ✅ [Bước 3] LLM giải thích xong")
 
@@ -376,7 +402,20 @@ def academic_expert_node(state: dict) -> dict:
     # =====================================================================
     # 2. MULTI-UNIVERSITY: Lấy thông tin trường từ user_profile + registry
     # =====================================================================
-    target_uni = str(user_profile.get("target_university", "BKA"))
+    target_uni = user_profile.get("target_university")
+    if not target_uni:
+        signed_msg = AIMessage(
+            content=(
+                "[Báo cáo từ AcademicExpert]:\n"
+                "Hệ thống chưa xác định được trường mục tiêu, nên không tra cứu quy chế tuyển sinh để tránh dùng nhầm quy định của trường khác."
+            ),
+            name="AcademicExpert",
+        )
+        called_agents = state.get("called_agents", [])
+        if "AcademicExpert" not in called_agents:
+            called_agents = called_agents + ["AcademicExpert"]
+        return {"messages": [signed_msg], "called_agents": called_agents}
+    target_uni = str(target_uni)
     # TEMPORAL ANCHORING: Nếu user không nhập năm → mặc định = năm hiện tại
     target_year = str(user_profile.get("target_year", CURRENT_YEAR))
     uni_info = get_university_info(target_uni)
@@ -433,7 +472,7 @@ LỆNH BẮT BUỘC:
     context_msg = HumanMessage(content=forced_context)
     
     # 5. Gọi LLM
-    result = academic_agent.invoke({"messages": [context_msg]})
+    result = get_expert_agents()["academic_agent"].invoke({"messages": [context_msg]})
     
     final_msg = result["messages"][-1] if isinstance(result, dict) and "messages" in result else result
     
@@ -472,7 +511,19 @@ def data_strategist_node(state: AgentState) -> dict:
     user_profile_str = str(user_profile)
     
     # MULTI-UNIVERSITY: Inject university info
-    target_uni = user_profile.get("target_university", "TMU")
+    target_uni = user_profile.get("target_university")
+    if not target_uni:
+        signed_msg = AIMessage(
+            content=(
+                "[Báo cáo từ DataStrategist]:\n"
+                "Hệ thống chưa xác định được trường mục tiêu, nên không tra cứu điểm chuẩn để tránh dùng nhầm dữ liệu của trường khác."
+            ),
+            name="DataStrategist",
+        )
+        called_agents = state.get("called_agents", [])
+        if "DataStrategist" not in called_agents:
+            called_agents = called_agents + ["DataStrategist"]
+        return {"messages": [signed_msg], "called_agents": called_agents}
     uni_info = get_university_info(target_uni)
     uni_name = uni_info["name"]
     
@@ -482,6 +533,21 @@ def data_strategist_node(state: AgentState) -> dict:
     
     # Chuẩn hóa tham số: Lấy major_code
     major_code = user_profile.get("target_major", "")
+    if not major_code:
+        logger.warning("   Missing target_major; skipping cutoff comparison to avoid cross-major score lookup")
+        signed_msg = AIMessage(
+            content=(
+                f"[Báo cáo từ DataStrategist — Trường {target_uni}]:\n"
+                f"Hệ thống chưa xác định được mã ngành cụ thể cho trường {target_uni}. "
+                "Vì vậy, hệ thống không so sánh điểm chuẩn để tránh lấy nhầm điểm của ngành khác. "
+                "Vui lòng cung cấp mã ngành hoặc tên ngành rõ hơn."
+            ),
+            name="DataStrategist",
+        )
+        called_agents = state.get("called_agents", [])
+        if "DataStrategist" not in called_agents:
+            called_agents = called_agents + ["DataStrategist"]
+        return {"messages": [signed_msg], "called_agents": called_agents}
     
     # 🆕 LẤY ĐIỂM ĐÃ TÍNH TỪ SCORE CALCULATOR
     calculated_details = state.get("calculated_details", {})
@@ -495,15 +561,30 @@ def data_strategist_node(state: AgentState) -> dict:
     confirmed_method_tag = get_standard_method_tag(query, target_uni)
     logger.info(f"   🔍 Taxonomy Engine resolved method_tag: {confirmed_method_tag} cho trường {target_uni}")
     
+    if not confirmed_method_tag:
+        signed_msg = AIMessage(
+            content=(
+                f"[Báo cáo từ DataStrategist — Trường {target_uni}]:\n"
+                "Hệ thống chưa xác định chắc chắn phương thức xét tuyển từ câu hỏi. "
+                "Vì vậy, hệ thống không tra cứu điểm chuẩn để tránh so sánh nhầm phương thức. "
+                "Vui lòng nêu rõ phương thức, ví dụ: THPT_QG, học bạ, TSA, HSA, hoặc xét tuyển kết hợp chứng chỉ quốc tế."
+            ),
+            name="DataStrategist",
+        )
+        called_agents = state.get("called_agents", [])
+        if "DataStrategist" not in called_agents:
+            called_agents = called_agents + ["DataStrategist"]
+        return {"messages": [signed_msg], "called_agents": called_agents}
+
     tsa = calculated_details.get("tsa_score")
     ielts = calculated_details.get("ielts_score")
     bonus = calculated_details.get("ielts_bonus", 0)
     
     # CẢNH BÁO DEBUG: Nếu hồ sơ có điểm thi đặc thù nhưng Taxonomy Engine lại trả về xét điểm thi phổ thông
-    if confirmed_method_tag == "THPT_QG" and ((tsa is not None and float(tsa) > 0) or (ielts is not None and float(ielts) > 0)):
+    if confirmed_method_tag == "THPT_QG" and (tsa is not None and float(tsa) > 0):
         logger.warning(
             f"   ⚠️ LƯU Ý DEBUG: Taxonomy Engine trả về 'THPT_QG' nhưng hồ sơ "
-            f"có tsa={tsa} hoặc ielts={ielts}. Kiểm tra lại logic mapping của "
+            f"có tsa={tsa}. Kiểm tra lại logic mapping của "
             f"Taxonomy Engine cho trường {target_uni} nếu thấy bất thường."
         )
     
@@ -568,14 +649,12 @@ def data_strategist_node(state: AgentState) -> dict:
     
     # Parse JSON từ kết quả tool (tool trả về text + JSON)
     cutoff = None
-    json_match = re.search(r'\{[^{}]*"status"\s*:\s*"success"[^{}]*\}', str(tool_result), re.DOTALL)
-    if not json_match:
-        # Thử tìm JSON block hoàn chỉnh
-        json_match = re.search(r'(\{.*?"history".*?\].*?\})', str(tool_result), re.DOTALL)
-    
-    if json_match:
+    result_text = str(tool_result)
+    json_start = result_text.find("{")
+    json_text = result_text[json_start:].strip() if json_start >= 0 else ""
+    if json_text:
         try:
-            data = json.loads(json_match.group())
+            data = json.loads(json_text)
             if data.get("status") == "success" and data.get("history"):
                 cutoff = float(data["history"][0].get("score", 0))
                 logger.info(f"   ✅ Parsed cutoff_score = {cutoff} from JSON history")
@@ -690,8 +769,26 @@ def score_calculator_node(state: AgentState) -> dict:
     
     # 1. Trích xuất dữ liệu từ hồ sơ
     user_profile = state.get("user_profile", {})
-    target_uni = str(user_profile.get("target_university", "BKA"))
-    target_year = str(user_profile.get("target_year", "2024"))
+    target_uni = user_profile.get("target_university")
+    if not target_uni:
+        calculation_msg = AIMessage(
+            content=(
+                "[📊 SCORE CALCULATION REPORT]\n"
+                "Hệ thống chưa xác định được trường mục tiêu, nên không tính điểm xét tuyển để tránh áp dụng nhầm công thức."
+            ),
+            name="ScoreCalculator",
+        )
+        called_agents = state.get("called_agents", [])
+        if "ScoreCalculator" not in called_agents:
+            called_agents = called_agents + ["ScoreCalculator"]
+        return {
+            "messages": [calculation_msg],
+            "called_agents": called_agents,
+            "calculated_score": None,
+            "calculated_details": {},
+        }
+    target_uni = str(target_uni)
+    target_year = str(user_profile.get("target_year", CURRENT_YEAR))
     
     # Prefer values provided in the user's latest question; fall back to profile
     query_text = ""
@@ -704,6 +801,7 @@ def score_calculator_node(state: AgentState) -> dict:
             break
 
     import re
+    assessment_from_query = None
     tsa_from_query = None
     ielts_from_query = None
     if query_text:
@@ -716,6 +814,20 @@ def score_calculator_node(state: AgentState) -> dict:
             except Exception:
                 tsa_from_query = None
 
+        assessment_labels = r"TSA|ĐGTD|DGTD|đánh giá tư duy|danh gia tu duy|HSA|ĐGNL|DGNL|đánh giá năng lực|danh gia nang luc|V-SAT|VSAT"
+        for pattern in (
+            rf"(?:{assessment_labels})[^\d]*(\d+(?:\.\d+)?)",
+            rf"(\d+(?:\.\d+)?)\s*(?:điểm)?\s*(?:{assessment_labels})",
+        ):
+            match_assessment = re.search(pattern, query_text, re.IGNORECASE)
+            if match_assessment:
+                try:
+                    assessment_from_query = float(match_assessment.group(1))
+                    logger.info(f"   📖 Trích xuất từ query: điểm bài thi riêng/ĐGNL/TSA = {assessment_from_query}")
+                    break
+                except Exception:
+                    assessment_from_query = None
+
         # Extract IELTS if mentioned in query
         match2 = re.search(r"(?:IELTS|ielts)[^\d]*(\d+(?:\.\d+)?)", query_text, re.IGNORECASE)
         if match2:
@@ -726,7 +838,10 @@ def score_calculator_node(state: AgentState) -> dict:
                 ielts_from_query = None
 
     # Prefer query values when present; otherwise use profile
-    if tsa_from_query is not None:
+    if assessment_from_query is not None:
+        tsa_score = assessment_from_query
+        tsa_source = "query"
+    elif tsa_from_query is not None:
         tsa_score = tsa_from_query
         tsa_source = "query"
     else:
@@ -803,7 +918,7 @@ HƯỚNG DẪN BẮT BUỘC:
 
     logger.info(f"   🤖 Đang gọi strict_llm để phân tích công thức và tính toán...")
     try:
-        structured_llm = strict_llm.with_structured_output(ScoreCalculationResult)
+        structured_llm = get_llms()["strict_llm"].with_structured_output(ScoreCalculationResult)
         result = structured_llm.invoke(prompt)
         
         total_score = result.total_score
@@ -872,7 +987,7 @@ def lookup_agent_node(state: AgentState) -> dict:
     # Dùng Gemini LLM để test (Groq gặp vấn đề HTTP 400)
     tools = [search_admission_rules, get_historical_scores]
     lookup_agent = create_expert_agent(
-        llm=strict_llm,  # Dùng Gemini thay vì Groq
+        llm=get_llms()["strict_llm"],  # Dùng Gemini thay vì Groq
         tools=tools,
         system_prompt=LOOKUP_AGENT_PROMPT,
     )
@@ -1019,6 +1134,73 @@ def supervisor_node(state: AgentState) -> dict:
 # Response Synthesis Node
 # ============================================================================
 
+def _extract_verified_admission_assessment(data_report: str) -> str | None:
+    """Extract deterministic admission comparison from DataStrategist output."""
+    if not data_report:
+        return None
+
+    score_match = re.search(r"Điểm xét tuyển của học sinh:\s*([\d.]+)", data_report)
+    cutoff_match = re.search(
+        r"Điểm chuẩn thực tế\s*\(([^,]+),\s*năm\s*([^)]+)\):\s*([\d.]+)",
+        data_report,
+    )
+    diff_match = re.search(r"Chênh lệch:\s*([+-]?[\d.]+)", data_report)
+    label_match = re.search(r"\*\*(AN TOÀN|THỬ THÁCH|TRƯỢT)\*\*", data_report)
+
+    if not score_match or not cutoff_match:
+        return None
+
+    score = score_match.group(1)
+    method_tag = cutoff_match.group(1)
+    year = cutoff_match.group(2)
+    cutoff = cutoff_match.group(3)
+    diff = diff_match.group(1) if diff_match else None
+    label = label_match.group(1) if label_match else None
+
+    if label == "AN TOÀN":
+        advice = "cơ hội của bạn ở ngưỡng **Rất An Toàn**. Bạn có thể tự tin đặt nguyện vọng."
+    elif label == "THỬ THÁCH":
+        advice = "đây là lựa chọn **có tính cạnh tranh cao**. Điểm của bạn đang sát mức điểm chuẩn, nên chuẩn bị thêm phương án dự phòng."
+    elif label == "TRƯỢT":
+        advice = "ngành này hiện **rất khó khăn** với mức điểm này. Bạn nên cân nhắc phương thức khác hoặc ngành thay thế."
+    else:
+        advice = "hãy dùng chênh lệch này để cân nhắc thứ tự nguyện vọng."
+
+    diff_line = f"\n- Chênh lệch: {diff}" if diff is not None else ""
+    return (
+        "📊 **Đánh giá cơ hội:**\n"
+        f"- Điểm xét tuyển của bạn: {score}\n"
+        f"- Điểm chuẩn thực tế ({method_tag}, năm {year}): {cutoff}"
+        f"{diff_line}\n"
+        f"- Kết luận: {advice}"
+    )
+
+
+def _repair_synthesis_contradictions(final_response: str, data_report: str) -> str:
+    """Prevent final synthesis from contradicting verified DataStrategist data."""
+    verified_assessment = _extract_verified_admission_assessment(data_report)
+    if not verified_assessment:
+        return final_response
+
+    contradiction_phrases = [
+        "chưa truy xuất được dữ liệu điểm chuẩn",
+        "không truy xuất được dữ liệu điểm chuẩn",
+        "chưa tìm thấy thông tin điểm chuẩn",
+        "không tìm thấy thông tin điểm chuẩn",
+    ]
+    lower_response = final_response.lower()
+    if not any(phrase in lower_response for phrase in contradiction_phrases):
+        return final_response
+
+    assessment_section_pattern = re.compile(
+        r"(?s)(?:[-*]\s*)?(?:📊\s*)?\*\*Đánh giá cơ hội:\*\*.*?(?=\n(?:[-*]\s*)?(?:🎯|🧮|📊)\s*\*\*|\Z)"
+    )
+    if assessment_section_pattern.search(final_response):
+        return assessment_section_pattern.sub(verified_assessment, final_response, count=1)
+
+    return f"{final_response}\n\n{verified_assessment}"
+
+
 def synthesis_node(state: AgentState) -> dict:
     """
     Final synthesis node that compiles all expert responses into a coherent answer.
@@ -1041,9 +1223,12 @@ def synthesis_node(state: AgentState) -> dict:
         user_query = getattr(last_msg, "content", str(last_msg))
 
     expert_responses = []
+    data_strategist_report = ""
     # 2. Collect messages from experts and label their sources clearly
     for msg in state.get("messages", []):
         if hasattr(msg, "name") and msg.name in ["CareerProfiler", "AcademicExpert", "ScoreCalculator", "DataStrategist"]:
+            if msg.name == "DataStrategist":
+                data_strategist_report = str(msg.content)
             expert_responses.append(f"--- BÁO CÁO TỪ {msg.name.upper()} ---\n{msg.content}")
             
     if not expert_responses:
@@ -1086,7 +1271,7 @@ DỮ LIỆU TỪ CÁC CHUYÊN GIA:
 Câu trả lời tư vấn:"""
 
         # Gọi LLaMA (Groq) thay vì Gemini để tránh bị treo do quota/rate-limits
-        final_msg = groq_llm.invoke(synthesis_prompt)
+        final_msg = get_llms()["groq_llm"].invoke(synthesis_prompt)
         
         # Xử lý trường hợp nội dung trả về
         if isinstance(final_msg.content, list):
@@ -1094,6 +1279,11 @@ Câu trả lời tư vấn:"""
             final_response = "\n".join(text_blocks) if text_blocks else str(final_msg.content)
         else:
             final_response = final_msg.content
+
+        final_response = _repair_synthesis_contradictions(
+            str(final_response),
+            data_strategist_report,
+        )
             
         logger.info(f"   ✅ Synthesis completed")
     
@@ -1106,95 +1296,77 @@ Câu trả lời tư vấn:"""
 # 5. Build StateGraph
 # ============================================================================
 
-logger.info("\n" + "=" * 70)
-logger.info("Building LangGraph State Machine...")
-logger.info("=" * 70)
+def build_ai_workflow():
+    """Build and compile the LangGraph workflow without running at import time."""
+    logger.info("\n" + "=" * 70)
+    logger.info("Building LangGraph State Machine...")
+    logger.info("=" * 70)
 
-# Initialize StateGraph
-graph_builder = StateGraph(AgentState)
+    graph_builder = StateGraph(AgentState)
 
-# Add nodes
-logger.info("Adding nodes...")
-graph_builder.add_node("receptionist", receptionist_node)
-graph_builder.add_node("supervisor", supervisor_node)
-graph_builder.add_node("CareerProfiler", career_profiler_node)
-graph_builder.add_node("AcademicExpert", academic_expert_node)
-graph_builder.add_node("ScoreCalculator", score_calculator_node)
-graph_builder.add_node("DataStrategist", data_strategist_node)
-graph_builder.add_node("LookupAgent", lookup_agent_node)
-graph_builder.add_node("synthesis", synthesis_node)
-logger.info("   ✅ Nodes added")
+    logger.info("Adding nodes...")
+    graph_builder.add_node("receptionist", receptionist_node)
+    graph_builder.add_node("supervisor", supervisor_node)
+    graph_builder.add_node("CareerProfiler", career_profiler_node)
+    graph_builder.add_node("AcademicExpert", academic_expert_node)
+    graph_builder.add_node("ScoreCalculator", score_calculator_node)
+    graph_builder.add_node("DataStrategist", data_strategist_node)
+    graph_builder.add_node("LookupAgent", lookup_agent_node)
+    graph_builder.add_node("synthesis", synthesis_node)
+    logger.info("Nodes added")
 
-# Add edges
-logger.info("Adding edges...")
+    graph_builder.add_edge(START, "receptionist")
 
-# Start → Receptionist (NEW: Entry point for entity extraction)
-graph_builder.add_edge(START, "receptionist")
-logger.info("   ✅ START → receptionist (Entity Extraction)")
+    def route_from_receptionist(state: AgentState) -> str:
+        next_agent = state.get("next_agent", "supervisor")
+        return next_agent
 
-# Receptionist → Supervisor or END (conditional based on is_ambiguous)
-def route_from_receptionist(state: AgentState) -> str:
-    """
-    Route from receptionist node:
-    - If next_agent == "END": User question is ambiguous, need clarification
-    - If next_agent == "supervisor": Data is clear, proceed to main workflow
-    """
-    next_agent = state.get("next_agent", "supervisor")
-    return next_agent
+    graph_builder.add_conditional_edges(
+        "receptionist",
+        route_from_receptionist,
+        {
+            "END": END,
+            "supervisor": "supervisor",
+        }
+    )
 
+    def route_to_agent(state: AgentState) -> str:
+        next_agent = state.get("next_agent", "FINISH")
+        return next_agent
 
-graph_builder.add_conditional_edges(
-    "receptionist",
-    route_from_receptionist,
-    {
-        "END": END,
-        "supervisor": "supervisor",
-    }
-)
-logger.info("   ✅ receptionist → [END if ambiguous, supervisor if clear]")
+    graph_builder.add_conditional_edges(
+        "supervisor",
+        route_to_agent,
+        {
+            "LookupAgent": "LookupAgent",
+            "CareerProfiler": "CareerProfiler",
+            "AcademicExpert": "AcademicExpert",
+            "ScoreCalculator": "ScoreCalculator",
+            "DataStrategist": "DataStrategist",
+            "FINISH": "synthesis",
+        }
+    )
 
-# Supervisor → Expert agents (conditional)
-def route_to_agent(state: AgentState) -> str:
-    """Route based on next_agent from supervisor."""
-    next_agent = state.get("next_agent", "FINISH")
-    # Return the string directly - conditional_edges will map it
-    return next_agent
+    graph_builder.add_edge("CareerProfiler", "supervisor")
+    graph_builder.add_edge("AcademicExpert", "supervisor")
+    graph_builder.add_edge("ScoreCalculator", "supervisor")
+    graph_builder.add_edge("DataStrategist", "supervisor")
+    graph_builder.add_edge("LookupAgent", END)
+    graph_builder.add_edge("synthesis", END)
 
-
-graph_builder.add_conditional_edges(
-    "supervisor",
-    route_to_agent,
-    {
-        "LookupAgent": "LookupAgent",
-        "CareerProfiler": "CareerProfiler",
-        "AcademicExpert": "AcademicExpert",
-        "ScoreCalculator": "ScoreCalculator",
-        "DataStrategist": "DataStrategist",
-        "FINISH": "synthesis",  # Route to synthesis node instead of END
-    }
-)
-logger.info("   ✅ supervisor → [agents, synthesis, LookupAgent]")
+    compiled_graph = graph_builder.compile()
+    logger.info("Graph compiled successfully")
+    return compiled_graph
 
 
-# Experts → back to Supervisor
-graph_builder.add_edge("CareerProfiler", "supervisor")
-graph_builder.add_edge("AcademicExpert", "supervisor")
-graph_builder.add_edge("ScoreCalculator", "supervisor")
-graph_builder.add_edge("DataStrategist", "supervisor")
-logger.info("   ✅ [agents] → supervisor (loop)")
+def get_ai_workflow():
+    """FastAPI dependency-friendly accessor for the cached AI workflow."""
+    global _ai_workflow
 
-# LookupAgent → END (bỏ qua Synthesis)
-graph_builder.add_edge("LookupAgent", END)
-logger.info("   ✅ LookupAgent → END (Fast Lane)")
+    if _ai_workflow is None:
+        _ai_workflow = build_ai_workflow()
 
-# Synthesis → END
-graph_builder.add_edge("synthesis", END)
-logger.info("   ✅ synthesis → END")
-
-# Compile graph
-app_graph = graph_builder.compile()
-logger.info("\n✅ Graph compiled successfully!")
-
+    return _ai_workflow
 
 # ============================================================================
 # 6. Test Execution (Multi-University Support)
@@ -1310,7 +1482,7 @@ def run_test(test_key: str):
     event_count = 0
     final_response = None
 
-    for event in app_graph.stream(initial_state, stream_mode="values"):
+    for event in get_ai_workflow().stream(initial_state, stream_mode="values"):
         event_count += 1
         messages = event.get("messages", [])
         if messages:

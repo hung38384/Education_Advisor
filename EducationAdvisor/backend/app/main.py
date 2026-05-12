@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.connection import connect_to_mongo, close_mongo_connection
+from app.api.routes import advisor
 
 # Configure logging
 logging.basicConfig(
@@ -75,6 +76,8 @@ app.add_middleware(
 
 
 # ==================== Routes ====================
+
+app.include_router(advisor.router, prefix="/api/v1")
 
 @app.get("/", tags=["Health"])
 async def root():
