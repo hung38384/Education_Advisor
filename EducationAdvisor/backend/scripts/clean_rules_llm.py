@@ -292,7 +292,7 @@ SYSTEM_PROMPT = (
 
 # Khởi tạo model với SYSTEM INSTRUCTION ngắn gọn để định hình vai trò
 model = genai.GenerativeModel(
-    "gemini-2.5-flash",
+    "gemini-3-flash-preview",
     system_instruction=SYSTEM_PROMPT
 )
 
@@ -553,8 +553,97 @@ def clean_admission_rules(force_reprocess: bool = False):
 
 if __name__ == "__main__":
     # Thêm --force để ghi đè file đã tồn tại
+    # Thêm --file để clean file cụ thể (dùng cho batch processing)
     import sys
-    force = "--force" in sys.argv
-    if force:
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Clean admission rules bằng Gemini")
+    parser.add_argument("--force", action="store_true", help="Ghi đè file đã tồn tại")
+    parser.add_argument("--file", type=str, default=None, help="Clean file cụ thể (ví dụ: BKA_DeAn2024.md)")
+    args = parser.parse_args()
+    
+    if args.force:
         print("⚡ Chế độ FORCE: sẽ ghi đè tất cả file *_clean.md hiện có.")
-    clean_admission_rules(force_reprocess=force)
+    
+    if args.file:
+        # Mode single file (dùng cho batch processing)
+        base_dir = Path(__file__).parent.parent
+        processed_dir = base_dir / "data" / "processed_rules"
+        target_file = processed_dir / args.file
+        
+        if not target_file.exists():
+            print(f"❌ File không tồn tại: {target_file}")
+            sys.exit(1)
+        
+        print(f"\n{'='*65}")
+        print(f"🤖 Single file mode: {args.file}")
+        print(f"{'='*65}\n")
+        
+        # Simulate process_directory nhưng chỉ cho 1 file
+        try:
+            if target_file.name.endswith("_raw.md"):
+                clean_filename = target_file.name.replace("_raw.md", "_clean.md")
+            else:
+                clean_filename = target_file.stem + "_clean.md"
+            
+            clean_path = processed_dir / clean_filename
+            
+            # Kiểm tra file đã tồn tại
+            if clean_path.exists() and not args.force:
+                existing_size = clean_path.stat().st_size
+                if existing_size >= MIN_OUTPUT_CHARS:
+                    print(f"⏭️  File {clean_filename} đã tồn tại ({existing_size:,} bytes) → bỏ qua.")
+                    sys.exit(0)
+            
+            # Đọc nội dung thô
+            with open(target_file, "r", encoding="utf-8") as f:
+                raw_content = f.read()
+            
+            if not raw_content.strip():
+                print(f"⚠️  File {target_file.name} rỗng — bỏ qua.")
+                sys.exit(1)
+            
+            char_count = len(raw_content)
+            print(f"   📄 Kích thước: {char_count:,} ký tự (~{char_count // 4:,} tokens)")
+            
+            print(f"   ⚡ Gọi Gemini 1 lần với full context ({char_count:,} ký tự)...")
+            trigger_prompt = (
+                "\n\n================================================================================\n"
+                "KẾT THÚC TÀI LIỆU THÔ.\n\n"
+                "Dựa vào nội dung tài liệu thô cung cấp ở trên, HÃY BẮT ĐẦU TRÍCH XUẤT VÀ TRẢ VỀ TOÀN BỘ KẾT QUẢ DƯỚI ĐỊNH DẠNG "
+                "MARKDOWN CÓ CẤU TRÚC THEO ĐÚNG YÊU CẦU CỦA ĐOẠN 'MASTER PROMPT' Ở TRÊN NGAY BÂY GIỜ.\n"
+                "LƯU Ý ĐẶC BIỆT TRÁNH LỖI ĐỨT GÃY: BẠN PHẢI SINH TOÀN BỘ VĂN BẢN CHO ĐẾN KHI HOÀN THÀNH MỤC '11. BẢNG TÓM TẮT NHANH CHO AI AGENT'.\n"
+                "NẾU TÀI LIỆU BỊ THIẾU THÔNG TIN Ở BẤT KỲ MỤC/CỘT NÀO TRONG BẢNG, HÃY GHI 'Không có thông tin chi tiết' VÀ TIẾP TỤC, TUYỆT ĐỐI KHÔNG DỪNG LẠI GIỮA CHỪNG.\n"
+            )
+            data_section = "NỘI DUNG TÀI LIỆU THÔ (BẮT ĐẦU TỪ ĐÂY):\n================================================================================\n" + raw_content + trigger_prompt
+            
+            full_user_prompt = MASTER_PROMPT + "\n\n" + data_section
+            clean_content = normalize_newlines(call_gemini_with_retry(full_user_prompt))
+            
+            out_chars = len(clean_content)
+            if out_chars < MIN_OUTPUT_CHARS:
+                print(f"   ❌ Output quá nhỏ ({out_chars} ký tự) — có thể Gemini gặp lỗi. Không lưu file.")
+                print(f"   👉 Nội dung Gemini trả về:\n{clean_content}\n")
+                debug_path = processed_dir / (target_file.stem + "_debug_short.md")
+                with open(debug_path, "w", encoding="utf-8") as f:
+                    f.write(clean_content)
+                print(f"   (Đã lưu nội dung ngắn vào {debug_path.name})")
+                sys.exit(1)
+            
+            # Lưu file đã làm sạch
+            with open(clean_path, "w", encoding="utf-8") as f:
+                f.write(clean_content)
+            
+            print(f"   ✅ Hoàn thành! Đã lưu: {clean_filename}")
+            print(f"      Input: {char_count:,} ký tự → Output: {out_chars:,} ký tự")
+            print(f"      Tỷ lệ nén: {(1 - out_chars/char_count)*100:.1f}%")
+            sys.exit(0)
+        
+        except Exception as e:
+            print(f"   ❌ Lỗi khi xử lý {target_file.name}: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+    else:
+        # Mode batch (xử lý toàn bộ)
+        clean_admission_rules(force_reprocess=args.force)

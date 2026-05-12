@@ -16,16 +16,22 @@ class AgentState(TypedDict):
     Attributes:
         messages: Conversation history. New messages are automatically appended.
         next_agent: Indicates which agent should be called next by supervisor.
-                   Values: "CareerProfiler", "AcademicExpert", "DataStrategist", "FINISH"
+                   Values: "CareerProfiler", "AcademicExpert", "ScoreCalculator", "DataStrategist", "FINISH"
         user_profile: Dictionary containing student information:
                      - mbti: MBTI personality type and description
                      - ielts: IELTS score (float)
-                     - transcript: Dict of subject::score for academic review
-                     - Add more fields as needed (hsCode, preferences, etc.)
+                     - transcript: Dict of subject::score for academic assessment
+                     - tsa_score: TSA/ĐGTD score (float)
+                     - target_university, target_major, target_year
         called_agents: List of agents that have already been called (tracks progress)
+        calculated_score: Total admission score calculated by ScoreCalculator (TSA + IELTS bonus)
+        calculated_details: Dictionary with breakdown:
+                           - tsa_score, ielts_score, ielts_bonus, total_score
     """
     
     messages: Annotated[list, add_messages]
     next_agent: str
     user_profile: dict[str, Any]
     called_agents: list[str]
+    calculated_score: float | None
+    calculated_details: dict[str, Any]

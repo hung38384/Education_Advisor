@@ -1,68 +1,156 @@
-# 1. Các phương thức xét tuyển (Admission Methods)
+# Đại học Bách khoa Hà Nội — Đề án Tuyển sinh 2023
 
-Đại học Bách khoa Hà Nội tuyển sinh theo 4 phương thức chính:
+---
 
-*   **i) Phương thức xét tuyển tài năng (XTTN)**
-    *   **Xét tuyển thẳng học sinh giỏi (HSG) theo quy định của Bộ Giáo dục và Đào tạo:** Dành cho thí sinh tốt nghiệp THPT năm 2023, đạt giải Nhất, Nhì, Ba trong kỳ thi chọn HSG Quốc gia, hoặc tham dự kỳ thi chọn đội tuyển quốc gia dự thi Olympic Quốc tế, hoặc đạt giải Nhất, Nhì, Ba trong cuộc thi KHKT cấp Quốc gia do Bộ GDĐT tổ chức.
-    *   **Xét tuyển dựa trên các chứng chỉ quốc tế SAT, ACT, A-Level, AP và IB:** Thí sinh có điểm TBC học tập các môn văn hóa (trừ Thể dục và GDQPAN) từng năm học lớp 10, 11, 12 đạt 8.0 trở lên và có ít nhất 1 trong các chứng chỉ Quốc tế đã nêu.
-    *   **Xét tuyển dựa theo hồ sơ năng lực kết hợp phỏng vấn:** Thí sinh tốt nghiệp THPT năm 2023, có điểm TBC học tập các môn văn hóa (trừ Thể dục và GDQP-AN) từng năm học lớp 10, 11 và lớp 12 đạt 8.0 trở lên và đáp ứng một trong các điều kiện sau:
-        *   Được chọn tham dự kỳ thi HSG Quốc gia hoặc đạt giải Nhất, Nhì, Ba, Khuyến khích trong kỳ thi chọn HSG cấp tỉnh/thành phố các môn Toán, Lý, Hóa, Sinh, Tin, Ngoại ngữ, Tổ hợp.
-        *   Được chọn tham dự cuộc thi KHKT Quốc gia hoặc đạt giải Nhất, Nhì cấp Tỉnh/Thành phố trở lên cuộc thi KHKT.
-        *   Được chọn tham dự cuộc thi Đường lên đỉnh Olympia từ vòng thi tháng trở lên.
-        *   Có chứng chỉ tiếng Anh VSTEP từ B2 trở lên, hoặc IELTS (academic) từ 6.0 trở lên (hoặc tương đương) để đăng ký xét tuyển vào các ngành Ngôn ngữ Anh và Kinh tế - Quản lý.
-        *   Là học sinh hệ chuyên của các trường THPT và THPT chuyên trên toàn quốc, các lớp chuyên, hệ chuyên thuộc các Trường đại học, Đại học quốc gia, Đại học vùng.
-*   **ii) Phương thức xét tuyển dựa theo kết quả bài thi đánh giá tư duy (ĐGTD) năm 2023**
-    *   Đối tượng xét tuyển: Thí sinh tham dự kỳ thi Đánh giá tư duy do Đại học Bách khoa Hà Nội và một số cơ sở giáo dục đại học khác tổ chức.
-*   **iii) Phương thức xét tuyển dựa theo kết quả thi tốt nghiệp THPT 2023**
-    *   Đối tượng xét tuyển: Thí sinh tham dự kỳ thi tốt nghiệp THPT năm 2023 do Bộ GDĐT và các Sở GDĐT tổ chức.
-*   **iv) Xét tuyển thẳng theo quy định của Bộ Giáo dục và Đào tạo**
-    *   Đối tượng xét tuyển: Theo khoản 1 và 4, Điều 8 Quy chế tuyển sinh đại học, tuyển sinh cao đẳng ngành Giáo dục Mầm non, ban hành kèm theo Thông tư số 08/2022/TT-BGDĐT.
+## 1. TỔNG QUAN PHƯƠNG THỨC XÉT TUYỂN
 
-# 2. Điều kiện tiên quyết (Prerequisites & Thresholds)
+| STT | Mã Phương thức | Tên Phương thức | Chỉ tiêu (%) | Đối tượng áp dụng |
+| --- | --- | --- | --- | --- |
+| 1 | XTTN | Xét tuyển tài năng (bao gồm Tuyển thẳng Bộ GD&ĐT) | 15 – 20% | Thí sinh đạt giải HSG, có chứng chỉ quốc tế, hoặc hồ sơ năng lực xuất sắc |
+| 2 | ĐGTD | Xét tuyển dựa theo kết quả bài thi Đánh giá tư duy | 85 – 90% (gộp chung với xét điểm THPT) | Thí sinh dự thi ĐGTD năm 2023 do ĐHBK HN tổ chức |
+| 3 | THPT | Xét tuyển dựa theo kết quả thi tốt nghiệp THPT | 85 – 90% (gộp chung với xét điểm ĐGTD) | Thí sinh dự thi tốt nghiệp THPT năm 2023 |
 
-*   **Điều kiện chung:** Thí sinh phải đáp ứng các điều kiện được tham gia tuyển sinh đại học theo quy định tại Quy chế tuyển sinh hiện hành. Điều kiện này không áp dụng cho thí sinh thuộc diện tuyển thẳng HSG theo quy định của Bộ GDĐT; thí sinh đăng ký xét tuyển vào các chương trình đào tạo quốc tế do nước ngoài cấp bằng; thí sinh đã tốt nghiệp cao đẳng hệ chính quy của ĐHBK Hà Nội.
-*   **Điểm TBC học tập:** Đối với phương thức xét tuyển tài năng (dựa trên chứng chỉ quốc tế và hồ sơ năng lực), thí sinh phải có điểm TBC học tập các môn văn hóa (trừ 2 môn Thể dục và GDQP-AN) từng năm học lớp 10, 11, 12 đạt 8.0 trở lên.
-*   **Ngưỡng điểm nhận hồ sơ:** Đối với phương thức xét tuyển theo kết quả Kỳ thi Đánh giá tư duy và xét tuyển theo kết quả kỳ thi tốt nghiệp THPT 2023, thí sinh phải đạt ngưỡng điểm nhận hồ sơ đăng ký xét tuyển do ĐHBK Hà Nội quy định.
-*   **Trình độ tiếng Anh cho chương trình giảng dạy bằng tiếng Anh:** Thí sinh cần có một trong những điều kiện sau:
-    *   Chứng chỉ tiếng Anh VSTEP trình độ B1 trở lên, IELTS (academic) 5.0 trở lên hoặc tương đương.
-    *   Điểm thi tốt nghiệp THPT năm 2023 môn tiếng Anh đạt yêu cầu của ĐHBK Hà Nội.
+---
 
-# 3. Công thức tính điểm xét tuyển (Score Calculation Formulas)
+## 2. ĐIỀU KIỆN TIÊN QUYẾT & NGƯỠNG ĐẢM BẢO CHẤT LƯỢNG ĐẦU VÀO
 
-*   **Công thức tính điểm xét tuyển theo Kỳ thi Đánh giá tư duy (ĐGTD):**
-    `Điểm xét = Điểm thi ĐGTD + Điểm ưu tiên (KV, ĐT) + Điểm thưởng`
-    *   Trong đó:
-        *   Điểm ưu tiên: theo quy định của Bộ GDĐT, quy về thang điểm 100.
-        *   Điểm thưởng: áp dụng cho thí sinh có chứng chỉ ngoại ngữ VSTEP hoặc chứng chỉ quốc tế IELTS (hoặc tương đương) theo quy định tại Bảng 6 và Bảng 7 (trong mục 4).
-*   **Công thức tính điểm xét tuyển theo Kỳ thi tốt nghiệp THPT 2023:**
-    `Điểm xét = Tổng điểm 3 môn thi (có tính hệ số môn chính nếu có) + Điểm ưu tiên`
-    *   Điểm xét từng ngành, chương trình đào tạo xác định theo tổng điểm thi 3 môn thi của các tổ hợp A00, A01, A02, B00, D01, D07, D26, D28 và D29 có tính hệ số môn chính ở một số ngành và điểm cộng ưu tiên.
-    *   Thí sinh có chứng chỉ tiếng Anh quốc tế IELTS (Academic) hoặc tương đương có thể được quy đổi điểm thay cho điểm thi môn tiếng Anh để xét tuyển vào các ngành/chương trình theo tổ hợp A01, D07, D01 (theo Bảng 8, 9 trong mục 4).
-*   **Chênh lệch điểm chuẩn trúng tuyển:** Đối với ngành/chương trình xét tuyển theo nhiều tổ hợp môn, điểm trúng tuyển theo các tổ hợp là như nhau.
-*   **Điều kiện phụ (tie-breaker rule):** Tài liệu này có đề cập đến "Điều kiện phụ khi xét tuyển" nhưng không cung cấp thông tin chi tiết về quy tắc cụ thể.
+* **Ngưỡng điểm học bạ (GPA) sơ tuyển:** - ĐỐI VỚI PHƯƠNG THỨC XÉT TUYỂN TÀI NĂNG (Chứng chỉ QT và Hồ sơ năng lực): Điểm Trung bình chung (TBC) học tập các môn văn hóa (trừ Thể dục và GDQP-AN) từng năm học lớp 10, 11 và lớp 12 **≥ 8.0**.
+* ĐỐI VỚI CÁC PHƯƠNG THỨC CÒN LẠI: Không yêu cầu điều kiện GPA học bạ tiên quyết.
 
-# 4. Bảng quy đổi chứng chỉ Ngoại ngữ (Language Certificate Conversions)
 
-**Điểm thưởng đối với chứng chỉ VSTEP (áp dụng cho phương thức ĐGTD)**
+* **Tốt nghiệp THPT:** Bắt buộc.
+* **Yêu cầu Tiếng Anh đầu vào (CHỈ áp dụng cho các chương trình giảng dạy bằng tiếng Anh):** Thí sinh phải đáp ứng MỘT trong các điều kiện sau:
+* Chứng chỉ VSTEP ≥ B1.
+* IELTS (Academic) ≥ 5.0 (hoặc tương đương).
+* Điểm thi tốt nghiệp THPT 2023 môn tiếng Anh đạt yêu cầu của ĐHBK Hà Nội.
 
-| Điểm VSTEP  | 5,0 – 5,5 | 6,0 – 6,5 | 7,0 | 7,5 – 8,0 | › 8,5 |
-| :---------- | :-------- | :-------- | :-- | :-------- | :---- |
-| Điểm thưởng | 1         | 2         | 3   | 4         | 5     |
 
-**Điểm thưởng đối với chứng chỉ IELTS (Academic) hoặc tương đương (áp dụng cho phương thức ĐGTD)**
+* **Ngưỡng điểm sàn theo phương thức:** Công bố sau khi có kết quả thi THPT 2023 và ĐGTD 2023.
 
-| IELTS       | 5.0 | 5.5 | 6.0 | 6.5 | › 7.0 |
-| :---------- | :-- | :-- | :-- | :-- | :---- |
-| Điểm thưởng | 1   | 2   | 3   | 4   | 5     |
+---
 
-**Quy đổi điểm chứng chỉ VSTEP (thay thế điểm thi môn tiếng Anh THPT)**
+## 3. PHƯƠNG THỨC 1: XÉT TUYỂN TÀI NĂNG / ƯU TIÊN / THẲNG
 
-| Điểm VSTEP   | 5,0 – 5,5 | 6,0 – 6,5 | 7,0 – 7,5 | › 8,0 |
-| :----------- | :-------- | :-------- | :-------- | :---- |
-| Điểm quy đổi | 8,50      | 9,00      | 9,50      | 10,00 |
+### 3.1 Điều kiện đặc cách
 
-**Quy đổi điểm chứng chỉ IELTS (Academic) (thay thế điểm thi môn tiếng Anh THPT)**
+* **Xét tuyển thẳng theo quy định Bộ GD&ĐT:** Thí sinh thi Olympic Quốc tế; Đạt giải Nhất, Nhì, Ba HSG Quốc gia; Tham gia KHKT Quốc tế; Đạt giải Nhất, Nhì, Ba KHKT Quốc gia.
+* **Xét tuyển theo chứng chỉ Quốc tế:** TBC lớp 10, 11, 12 ≥ 8.0 VÀ có ít nhất một chứng chỉ: SAT, ACT, A-Level, AP, IB.
+* **Xét tuyển theo hồ sơ năng lực kết hợp phỏng vấn:** TBC lớp 10, 11, 12 ≥ 8.0 VÀ thỏa mãn 1 trong các điều kiện:
+* Tham dự HSG Quốc gia hoặc đạt giải Nhất, Nhì, Ba, Khuyến khích HSG Tỉnh/Thành phố (các môn Toán, Lý, Hóa, Sinh, Tin, Ngoại ngữ, Tổ hợp).
+* Tham dự KHKT Quốc gia hoặc đạt giải Nhất, Nhì KHKT Tỉnh/Thành phố.
+* Tham dự thi Đường lên đỉnh Olympia từ vòng tháng trở lên.
+* VSTEP ≥ B2 hoặc IELTS ≥ 6.0 (áp dụng cho ngành Ngôn ngữ Anh và Kinh tế - Quản lý).
+* Học sinh hệ chuyên tại các trường THPT trên toàn quốc.
 
-| IELTS        | 5.0  | 5.5  | 6.0  | › 6.5 |
-| :----------- | :--- | :--- | :--- | :---- |
-| Điểm quy đổi | 8,50 | 9,00 | 9,50 | 10,00 |
+
+
+### 3.2 Quy tắc tính điểm hồ sơ năng lực (HSNL)
+
+> **Điểm HSNL = Điểm học lực + Điểm thành tích + Điểm phỏng vấn + Điểm thưởng** (Thang 100)
+
+Trong đó:
+
+* Điểm học lực: Tối đa 40 điểm.
+* Điểm thành tích: Tối đa 40 điểm.
+* Điểm phỏng vấn: Tối đa 20 điểm.
+* Điểm thưởng: Tối đa 10 điểm.
+
+---
+
+## 5. PHƯƠNG THỨC 3: XÉT ĐIỂM THI TỐT NGHIỆP THPT QUỐC GIA (THPT QG)
+
+### 5.1 Công thức tính điểm xét tuyển THPT QG
+
+**5.1.a — Công thức KHÔNG nhân hệ số môn chính:**
+
+> **ĐXT = Điểm_Môn_1 + Điểm_Môn_2 + Điểm_Môn_3 + Điểm_ưu_tiên**
+
+**5.1.b — Công thức CÓ nhân hệ số môn chính (áp dụng cho một số ngành có môn chính):**
+
+> **ĐXT = [Điểm_Môn_1 + Điểm_Môn_2 + (Điểm_Môn_chính × Hệ_số)] × (3 / Tổng_hệ_số) + Điểm_ưu_tiên**
+> *(Lưu ý: Mức hệ số cụ thể do quy định chi tiết của từng mã ngành)*
+
+### 5.2 Tổ hợp môn xét tuyển
+
+* Các tổ hợp áp dụng: **A00, A01, A02, B00, D01, D07, D26, D28, D29**.
+
+### 5.3 Điều kiện phụ (tie-breaker)
+
+* **Công thức/Quy tắc phụ:** Tiêu chí 1: `Tổng điểm 3 môn thuộc tổ hợp môn xét tuyển (không nhân hệ số, không làm tròn) > Mức_điểm_ngưỡng_tie_breaker`. Tiêu chí này áp dụng cho các thí sinh ở cuối danh sách có mức ĐXT bằng nhau.
+
+---
+
+## 6. PHƯƠNG THỨC 4: XÉT KẾT QUẢ THI ĐÁNH GIÁ TƯ DUY (TSA — ĐH Bách Khoa)
+
+### 6.1 Công thức tính điểm xét tuyển theo TSA
+
+> **ĐXT = Điểm_thi_ĐGTD + Điểm_ưu_tiên + Điểm_thưởng** Trong đó:
+
+* Thang điểm thi: **Thang 100**.
+* Điểm thưởng: Dành cho thí sinh có chứng chỉ ngoại ngữ (VSTEP, IELTS) xem chi tiết tại Bảng thưởng mục 8.3.
+* Tổ hợp xét tuyển duy nhất: **K00** (Toán – Đọc hiểu – Tư duy Khoa học/Giải quyết vấn đề).
+
+---
+
+## 8. PHƯƠNG THỨC 6: XÉT KẾT HỢP CHỨNG CHỈ NGOẠI NGỮ QUỐC TẾ
+
+ĐHBK Hà Nội áp dụng chứng chỉ Tiếng Anh theo 2 cơ chế độc lập tùy vào Phương thức xét tuyển: **Quy đổi điểm** (cho PT THPT QG) và **Cộng điểm thưởng** (cho PT ĐGTD).
+
+### 8.1 QUY ĐỔI ĐIỂM CHỨNG CHỈ (ÁP DỤNG CHO XÉT ĐIỂM THPT QG)
+
+> **Quy tắc sử dụng điểm quy đổi:** CHỈ ĐƯỢC CHỌN THAY THẾ. Thí sinh sử dụng điểm quy đổi từ chứng chỉ VSTEP/IELTS để THAY THẾ trực tiếp cho điểm thi môn Tiếng Anh trong kỳ thi THPT QG. Áp dụng khi xét tuyển các tổ hợp có môn Tiếng Anh (**A01, D07, D01**). KHÔNG áp dụng cho các ngoại ngữ khác đối với diện miễn thi.
+
+| Chứng chỉ | Mức điểm chứng chỉ | Điểm Tiếng Anh quy đổi (thang 10) |
+| --- | --- | --- |
+| IELTS (Academic) | 5.0 | 8.50 |
+| IELTS (Academic) | 5.5 | 9.00 |
+| IELTS (Academic) | 6.0 | 9.50 |
+| IELTS (Academic) | ≥ 6.5 | 10.00 |
+| VSTEP | 5.0 – 5.5 | 8.50 |
+| VSTEP | 6.0 – 6.5 | 9.00 |
+| VSTEP | 7.0 – 7.5 | 9.50 |
+| VSTEP | ≥ 8.0 | 10.00 |
+
+### 8.2 ĐIỂM THƯỞNG CHO CHỨNG CHỈ (ÁP DỤNG CHO XÉT ĐGTD - K00)
+
+> **Quy tắc:** Điểm thưởng được CỘNG THÊM vào ĐXT của Phương thức Đánh giá tư duy (K00). Không thay thế môn thi do ĐGTD không có môn Tiếng Anh riêng lẻ.
+
+| Chứng chỉ | Mức điểm chứng chỉ | Điểm thưởng cộng thêm |
+| --- | --- | --- |
+| IELTS (Academic) | 5.0 | + 1 |
+| IELTS (Academic) | 5.5 | + 2 |
+| IELTS (Academic) | 6.0 | + 3 |
+| IELTS (Academic) | 6.5 | + 4 |
+| IELTS (Academic) | ≥ 7.0 | + 5 |
+| VSTEP | 5.0 – 5.5 | + 1 |
+| VSTEP | 6.0 – 6.5 | + 2 |
+| VSTEP | 7.0 | + 3 |
+| VSTEP | 7.5 – 8.0 | + 4 |
+| VSTEP | ≥ 8.5 | + 5 |
+
+---
+
+## 10. CHÚ Ý ĐẶC BIỆT THEO NGÀNH
+
+| Mã ngành | Tên ngành | Quy định/Điều kiện đặc thù |
+| --- | --- | --- |
+| Ngành đào tạo bằng Tiếng Anh | Các chương trình Tiếng Anh, ELITECH, Liên kết QT | **Bắt buộc** có VSTEP ≥ B1, IELTS ≥ 5.0 hoặc tương đương, hoặc điểm THPT môn Tiếng Anh đạt ngưỡng quy định để đủ điều kiện xét tuyển. |
+| Các ngành Ngôn ngữ, Kinh tế | Ngôn ngữ Anh, Kinh tế - Quản lý | Khi xét tuyển tài năng (hồ sơ năng lực), chấp nhận chứng chỉ VSTEP ≥ B2 hoặc IELTS ≥ 6.0. |
+
+---
+
+## 11. BẢNG TÓM TẮT NHANH CHO AI AGENT
+
+| Thông tin | Giá trị |
+| --- | --- |
+| Tên trường | Đại học Bách khoa Hà Nội |
+| Mã trường (TS247) | BKA |
+| Năm Đề án | 2023 |
+| Các phương thức xét tuyển | XTTN, ĐGTD, THPT |
+| Thang điểm THPT QG | 30 |
+| Thang điểm ĐGNL HSA | Không áp dụng |
+| Thang điểm TSA | 100 |
+| Có nhân hệ số môn chính? | Có (trong THPT QG tùy ngành) |
+| Có điểm thưởng ngoại ngữ? | Có (Cộng thêm vào ĐXT ĐGTD) |
+| Có quy đổi chứng chỉ ngoại ngữ? | Có (Thay thế môn Tiếng Anh kỳ thi THPT QG) |
+| Điểm sàn tối thiểu THPT QG | Chưa công bố (phụ thuộc kết quả thi) |

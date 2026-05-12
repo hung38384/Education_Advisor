@@ -38,8 +38,9 @@ class CleanupConfig:
     CHROMA_DB_PATHS = [
         "data/chroma_db",
         ".chroma",
+        "backend/data/chroma_db",
     ]
-
+    
     # Cache directories to remove
     CACHE_PATHS = [
         ".cache",
@@ -47,10 +48,12 @@ class CleanupConfig:
         ".langchain_cache",
         ".llamaindex_cache",
         "cache",
+        "backend/.cache",
+        "backend/__pycache__",
     ]
-
+    
     # Data directory for selective cleanup
-    DATA_DIR = Path("data")
+    DATA_DIR = Path("backend/data")
     
     # Extensions to remove from DATA_DIR (keep PDFs)
     EXTENSIONS_TO_REMOVE = [".md", ".txt", ".json"]

@@ -1,81 +1,211 @@
-# 1. Các phương thức xét tuyển (Admission Methods)
+# ĐẠI HỌC BÁCH KHOA HÀ NỘI — Đề án Tuyển sinh 2025
 
-*   **Phương thức xét tuyển tài năng (XTTN)**
-    *   **Diện 1.1:** Thí sinh tốt nghiệp THPT cùng năm xét tuyển, đạt giải cao trong các Kỳ thi chọn học sinh giỏi quốc gia, Kỳ thi chọn học sinh trung học phổ thông vào các đội tuyển quốc gia dự thi Olympic quốc tế và khu vực, hoặc cuộc thi Khoa học kỹ thuật (KHKT) cấp quốc gia (ViSEF) hoặc quốc tế (ISEF). Thời gian đạt giải không quá 3 năm tính tới thời điểm xét tuyển thẳng.
-    *   **Diện 1.2:** Thí sinh tốt nghiệp THPT, có điểm trung bình chung (TBC) học tập từng năm học lớp 10, 11, 12 đạt 8.0 trở lên. Thí sinh có ít nhất 1 trong các chứng chỉ quốc tế sau: SAT, ACT, A-Level, AP và IB. Đối với chứng chỉ A-Level và AP, chỉ xét đối với chứng chỉ có điểm thi môn Toán và 2 trong số các môn học sau: Lý/Hóa/Sinh/Tin/Khoa học/tiếng Anh. Điểm chứng chỉ áp dụng để xét tuyển là tổng điểm của môn Toán và 2 môn thi có điểm số cao nhất còn lại.
-    *   **Diện 1.3:** Xét tuyển dựa theo hồ sơ năng lực kết hợp phỏng vấn. Thí sinh tốt nghiệp THPT cùng năm xét tuyển (không xét đối với thí sinh tốt nghiệp hệ Giáo dục thường xuyên), có điểm trung bình chung (TBC) học tập từng năm học lớp 10, 11, 12 đạt 8.0 trở lên và đáp ứng một trong những điều kiện sau:
-        1.  Đạt giải Khuyến khích trở lên trong kỳ thi chọn HSG các môn Toán, Lý, Hóa, Sinh, Tin học, Ngoại ngữ, Tổ hợp trong thời gian học THPT do các Sở GDĐT, Đại học Quốc gia Hà Nội, Đại học Quốc gia thành phố Hồ Chí Minh, Đại học Huế, Trường Đại học Sư phạm Hà Nội, Trường Đại học Sư phạm thành phố Hồ Chí Minh, Trường Đại học Vinh, Trường phổ thông Vùng cao Việt Bắc chủ trì tổ chức và cấp giấy chứng nhận đạt giải.
-        2.  Đạt giải Ba trở lên cuộc thi KHKT do Sở GDĐT hoặc Bộ GDĐT chủ trì tổ chức để lựa chọn đi dự thi ViSEF và ISEF.
-        3.  Được chọn tham dự cuộc thi Đường lên đỉnh Olympia do Đài Truyền hình Việt Nam chủ trì tổ chức từ vòng thi tháng trở lên.
-        4.  Là học sinh hệ chuyên (gồm chuyên Toán, Lý, Hóa, Sinh, Tin học, Ngoại ngữ) của các trường THPT và THPT chuyên trên toàn quốc.
+---
 
-*   **Phương thức xét tuyển dựa theo kết quả bài thi đánh giá tư duy (ĐGTD) năm 2024 và năm 2025**
-    *   **Đối tượng:** Thí sinh tham dự kỳ thi Đánh giá tư duy do ĐHBK Hà Nội tổ chức.
-    *   **Điều kiện dự tuyển:** Thí sinh đã tốt nghiệp THPT, đạt ngưỡng điểm xét tuyển theo điểm ĐGTD (sẽ thông báo sau khi có điểm thi tốt nghiệp THPT 2025).
+## 1. TỔNG QUAN PHƯƠNG THỨC XÉT TUYỂN
 
-*   **Phương thức xét tuyển dựa theo kết quả thi tốt nghiệp trung học phổ thông (THPT) năm 2025**
-    *   **Đối tượng:** Thí sinh tham dự kỳ thi tốt nghiệp THPT năm 2025 do Bộ GDĐT và các Sở GDĐT tổ chức.
-    *   **Điều kiện dự tuyển:** Thí sinh đã tốt nghiệp THPT, đạt ngưỡng điểm sàn do ĐHBK Hà Nội quy định (sẽ thông báo sau khi có điểm thi tốt nghiệp THPT 2025).
-    *   **Tổ hợp xét tuyển:** A00, A01, A02, B00, D01, D04, D07, D26, D28, D29 và K01 (Toán, Ngữ văn, Lý/Hóa/Sinh/Tin).
+| STT | Mã Phương thức | Tên Phương thức | Chỉ tiêu (Dự kiến) | Đối tượng áp dụng |
+| --- | --- | --- | --- | --- |
+| 1 | XTTN | Xét tuyển tài năng | [Chi tiết theo ngành] | Thí sinh đạt giải quốc gia/quốc tế, có chứng chỉ quốc tế (SAT, ACT...), học sinh chuyên. |
+| 2 | ĐGTD | Xét tuyển dựa trên kết quả thi Đánh giá tư duy (TSA) | [Chi tiết theo ngành] | Thí sinh tham dự kỳ thi ĐGTD năm 2024 hoặc 2025 do ĐHBK Hà Nội tổ chức. |
+| 3 | THPT | Xét tuyển dựa trên kết quả thi tốt nghiệp THPT 2025 | [Chi tiết theo ngành] | Thí sinh tham dự kỳ thi tốt nghiệp THPT năm 2025. |
+| 4 | KHÁC | Xét tuyển diện cử tuyển, lưu học sinh, học sinh nước ngoài | [Chi tiết theo hồ sơ] | Diện cử tuyển, hiệp định, tốt nghiệp THPT tại nước ngoài. |
 
-*   **Phương thức xét tuyển khác dành cho các trường hợp diện cử tuyển; lưu học sinh hiệp định và các học sinh học tập THPT ở nước ngoài.**
-    *   **Đối tượng:** Thí sinh diện cử tuyển và lưu học sinh (theo chỉ tiêu, công văn và hồ sơ từ Bộ GDĐT); các học sinh học các trường THPT ở nước ngoài.
-    *   **Điều kiện:** Đối với học sinh học THPT ở nước ngoài cần nộp hồ sơ về thông tin cá nhân, kết quả học tập, chứng chỉ tiếng Anh, minh chứng tài chính. Giám đốc Đại học quyết định việc tiếp nhận dựa trên hồ sơ của thí sinh.
+---
 
-# 2. Điều kiện tiên quyết (Prerequisites & Thresholds)
+## 2. ĐIỀU KIỆN TIÊN QUYẾT & NGƯỠNG ĐẢM BẢO CHẤT LƯỢNG ĐẦU VÀO
 
-*   **Điều kiện chung:** Thí sinh có đủ các điều kiện được tham gia tuyển sinh đại học theo quy định tại Quy chế tuyển sinh hiện hành.
-*   **Đối với phương thức Xét tuyển tài năng (Diện 1.2 và 1.3):** Điểm trung bình chung (TBC) học tập từng năm học lớp 10, 11, 12 đạt 8.0 trở lên.
-*   **Đối với chương trình Kỹ thuật Vi điện tử và Công nghệ Nano (MS2):**
-    *   Có điểm chuẩn tối thiểu là 24 (theo phương thức THPT hoặc mức tương đương ở các phương thức khác).
-    *   Có điểm môn Toán thi Tốt nghiệp THPT từ 8 trở lên.
-*   **Đối với các chương trình giảng dạy bằng tiếng Anh (có ghi chú "học bằng tiếng Anh" hoặc tương tự):** Thí sinh cần có một trong những điều kiện về trình độ tiếng Anh hoặc Ngoại ngữ tương đương như sau:
-    *   Có chứng chỉ tiếng Anh VSTEP trình độ B1 trở lên; HOẶC
-    *   Có chứng chỉ IELTS (academic) đạt 5.0 trở lên hoặc tương đương; HOẶC
-    *   Có điểm thi tốt nghiệp THPT năm 2025 môn tiếng Anh đạt từ 6.5 điểm trở lên.
-*   **Đối với các chương trình liên kết đào tạo quốc tế (TROY-BA, TROY-IT, FL2 - Tiếng Anh chuyên nghiệp quốc tế):** Thí sinh cần có một trong những điều kiện về trình độ tiếng Anh như sau:
-    *   Có chứng chỉ tiếng Anh VSTEP trình độ B2 trở lên; HOẶC
-    *   Có chứng chỉ IELTS (academic) đạt 5.5 trở lên hoặc tương đương.
+* **Ngưỡng điểm học bạ (GPA) sơ tuyển:** - Đối với XTTN (Diện 1.2 & 1.3): Điểm trung bình chung (TBC) học tập từng năm lớp 10, 11, 12 đạt **8.0 trở lên**.
+* **Tốt nghiệp THPT:** Bắt buộc cho tất cả các phương thức.
+* **Ngưỡng điểm sàn:** - **Phương thức ĐGTD & THPT:** Sẽ thông báo sau khi có kết quả thi tốt nghiệp THPT 2025.
+* **Riêng ngành MS2 (Kỹ thuật Vi điện tử và Công nghệ Nano):** Điểm chuẩn THPT tối thiểu **24.0**, điểm môn Toán thi tốt nghiệp THPT đạt từ **8.0 trở lên**.
 
-# 3. Công thức tính điểm xét tuyển (Score Calculation Formulas)
 
-*   **Tiêu chí phụ (Điều kiện phụ):** Các thí sinh có cùng mức điểm xét thì tiêu chí phụ để so sánh là điểm thi tốt nghiệp THPT môn Toán (TO).
+* **Điều kiện Ngoại ngữ (Bắt buộc cho chương trình giảng dạy bằng tiếng Anh, FL1, FL3):**
+* VSTEP đạt B1 trở lên; hoặc
+* IELTS đạt 5.0 trở lên; hoặc
+* Điểm thi tốt nghiệp THPT môn tiếng Anh đạt từ 6.5 trở lên.
 
-*   **Phương thức xét tuyển theo kết quả Kỳ thi Đánh giá tư duy (ĐGTD):**
-    *   **Tổ hợp xét tuyển:** K00 (Toán – Đọc hiểu – Tư duy Khoa học/Giải quyết vấn đề).
-    *   **Công thức:**
-        `Điểm xét = Min[100, Điểm thi ĐGTD + Điểm thưởng CCNN (nếu có)] + Điểm ưu tiên (KV, ĐT)`
-    *   **Ghi chú:**
-        *   Khi `[Điểm thi ĐGTD + Điểm thưởng CCNN (nếu có)]` vượt qua 100 điểm sẽ quy về 100 điểm.
-        *   Điểm ưu tiên là điểm ưu tiên đối tượng, khu vực theo quy định của Bộ GDĐT, quy về thang điểm 100, giảm dần khi `[Điểm thi ĐGTD + Điểm thưởng CCNN (nếu có)]` từ 75 điểm trở lên.
-        *   Điểm xét được làm tròn đến 2 chữ số thập phân sau dấu phẩy.
 
-*   **Phương thức xét tuyển theo kết quả kỳ thi tốt nghiệp THPT 2025:**
-    *   **1. Đối với tổ hợp môn không có môn chính:**
-        `Điểm xét = [(Môn 1 + Môn 2 + Môn 3)] + Điểm ưu tiên`
-    *   **2. Đối với tổ hợp môn có môn chính:**
-        `Điểm xét = [(Môn 1 + Môn 2 + Môn 3 + Môn chính) * 3/4] + Điểm ưu tiên`
-        *   **Ghi chú về môn chính:** Các tổ hợp in đậm (ví dụ A00, A01, A02, D01, D07, …) có môn chính là môn Toán, trừ 3 chương trình FL1 (Tiếng Anh KHKT và Công nghệ), FL2 (Tiếng Anh chuyên nghiệp quốc tế), FL3 (Tiếng Trung Khoa học và Công nghệ) xét tuyển theo tổ hợp D01, D04 có môn chính là môn ngoại ngữ.
-    *   **3. Đối với tổ hợp K01 (Toán, Văn, Lí/Hóa/Sinh/Tin):**
-        `Điểm xét = [(TO * 3 + VA * 1 + (LI/HO/SI/TI) * 2] * 1/2 + Điểm ưu tiên`
-        *   **Ghi chú về K01:** Môn Toán hệ số 3, môn Văn hệ số 1 và môn còn lại trong số 4 môn Lí/Hóa/Sinh/Tin có hệ số 2.
-    *   **Điểm ưu tiên:** Theo quy định của Bộ GDĐT.
+* **Điều kiện Ngoại ngữ (Bắt buộc cho TROY-BA, TROY-IT, FL2):**
+* VSTEP đạt B2 trở lên; hoặc
+* IELTS đạt 5.5 trở lên.
 
-# 4. Bảng quy đổi chứng chỉ Ngoại ngữ (Language Certificate Conversions)
 
-**Bảng 4.1. Quy định quy đổi chứng chỉ Ngoại ngữ thành điểm môn Ngoại ngữ THPT**
 
-| Điểm quy đổi Ngoại ngữ THPT | IELTS | VSTEP   | Aptis   | PEIC    | PTE    | Linguaskill | Cambridge English            | Cambridge Tests (điểm) | TOEIC   | TOEFL          |
-| ---------------------------- | ----- | ------- | ------- | ------- | ------ | ----------- | ---------------------------- | ---------------------- | ------- | -------------- |
-| 8.5                          | 5.0   | 5.5     | 80-120  | Level 2 | 29-35  | 140-159     | B1 Preliminary/PET           | 120-140                | 275-380 |                |
-| 9.0                          | 5.5   | 6.0-6.5 | 121-134 | Level 3 | 36-45  | 160-166     | B2 First/B2 Business Vantage | 400-430                |         | 150            |
-| 9.5                          | 6.0   | 7.0-7.5 | 135-148 | Level 3 | 46-55  | 167-173     | B2 First/B2 Business Vantage | 435-460                |         | 160            |
-| (Tương đương 10.0)           | 6.5   | 8.0     | 149-160 | Level 3 | 56-65  | 174-179     | B2 First/B2 Business Vantage | 465-485                |         | 170            |
-| (Tương đương 10.0)           | 7.0   | 8.5     | 161-167 | Level 4 | 66-75  |             | C1 Business Higher           | 490                    |         | 180            |
+---
 
-**Bảng 4.2. Mức điểm thưởng chứng chỉ Ngoại ngữ (áp dụng cho XTTN và ĐGTD)**
+## 3. PHƯƠNG THỨC 1: XÉT TUYỂN TÀI NĂNG (XTTN)
 
-| Điểm thưởng | IELTS | VSTEP  | Aptis   | PEIC    | PTE    | Linguaskill | Cambridge English | Cambridge Tests (điểm) | TOEIC | TOEFL          |
-| ----------- | ----- | ------ | ------- | ------- | ------ | ----------- | ----------------- | ---------------------- | ----- | -------------- |
-| 6           |       | 9.0    | 168-174 | Level 4 | 76-83  |             | C1 Advanced/CAE   |                        | 190   | 475-485        |
-| 7           |       | 9.5-10 | 175-180 | Level 4 | 84-88  |             | C2 Proficiency    |                        | 200   | 490-495        |
+### 3.1 Đối tượng xét tuyển
+
+* **Diện 1.1 (Xét tuyển thẳng):** Thí sinh đạt giải cao (Nhất, Nhì, Ba) kỳ thi chọn HSG quốc gia hoặc cuộc thi KHKT quốc gia/quốc tế. Thời hạn giải không quá 3 năm.
+* **Diện 1.2 (Xét tuyển theo chứng chỉ quốc tế):** Có chứng chỉ SAT, ACT, A-Level, AP, IB và GPA 3 năm đạt 8.0+.
+* *Công thức tính điểm chứng chỉ A-Level/AP:* Tổng điểm môn Toán + 2 môn có điểm cao nhất còn lại (trong danh mục Lý/Hóa/Sinh/Tin/Khoa học/Tiếng Anh).
+
+
+* **Diện 1.3 (Xét hồ sơ năng lực + Phỏng vấn):** GPA 3 năm đạt 8.0+ và đáp ứng 01 trong các điều kiện:
+* Giải HSG cấp tỉnh/thành phố (Toán, Lý, Hóa, Sinh, Tin, Anh...).
+* Giải cuộc thi KHKT cấp tỉnh trở lên.
+* Tham dự Đường lên đỉnh Olympia (vòng tháng trở lên).
+* Là học sinh hệ chuyên (Toán, Lý, Hóa, Sinh, Tin, Anh).
+
+
+
+---
+
+## 4. PHƯƠNG THỨC 2: XÉT ĐIỂM THI TỐT NGHIỆP THPT 2025
+
+### 4.1 Công thức tính điểm xét tuyển (ĐXT)
+
+**4.1.a — Tổ hợp môn KHÔNG có môn chính:**
+
+> **ĐXT = Môn_1 + Môn_2 + Môn_3 + Điểm_ưu_tiên**
+
+**4.1.b — Tổ hợp môn CÓ môn chính (Toán hoặc Ngoại ngữ):**
+
+> **ĐXT = [(Môn_1 + Môn_2 + Môn_3 + Môn_chính) × 3/4] + Điểm_ưu_tiên**
+
+**4.1.c — Xét tuyển theo tổ hợp K01 (Toán, Văn, Tự chọn Lý/Hóa/Sinh/Tin):**
+
+> **ĐXT = [(Toán × 3 + Văn × 1 + Môn_TC × 2) × 1/2] + Điểm_ưu_tiên**
+
+**Ghi chú chung:**
+
+* Điểm ưu tiên: Thực hiện theo quy định của Bộ GD&ĐT (giảm dần khi tổng điểm đạt từ 22.5/30 hoặc 75/100 trở lên).
+* Thang điểm: Quy về thang 30. Làm tròn đến 2 chữ số thập phân.
+
+### 4.2 Điều kiện phụ (tie-breaker)
+
+* **Tiêu chí 1:** Nếu thí sinh cùng mức điểm xét, ưu tiên thí sinh có điểm thi tốt nghiệp THPT môn **Toán (TO)** cao hơn.
+
+---
+
+## 5. PHƯƠNG THỨC 3: XÉT KẾT QUẢ THI ĐÁNH GIÁ TƯ DUY (TSA)
+
+### 5.1 Công thức tính điểm xét tuyển (ĐXT)
+
+> **ĐXT = Min[100, Điểm_thi_TSA + Điểm_thưởng_CCNN] + Điểm_ưu_tiên**
+
+Trong đó:
+
+* **Thang điểm TSA:** tối đa 100 điểm.
+* **Tổ hợp xét tuyển:** K00 (Toán – Đọc hiểu – Tư duy Khoa học/Giải quyết vấn đề).
+* **Điểm thưởng CCNN:** Điểm cộng cho chứng chỉ IELTS/VSTEP (xem mục 6).
+* **Điểm ưu tiên:** Theo quy định Bộ GD&ĐT, quy về thang 100.
+
+---
+
+## 6. QUY ĐỔI CHỨNG CHỈ NGOẠI NGỮ QUỐC TẾ
+
+### 6.1 Điểm quy đổi thay thế môn Tiếng Anh (Xét tuyển THPT)
+
+Thí sinh được sử dụng điểm quy đổi thay cho điểm thi môn Ngoại ngữ trong các tổ hợp xét tuyển.
+
+| Chứng chỉ IELTS (Academic) | Điểm Ngoại ngữ quy đổi (thang 10) |
+| --- | --- |
+| 5.0 | 8.5 |
+| 5.5 | 9.0 |
+| 6.0 | 9.5 |
+| 6.5 trở lên | 10.0 |
+
+### 6.2 Điểm THƯỞNG cho chứng chỉ (Xét tuyển TSA và XTTN 1.2, 1.3)
+
+| Chứng chỉ IELTS | VSTEP | Điểm thưởng cộng thêm |
+| --- | --- | --- |
+| 5.0 | B1 | + 1.0 |
+| 5.5 | B2 | + 2.0 |
+| 6.0 | C1 | + 3.0 |
+| 6.5 | C1 | + 4.0 |
+| 7.0 | C2 | + 5.0 |
+| 7.5 trở lên | C2 | + 6.0 |
+
+---
+
+## 7. CHỈ TIÊU VÀ TỔ HỢP XÉT TUYỂN THEO NGÀNH (ĐẠI HỌC CHÍNH QUY)
+
+| Mã XT | Tên chương trình | Mã ngành | Chỉ tiêu | Tổ hợp xét tuyển THPT |
+| --- | --- | --- | --- | --- |
+| BF1 | Kỹ thuật Sinh học | 7420202 | 160 | A00, B00, D07, K01 |
+| BF2 | Kỹ thuật Thực phẩm | 7540102 | 360 | A00, B00, D07, K01 |
+| BF-E12 | Kỹ thuật Thực phẩm (Tiếng Anh) | 7540102 | 60 | A00, B00, D07, K01 |
+| BF-E19 | Kỹ thuật Sinh học (Tiếng Anh) | 7420202 | 60 | A00, B00, D07, K01 |
+| CH1 | Kỹ thuật Hóa học | 7520301 | 680 | A00, B00, D07, K01 |
+| CH2 | Hóa học | 7440112 | 160 | A00, B00, D07, K01 |
+| CH-E11 | Kỹ thuật Hóa dược (Tiếng Anh) | 7520301 | 100 | A00, B00, D07, K01 |
+| ED2 | Công nghệ giáo dục | 7140103 | 120 | D01, A00, A01, K01 |
+| ED3 | Quản lý giáo dục | 7140114 | 60 | D01, A00, A01, K01 |
+| EE1 | Kỹ thuật Điện | 7520201 | 240 | A00, A01, K01 |
+| EE2 | Kỹ thuật ĐK & Tự động hóa | 7520216 | 500 | A00, A01, K01 |
+| EE-E18 | Hệ thống điện & NLTT (Tiếng Anh) | 7520201 | 60 | A00, A01, K01 |
+| EE-E8 | Kỹ thuật ĐK & TĐH (Tiếng Anh) | 7520216 | 140 | A00, A01, K01 |
+| EE-EP | Tin học công nghiệp & TĐH (PFIEV) | 7520216 | 40 | A00, A01, D29, K01 |
+| EM1 | Quản lý năng lượng | 7510604 | 60 | D01, A00, A01, K01 |
+| EM2 | Quản lý công nghiệp | 7510601 | 80 | D01, A00, A01, K01 |
+| EM3 | Quản trị kinh doanh | 7340101 | 120 | D01, A00, A01, K01 |
+| EM4 | Kế toán | 7340301 | 80 | D01, A00, A01, K01 |
+| EM5 | Tài chính - Ngân hàng | 7340201 | 80 | D01, A00, A01, K01 |
+| EM-E13 | Phân tích kinh doanh (Tiếng Anh) | 7340101 | 140 | D01, A01, D07, K01 |
+| EM-E14 | Logistics & Quản lý chuỗi cung ứng | 7510605 | 140 | D01, A01, D07, K01 |
+| ET1 | Kỹ thuật Điện tử - Viễn thông | 7520207 | 480 | A00, A01, K01 |
+| ET2 | Kỹ thuật Y sinh | 7520212 | 100 | A00, A01, B00, K01 |
+| ET-E16 | Truyền thông số & Đa phương tiện | 7520207 | 60 | A00, A01, K01 |
+| ET-E4 | Kỹ thuật ĐTVT (Tiếng Anh) | 7520207 | 120 | A00, A01, K01 |
+| ET-E5 | Kỹ thuật Y sinh (Tiếng Anh) | 7520212 | 40 | A00, A01, K01 |
+| ET-E9 | Hệ thống nhúng & IoT (Tiếng Nhật) | 7520207 | 80 | A00, A01, D28, K01 |
+| ET-LUH | ĐTVT (Hợp tác Đức) | 7520207 | 40 | A00, A01, D26, K01 |
+| EV1 | Kỹ thuật Môi trường | 7520320 | 160 | A00, B00, D07, K01 |
+| EV2 | Quản lý Tài nguyên & Môi trường | 7850101 | 120 | A00, B00, D07, K01 |
+| FL1 | Tiếng Anh KHKT & Công nghệ | 7220201 | 210 | D01, K01 |
+| FL2 | Tiếng Anh CNQT (Song bằng) | 7220201 | 90 | D01, K01 |
+| FL3 | Tiếng Trung KH & Công nghệ | 7220204 | 40 | D01, D04, K01 |
+| HE1 | Kỹ thuật Nhiệt | 7520115 | 250 | A00, A01, K01 |
+| IT1 | CNTT: Khoa học Máy tính | 7480101 | 300 | A00, A01, K01 |
+| IT2 | CNTT: Kỹ thuật Máy tính | 7480106 | 200 | A00, A01, K01 |
+| IT-E10 | Khoa học dữ liệu & AI | 7460108 | 120 | A00, A01, K01 |
+| IT-E15 | Cyber Security | 7480202 | 40 | A00, A01, K01 |
+| IT-E6 | CNTT (Việt - Nhật) | 7480201 | 240 | A00, A01, D28, K01 |
+| IT-E7 | Công nghệ thông tin (Global ICT) | 7480201 | 120 | A00, A01, K01 |
+| IT-EP | CNTT (Việt - Pháp) | 7480201 | 40 | A00, A01, D29, K01 |
+| ME1 | Kỹ thuật Cơ điện tử | 7520114 | 300 | A00, A01, K01 |
+| ME2 | Kỹ thuật Cơ khí | 7520103 | 560 | A00, A01, K01 |
+| ME-E1 | Kỹ thuật Cơ điện tử (Tiếng Anh) | 7520114 | 180 | A00, A01, K01 |
+| ME-GU | Cơ khí (Hợp tác Úc) | 7520103 | 40 | A00, A01, K01 |
+| ME-LUH | Cơ điện tử (Hợp tác Đức) | 7520114 | 50 | A00, A01, D26, K01 |
+| ME-NUT | Cơ điện tử (Hợp tác Nhật) | 7520114 | 100 | A00, A01, D28, K01 |
+| MI1 | Toán - Tin | 7460117 | 160 | A00, A01, K01 |
+| MI2 | Hệ thống thông tin quản lý | 7340405 | 80 | A00, A01, K01 |
+| MS1 | Kỹ thuật Vật liệu | 7520309 | 280 | A00, A01, D07, K01 |
+| MS2 | Kỹ thuật Vi điện tử & CN Nano | 7440122 | 180 | A00, A01, D07, K01 |
+| MS3 | Công nghệ vật liệu Polyme | 7510402 | 80 | A00, A01, D07, K01 |
+| MS5 | Kỹ thuật in | 7520137 | 60 | A00, A01, D07, K01 |
+| MS-E3 | KH & KT Vật liệu (Tiếng Anh) | 7520309 | 60 | A00, A01, D07, K01 |
+| PH1 | Vật lý kỹ thuật | 7520401 | 200 | A00, A01, K01 |
+| PH2 | Kỹ thuật hạt nhân | 7520402 | 40 | A00, A01, A02, K01 |
+| PH3 | Vật lý Y khoa | 7520402 | 60 | A00, A01, A02, K01 |
+| TE1 | Kỹ thuật Ô tô | 7520130 | 200 | A00, A01, K01 |
+| TE2 | Kỹ thuật Cơ khí động lực | 7520116 | 120 | A00, A01, K01 |
+| TE3 | Kỹ thuật Hàng không | 7520120 | 80 | A00, A01, K01 |
+| TE-E2 | Kỹ thuật Ô tô (Tiếng Anh) | 7520130 | 100 | A00, A01, K01 |
+| TE-EP | Cơ khí Hàng không (PFIEV) | 7520120 | 40 | A00, A01, D29, K01 |
+| TROY-BA | Quản trị kinh doanh (ĐH Troy) | 7340101 | 60 | D01, A00, A01, K01 |
+| TROY-IT | Khoa học máy tính (ĐH Troy) | 7480101 | 120 | D01, A00, A01, K01 |
+| TX1 | Công nghệ Dệt - May | 7540204 | 240 | A00, A01, D07, K01 |
+
+---
+
+## 8. BẢNG TÓM TẮT NHANH CHO AI AGENT
+
+| Thông tin | Giá trị |
+| --- | --- |
+| Tên trường | Đại học Bách khoa Hà Nội |
+| Mã trường | BKA |
+| Năm Đề án | 2025 |
+| Các phương thức xét tuyển | XTTN, ĐGTD, THPT |
+| Thang điểm THPT QG | 30 |
+| Thang điểm TSA | 100 |
+| Có nhân hệ số môn chính? | Có (Toán hoặc Ngoại ngữ tùy ngành) |
+| Hệ số tổ hợp K01 | Toán (x3), Văn (x1), Tự chọn (x2). Tổng chia 2. |
+| Có điểm thưởng ngoại ngữ? | Có (Dùng cho phương thức TSA và XTTN) |
+| Có quy đổi chứng chỉ ngoại ngữ? | Có (Dùng thay thế môn Ngoại ngữ trong xét THPT) |
+| Tiêu chí phụ | Điểm thi môn Toán (TO) |

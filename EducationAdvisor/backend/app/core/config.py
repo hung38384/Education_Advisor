@@ -57,9 +57,6 @@ class Settings(BaseSettings):
     # Logging Configuration
     LOG_LEVEL: str = Field(default="INFO")
 
-    # Internal service-to-service authentication
-    INTERNAL_API_KEY: str = Field(default="")
-
     class Config:
         env_file = ".env"
         case_sensitive = True
