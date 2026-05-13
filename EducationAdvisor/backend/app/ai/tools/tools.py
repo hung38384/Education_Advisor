@@ -98,6 +98,423 @@ def get_scores_collection():
     return _scores_collection
 
 
+def _build_method_query(processed_method_tag: str) -> list[dict]:
+    from app.utils.taxonomy_engine import get_method_aliases
+
+    method_conditions = [{"method_tag": processed_method_tag}]
+    method_aliases = get_method_aliases(processed_method_tag) if processed_method_tag else []
+    if method_aliases:
+        method_conditions.append({"method_alias": {"$in": method_aliases}})
+    return method_conditions
+
+
+def find_eligible_majors_by_score(
+    university: str,
+    score: float,
+    method_tag: str,
+    year: Optional[str] = None,
+    limit: int = 10,
+) -> str:
+    """
+    Return majors whose historical cutoff is <= the provided score.
+
+    This is intentionally a direct data lookup for ambiguous "I have X points,
+    what majors can I get into?" questions. It does not calculate admission
+    scores or map to other universities.
+    """
+    import json as json_lib
+
+    processed_method_tag = extract_method_tag(method_tag) if method_tag else None
+    university = str(university).strip().upper() if university else None
+
+    if not university:
+        return "Cần có mã trường để lọc danh sách ngành phù hợp."
+    if score is None:
+        return "Cần có điểm xét tuyển để lọc danh sách ngành phù hợp."
+    if not processed_method_tag:
+        return "Cần biết phương thức xét tuyển để lọc ngành, ví dụ THPT_QG, học bạ, TSA/HSA/ĐGNL."
+
+    try:
+        score_value = float(score)
+    except (TypeError, ValueError):
+        return "Điểm xét tuyển không hợp lệ."
+
+    try:
+        collection = get_scores_collection()
+        if collection is None:
+            return "Lỗi: MongoDB connection không được khởi tạo. Kiểm tra lại cấu hình."
+
+        base_filter = {"university_code": university}
+        if year:
+            try:
+                base_filter["year"] = int(year)
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid year format for eligible-major lookup: {year}")
+
+        method_conditions = _build_method_query(processed_method_tag)
+        method_filter = {"$or": method_conditions} if len(method_conditions) > 1 else method_conditions[0]
+        query_filter = {"$and": [base_filter, method_filter]}
+
+        if "year" not in base_filter:
+            latest_record = collection.find_one(query_filter, sort=[("year", -1)])
+            if latest_record and latest_record.get("year"):
+                base_filter["year"] = int(latest_record["year"])
+                query_filter = {"$and": [base_filter, method_filter]}
+
+        query_filter = {"$and": [query_filter, {"score": {"$lte": score_value, "$gt": 0}}]}
+        records = list(
+            collection.find(query_filter)
+            .sort([("score", -1), ("major_code", 1)])
+            .limit(max(1, min(int(limit), 30)))
+        )
+
+        if not records:
+            return json_lib.dumps(
+                {
+                    "status": "not_found",
+                    "university": university,
+                    "score": score_value,
+                    "method_tag": processed_method_tag,
+                    "year": base_filter.get("year"),
+                    "eligible_majors": [],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        seen = set()
+        majors = []
+        for record in records:
+            major_key = (record.get("major_code"), record.get("major_name"))
+            if major_key in seen:
+                continue
+            seen.add(major_key)
+            majors.append(
+                {
+                    "major_code": record.get("major_code"),
+                    "major_name": record.get("major_name"),
+                    "cutoff_score": float(record.get("score", 0)),
+                    "year": record.get("year"),
+                    "method_tag": record.get("method_tag"),
+                    "method_alias": record.get("method_alias"),
+                }
+            )
+
+        return json_lib.dumps(
+            {
+                "status": "success",
+                "university": university,
+                "score": score_value,
+                "method_tag": processed_method_tag,
+                "year": base_filter.get("year"),
+                "eligible_majors": majors,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    except PyMongoError as e:
+        logger.error(f"MongoDB error in eligible-major lookup: {e}")
+        return f"Lỗi cơ sở dữ liệu khi lọc ngành phù hợp: {str(e)}"
+    except Exception as e:
+        logger.error(f"Error in eligible-major lookup: {e}", exc_info=True)
+        return f"Lỗi khi lọc ngành phù hợp: {str(e)}"
+
+
+def compare_major_cutoffs(
+    university: str,
+    major_names: list[str],
+    method_tag: str,
+    year: str,
+) -> str:
+    """
+    Compare cutoff scores for multiple majors inside one university/year/method.
+
+    This deterministic lookup is used by preflight for short comparison
+    questions. It returns JSON so callers can build clean user-facing answers.
+    """
+    import json as json_lib
+    import unicodedata
+    from difflib import SequenceMatcher
+
+    def normalize_text(value: Any) -> str:
+        text = str(value or "").lower().strip()
+        text = unicodedata.normalize("NFD", text)
+        text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+        text = re.sub(r"[^a-z0-9]+", " ", text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    def get_record_score(record: dict) -> float:
+        for key in ("score", "cutoff_score", "diem_chuan", "benchmark_score"):
+            value = record.get(key)
+            if value is None:
+                continue
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return 0.0
+
+    def match_record(target_name: str, records: list[dict]) -> tuple[dict | None, float]:
+        target = normalize_text(target_name)
+        best_record = None
+        best_score = 0.0
+        for record in records:
+            candidates = [
+                record.get("major_name"),
+                record.get("major_code"),
+                record.get("major_alias"),
+            ]
+            for candidate in candidates:
+                normalized_candidate = normalize_text(candidate)
+                if not normalized_candidate:
+                    continue
+                if target == normalized_candidate:
+                    score = 1.0
+                elif target in normalized_candidate or normalized_candidate in target:
+                    score = 0.92
+                else:
+                    score = SequenceMatcher(None, target, normalized_candidate).ratio()
+                if score > best_score:
+                    best_score = score
+                    best_record = record
+        if best_score < 0.68:
+            return None, best_score
+        return best_record, best_score
+
+    processed_method_tag = extract_method_tag(method_tag) if method_tag else None
+    university = str(university).strip().upper() if university else None
+
+    if not university or not processed_method_tag or not year or len(major_names or []) < 2:
+        return json_lib.dumps(
+            {
+                "status": "missing_input",
+                "university": university,
+                "year": year,
+                "method_tag": processed_method_tag,
+                "major_names": major_names or [],
+            },
+            ensure_ascii=False,
+        )
+
+    try:
+        collection = get_scores_collection()
+        if collection is None:
+            return json_lib.dumps(
+                {"status": "error", "message": "Score database is unavailable."},
+                ensure_ascii=False,
+            )
+
+        base_filter = {"university_code": university}
+        try:
+            base_filter["year"] = int(year)
+        except (TypeError, ValueError):
+            return json_lib.dumps(
+                {"status": "missing_input", "message": "Invalid year.", "year": year},
+                ensure_ascii=False,
+            )
+
+        method_conditions = _build_method_query(processed_method_tag)
+        method_filter = {"$or": method_conditions} if len(method_conditions) > 1 else method_conditions[0]
+        query_filter = {"$and": [base_filter, method_filter]}
+        records = list(collection.find(query_filter).limit(2000))
+
+        matched = []
+        missing = []
+        used_keys = set()
+        for requested_name in major_names:
+            record, confidence = match_record(requested_name, records)
+            if not record:
+                missing.append(requested_name)
+                continue
+            key = (record.get("major_code"), record.get("major_name"))
+            if key in used_keys:
+                missing.append(requested_name)
+                continue
+            used_keys.add(key)
+            matched.append(
+                {
+                    "requested_name": requested_name,
+                    "major_code": record.get("major_code"),
+                    "major_name": record.get("major_name"),
+                    "score": get_record_score(record),
+                    "year": record.get("year"),
+                    "method_tag": record.get("method_tag"),
+                    "method_alias": record.get("method_alias"),
+                    "match_confidence": round(confidence, 3),
+                }
+            )
+
+        return json_lib.dumps(
+            {
+                "status": "success" if len(matched) >= 2 and not missing else "partial",
+                "university": university,
+                "year": base_filter["year"],
+                "method_tag": processed_method_tag,
+                "matched": matched,
+                "missing": missing,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    except PyMongoError as e:
+        logger.error(f"MongoDB error in major cutoff comparison: {e}")
+        return json_lib.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error in major cutoff comparison: {e}", exc_info=True)
+        return json_lib.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+def get_major_cutoffs_all_methods(
+    university: str,
+    major_name: str,
+    year: str,
+) -> str:
+    """
+    Return cutoff scores for one major across all methods in one university/year.
+
+    This supports queries such as "điểm ngành X theo tất cả phương thức năm Y"
+    without invoking counseling or score-calculation agents.
+    """
+    import json as json_lib
+    import unicodedata
+    from difflib import SequenceMatcher
+
+    def normalize_text(value: Any) -> str:
+        text = str(value or "").lower().strip()
+        text = unicodedata.normalize("NFD", text)
+        text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+        text = re.sub(r"[^a-z0-9]+", " ", text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    def get_record_score(record: dict) -> float:
+        for key in ("score", "cutoff_score", "diem_chuan", "benchmark_score"):
+            value = record.get(key)
+            if value is None:
+                continue
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return 0.0
+
+    university = str(university).strip().upper() if university else None
+    requested_major = str(major_name or "").strip()
+    target = normalize_text(requested_major)
+    if not university or not requested_major or not year:
+        return json_lib.dumps(
+            {
+                "status": "missing_input",
+                "university": university,
+                "major_name": requested_major,
+                "year": year,
+            },
+            ensure_ascii=False,
+        )
+
+    try:
+        collection = get_scores_collection()
+        if collection is None:
+            return json_lib.dumps(
+                {"status": "error", "message": "Score database is unavailable."},
+                ensure_ascii=False,
+            )
+
+        try:
+            year_value = int(year)
+        except (TypeError, ValueError):
+            return json_lib.dumps(
+                {"status": "missing_input", "message": "Invalid year.", "year": year},
+                ensure_ascii=False,
+            )
+
+        records = list(
+            collection.find({"university_code": university, "year": year_value}).limit(5000)
+        )
+        scored = []
+        for record in records:
+            candidates = [record.get("major_name"), record.get("major_code"), record.get("major_alias")]
+            best = 0.0
+            for candidate in candidates:
+                normalized_candidate = normalize_text(candidate)
+                if not normalized_candidate:
+                    continue
+                if target == normalized_candidate:
+                    score = 1.0
+                elif target in normalized_candidate or normalized_candidate in target:
+                    score = 0.92
+                else:
+                    score = SequenceMatcher(None, target, normalized_candidate).ratio()
+                best = max(best, score)
+            if best >= 0.68:
+                scored.append((best, record))
+
+        if not scored:
+            return json_lib.dumps(
+                {
+                    "status": "not_found",
+                    "university": university,
+                    "year": year_value,
+                    "requested_major": requested_major,
+                    "cutoffs": [],
+                },
+                ensure_ascii=False,
+            )
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        best_major_code = scored[0][1].get("major_code")
+        best_major_name = scored[0][1].get("major_name")
+        selected_records = [
+            record
+            for confidence, record in scored
+            if record.get("major_code") == best_major_code or record.get("major_name") == best_major_name
+        ]
+
+        seen = set()
+        cutoffs = []
+        for record in sorted(
+            selected_records,
+            key=lambda item: (str(item.get("method_tag") or ""), str(item.get("method_alias") or "")),
+        ):
+            key = (
+                record.get("method_tag"),
+                record.get("method_alias"),
+                get_record_score(record),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            cutoffs.append(
+                {
+                    "major_code": record.get("major_code"),
+                    "major_name": record.get("major_name"),
+                    "method_tag": record.get("method_tag"),
+                    "method_alias": record.get("method_alias"),
+                    "score": get_record_score(record),
+                    "year": record.get("year"),
+                }
+            )
+
+        return json_lib.dumps(
+            {
+                "status": "success",
+                "university": university,
+                "year": year_value,
+                "requested_major": requested_major,
+                "matched_major_code": best_major_code,
+                "matched_major_name": best_major_name,
+                "cutoffs": cutoffs,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    except PyMongoError as e:
+        logger.error(f"MongoDB error in all-method cutoff lookup: {e}")
+        return json_lib.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error in all-method cutoff lookup: {e}", exc_info=True)
+        return json_lib.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
 @tool
 def search_admission_rules(
     query: str,

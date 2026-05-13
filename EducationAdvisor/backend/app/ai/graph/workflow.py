@@ -18,6 +18,7 @@ import logging
 import time
 import datetime
 import re
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -45,12 +46,18 @@ from langgraph.prebuilt import create_react_agent
 # LangChain imports
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, BaseMessage, SystemMessage, AIMessage
+from langchain_core.messages import HumanMessage, BaseMessage, AIMessage
 from pydantic import BaseModel, Field
 
 # Import custom modules
 from app.ai.graph.state import AgentState
-from app.ai.tools.tools import search_admission_rules, get_historical_scores
+from app.ai.tools.tools import (
+    search_admission_rules,
+    get_historical_scores,
+    find_eligible_majors_by_score,
+    compare_major_cutoffs,
+    get_major_cutoffs_all_methods,
+)
 from app.ai.prompts.system_prompts import (
     SUPERVISOR_PROMPT,
     CAREER_PROFILER_PROMPT,
@@ -60,7 +67,7 @@ from app.ai.prompts.system_prompts import (
 )
 
 # Import Receptionist Node (Entity Extraction & Disambiguation)
-from app.ai.nodes.receptionist import receptionist_node
+from app.ai.nodes.receptionist import normalize_vietnamese_text, receptionist_node
 
 # Import ML Recommender (Hybrid AI - TabNet)
 from app.ai.ml.ml_recommender import get_recommender
@@ -209,6 +216,818 @@ def get_expert_agents():
 # ============================================================================
 # 3. Node Wrappers - Inject user_profile into system message
 # ============================================================================
+
+UNIVERSITY_ALIAS_MAP = {
+    "BKA": ["bka", "bach khoa ha noi", "hust", "dai hoc bach khoa ha noi"],
+    "QSB": ["qsb", "hcmut", "bach khoa hcm", "bach khoa tphcm", "dai hoc bach khoa tp hcm"],
+    "QHI": ["qhi", "uet", "cong nghe dhqg", "dai hoc cong nghe"],
+    "BVH": ["bvh", "ptit", "buu chinh vien thong"],
+    "SPK": ["spk", "hcmute", "su pham ky thuat tphcm"],
+    "KHA": ["kha", "neu", "kinh te quoc dan", "dai hoc kinh te quoc dan"],
+    "NTH": ["nth", "ftu", "ngoai thuong", "dai hoc ngoai thuong"],
+    "KSA": ["ksa", "ueh", "kinh te hcm", "kinh te tphcm"],
+    "TMU": ["tmu", "thuong mai", "dai hoc thuong mai"],
+    "LPH": ["lph", "hlu", "luat ha noi", "dai hoc luat ha noi"],
+    "YHB": ["yhb", "hmu", "y ha noi", "dai hoc y ha noi"],
+    "DKH": ["dkh", "hup", "duoc ha noi", "dai hoc duoc ha noi"],
+    "YDS": ["yds", "ump", "y duoc tphcm", "y duoc ho chi minh"],
+    "QHX": ["qhx", "ussh", "nhan van ha noi", "khoa hoc xa hoi nhan van"],
+    "QHF": ["qhf", "ulis", "ngoai ngu dhqg", "dai hoc ngoai ngu"],
+    "SPH": ["sph", "hnue", "su pham ha noi"],
+    "HQT": ["hqt", "dav", "ngoai giao", "hoc vien ngoai giao"],
+    "TCT": ["tct", "ctu", "can tho", "dai hoc can tho"],
+    "DDT": ["ddt", "dtu", "duy tan", "dai hoc duy tan"],
+    "DTT": ["dtt", "tdtu", "ton duc thang", "dai hoc ton duc thang"],
+}
+
+UNIVERSITY_DISPLAY_NAMES = {
+    "BKA": "Đại học Bách khoa Hà Nội",
+    "QSB": "Đại học Bách khoa - ĐHQG TP.HCM",
+    "QHI": "Đại học Công nghệ - ĐHQGHN",
+    "BVH": "Học viện Công nghệ Bưu chính Viễn thông",
+    "SPK": "Đại học Sư phạm Kỹ thuật TP.HCM",
+    "KHA": "Đại học Kinh tế Quốc dân",
+    "NTH": "Đại học Ngoại thương",
+    "KSA": "Đại học Kinh tế TP.HCM",
+    "TMU": "Đại học Thương mại",
+    "LPH": "Đại học Luật Hà Nội",
+    "YHB": "Đại học Y Hà Nội",
+    "DKH": "Đại học Dược Hà Nội",
+    "YDS": "Đại học Y Dược TP.HCM",
+    "QHX": "Đại học Khoa học Xã hội và Nhân văn - ĐHQGHN",
+    "QHF": "Đại học Ngoại ngữ - ĐHQGHN",
+    "SPH": "Đại học Sư phạm Hà Nội",
+    "HQT": "Học viện Ngoại giao",
+    "TCT": "Đại học Cần Thơ",
+    "DDT": "Đại học Duy Tân",
+    "DTT": "Đại học Tôn Đức Thắng",
+}
+
+ADMISSION_KEYWORDS = {
+    "tuyen sinh", "xet tuyen", "diem chuan", "diem san", "chi tieu",
+    "phuong thuc", "nganh", "khoi", "to hop", "hoc ba", "thpt", "thi",
+    "do nganh", "co hoi", "dai hoc", "truong", "ielts", "tsa", "hsa",
+    "dgnl", "dgtd", "vsat", "hoc phi", "chuong trinh", "ma nganh",
+}
+
+BLOCKLIST_KEYWORDS = {
+    "system prompt", "developer message", "api key", "secret", "password",
+    "token", "ignore previous", "bo qua huong dan", "jailbreak", "hack",
+    "malware", "sql injection", "lay key", "lo thong tin", "weather",
+    "thoi tiet", "chung khoan", "crypto", "viet code", "lap trinh",
+    "prompt", "huong dan noi bo", "noi bo he thong", "cau hinh he thong",
+    "source code", "ma nguon", "core cua he thong",
+}
+
+
+def _get_latest_user_query(state: dict) -> str:
+    for msg in reversed(state.get("messages", [])):
+        if isinstance(msg, tuple) and len(msg) >= 2 and msg[0] == "user":
+            return str(msg[1])
+        if hasattr(msg, "type") and getattr(msg, "type", None) == "human":
+            return str(msg.content)
+        if isinstance(msg, HumanMessage):
+            return str(msg.content)
+    return ""
+
+
+def _current_university(state: dict) -> str | None:
+    profile = state.get("user_profile", {}) or {}
+    return (profile.get("target_university") or state.get("target_university") or None)
+
+
+def _detect_mentioned_university(query: str) -> str | None:
+    normalized = normalize_vietnamese_text(query)
+    for code, aliases in UNIVERSITY_ALIAS_MAP.items():
+        if re.search(rf"\b{re.escape(code.lower())}\b", normalized):
+            return code
+        for alias in aliases:
+            if alias and alias in normalized:
+                return code
+    return None
+
+
+def _detect_mentioned_universities(query: str) -> list[str]:
+    normalized = normalize_vietnamese_text(query)
+    detected: list[str] = []
+    for code, aliases in UNIVERSITY_ALIAS_MAP.items():
+        matched = re.search(rf"\b{re.escape(code.lower())}\b", normalized)
+        if not matched:
+            matched = any(alias and alias in normalized for alias in aliases)
+        if matched and code not in detected:
+            detected.append(code)
+    return detected
+
+
+def _display_university_name(code: str) -> str:
+    normalized_code = str(code or "").upper()
+    return UNIVERSITY_DISPLAY_NAMES.get(normalized_code) or get_university_name(normalized_code)
+
+
+def _latest_admission_year_for_lookup(state: dict) -> str:
+    profile_year = (state.get("user_profile", {}) or {}).get("target_year")
+    if profile_year:
+        return str(profile_year)
+    return str(max(CURRENT_YEAR - 1, 2025))
+
+
+def _summarize_admission_methods(university_code: str, year: str, raw_context: str) -> str:
+    prompt = f"""Bạn là trợ lý tuyển sinh. Hãy đọc dữ liệu quy chế dưới đây và trả lời DUY NHẤT câu hỏi: trường có những phương thức tuyển sinh nào.
+
+Yêu cầu bắt buộc:
+- Chỉ bám vào trường {university_code}, năm {year}.
+- Chỉ liệt kê các phương thức tuyển sinh.
+- Không nhắc tên file, nguồn, metadata, tag "[Kết quả]".
+- Không trình bày điểm sàn, thang điểm, bảng quy đổi, điều kiện chi tiết nếu người dùng không hỏi.
+- Nếu dữ liệu trùng lặp, gộp lại.
+- Trả lời ngắn gọn bằng tiếng Việt, dạng bullet.
+
+Dữ liệu:
+{raw_context}
+"""
+    try:
+        response = get_llms()["strict_llm"].invoke(prompt)
+        content = response.content if hasattr(response, "content") else str(response)
+        if isinstance(content, list):
+            text_blocks = [item.get("text", "") for item in content if isinstance(item, dict)]
+            content = "\n".join(text_blocks)
+        cleaned = str(content).strip()
+        forbidden_markers = ["[Kết quả", "Nguồn:", "_clean.md", "source", "metadata"]
+        for marker in forbidden_markers:
+            cleaned = cleaned.replace(marker, "")
+        return cleaned
+    except Exception as e:
+        logger.error(f"Failed to summarize admission methods: {e}", exc_info=True)
+        return (
+            "Mình đã tìm thấy dữ liệu quy chế tuyển sinh, nhưng chưa thể tóm tắt tự động ở thời điểm này. "
+            "Bạn vui lòng thử lại sau hoặc hỏi cụ thể một phương thức tuyển sinh."
+        )
+
+
+def _summarize_admission_rules(university_code: str, year: str, raw_context: str) -> str:
+    prompt = f"""Bạn là trợ lý tuyển sinh. Hãy tóm tắt quy chế xét tuyển của trường {university_code} năm {year} từ dữ liệu dưới đây.
+
+Yêu cầu bắt buộc:
+- Chỉ bám vào trường {university_code}, năm {year}.
+- Trả lời đúng phạm vi "quy chế xét tuyển": phương thức chính, nguyên tắc xét tuyển, điều kiện/lưu ý quan trọng nếu có.
+- Không nhắc tên file, nguồn, metadata, tag "[Kết quả]", tên collection, ChromaDB, MongoDB hay log nội bộ.
+- Không đổ toàn bộ bảng Markdown nếu người dùng chỉ hỏi chung.
+- Nếu dữ liệu trùng lặp, gộp lại.
+- Trả lời ngắn gọn bằng tiếng Việt, dạng bullet.
+
+Dữ liệu:
+{raw_context}
+"""
+    try:
+        response = get_llms()["strict_llm"].invoke(prompt)
+        content = response.content if hasattr(response, "content") else str(response)
+        if isinstance(content, list):
+            text_blocks = [item.get("text", "") for item in content if isinstance(item, dict)]
+            content = "\n".join(text_blocks)
+        cleaned = str(content).strip()
+        cleaned = re.sub(r"\[[^\]\n]{0,80}\]\s*:?", "", cleaned)
+        cleaned = re.sub(r"(?im)^\s*(Nguồn|Source|Metadata)\s*:.*$", "", cleaned)
+        cleaned = cleaned.replace("_clean.md", "")
+        return cleaned.strip()
+    except Exception as e:
+        logger.error(f"Failed to summarize admission rules: {e}", exc_info=True)
+        return (
+            "Mình đã tìm thấy dữ liệu quy chế xét tuyển, nhưng chưa thể tóm tắt tự động ở thời điểm này. "
+            "Bạn vui lòng hỏi cụ thể hơn về phương thức, điều kiện xét tuyển hoặc cách tính điểm."
+        )
+
+
+def _is_rules_lookup(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return (
+        any(term in normalized for term in ["quy che", "quy dinh", "de an", "thong tin tuyen sinh"])
+        and any(term in normalized for term in ["xet tuyen", "tuyen sinh"])
+    )
+
+
+def _extract_year_from_query(query: str) -> str | None:
+    normalized = normalize_vietnamese_text(query)
+    match = re.search(r"\b(20\d{2}|19\d{2})\b", normalized)
+    return match.group(1) if match else None
+
+
+def _extract_compared_major_names(query: str) -> list[str]:
+    normalized = normalize_vietnamese_text(query)
+    normalized = re.sub(r"\b(20\d{2}|19\d{2})\b", " ", normalized)
+    normalized = re.sub(
+        r"\b(thpt_qg|thpt qg|diem thi thpt|hoc ba|tsa|dgtd|hsa|dgnl|apt|ielts|chung chi quoc te)\b",
+        " ",
+        normalized,
+    )
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    patterns = [
+        r"\bcua\s+(.+?)\s+va\s+(.+)$",
+        r"\bnganh\s+(.+?)\s+(?:co\s+)?(?:diem\s+)?(?:cao hon|thap hon|so voi|hon)\s+(?:nganh\s+)?(.+)$",
+        r"\bso sanh\s+(?:diem chuan\s+)?(.+?)\s+va\s+(.+)$",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, normalized)
+        if not match:
+            continue
+        names = [re.sub(r"^(nganh|cua)\s+", "", part).strip(" .,:;") for part in match.groups()]
+        names = [name for name in names if len(name) >= 2]
+        if len(names) >= 2:
+            return names[:2]
+    return []
+
+
+def _format_major_cutoff_comparison(university_code: str, year: str, method_tag: str, result_text: str) -> str:
+    try:
+        payload = json.loads(result_text)
+    except json.JSONDecodeError:
+        return (
+            f"Mình chưa đọc được dữ liệu điểm chuẩn của {_display_university_name(university_code)} ({university_code}) "
+            f"năm {year} theo phương thức {method_tag}. Bạn vui lòng thử lại hoặc cung cấp mã ngành cụ thể."
+        )
+
+    matched = payload.get("matched") or []
+    missing = payload.get("missing") or []
+    if len(matched) < 2 or missing:
+        missing_text = ", ".join(str(item) for item in missing) if missing else "một trong hai ngành"
+        return (
+            f"Mình chưa tìm thấy đủ dữ liệu điểm chuẩn cho {missing_text} tại "
+            f"{_display_university_name(university_code)} ({university_code}) năm {year} theo phương thức {method_tag}. "
+            "Bạn vui lòng dùng đúng tên ngành hoặc mã ngành trong đề án tuyển sinh để mình so sánh chính xác."
+        )
+
+    first, second = matched[0], matched[1]
+    first_score = float(first.get("score") or 0)
+    second_score = float(second.get("score") or 0)
+    first_name = first.get("major_name") or first.get("requested_name")
+    second_name = second.get("major_name") or second.get("requested_name")
+    first_code = first.get("major_code") or "không rõ mã"
+    second_code = second.get("major_code") or "không rõ mã"
+
+    if first_score > second_score:
+        verdict = f"{first_name} cao hơn {second_name} {first_score - second_score:.2f} điểm."
+    elif second_score > first_score:
+        verdict = f"{second_name} cao hơn {first_name} {second_score - first_score:.2f} điểm."
+    else:
+        verdict = f"Hai ngành có cùng mức điểm chuẩn {first_score:.2f}."
+
+    return (
+        f"So sánh điểm chuẩn {method_tag} năm {year} của {_display_university_name(university_code)} ({university_code}):\n\n"
+        f"- {first_name} ({first_code}): {first_score:.2f} điểm\n"
+        f"- {second_name} ({second_code}): {second_score:.2f} điểm\n\n"
+        f"Kết luận: {verdict}"
+    )
+
+
+def _is_major_all_methods_cutoff_query(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    all_methods_terms = [
+        "tat ca phuong thuc",
+        "cac phuong thuc",
+        "moi phuong thuc",
+        "toan bo phuong thuc",
+    ]
+    return (
+        "diem" in normalized
+        and "nganh" in normalized
+        and any(term in normalized for term in all_methods_terms)
+    )
+
+
+def _extract_single_major_name_for_cutoff(query: str) -> str | None:
+    normalized = normalize_vietnamese_text(query)
+    normalized = re.sub(r"\b(20\d{2}|19\d{2})\b", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    patterns = [
+        r"\bdiem\s+(?:chuan\s+)?nganh\s+(.+?)\s+(?:theo|nam|o|cua)\b",
+        r"\bnganh\s+(.+?)\s+(?:theo|nam|o|cua)\b",
+        r"\bdiem\s+(?:chuan\s+)?(?:cua\s+)?(.+?)\s+(?:theo tat ca phuong thuc|cac phuong thuc|moi phuong thuc|toan bo phuong thuc)\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, normalized)
+        if not match:
+            continue
+        major_name = match.group(1).strip(" .,:;")
+        major_name = re.sub(r"^(nganh|cua)\s+", "", major_name).strip()
+        if len(major_name) >= 2:
+            return major_name
+    return None
+
+
+def _format_major_all_methods_cutoffs(university_code: str, year: str, result_text: str) -> str:
+    try:
+        payload = json.loads(result_text)
+    except json.JSONDecodeError:
+        return (
+            f"Mình chưa đọc được dữ liệu điểm chuẩn của {_display_university_name(university_code)} ({university_code}) "
+            f"năm {year}. Bạn vui lòng thử lại hoặc cung cấp mã ngành cụ thể."
+        )
+
+    requested_major = payload.get("requested_major") or "ngành này"
+    if payload.get("status") != "success" or not payload.get("cutoffs"):
+        return (
+            f"Mình chưa tìm thấy điểm chuẩn của ngành {requested_major} tại "
+            f"{_display_university_name(university_code)} ({university_code}) năm {year}. "
+            "Bạn vui lòng kiểm tra lại tên ngành hoặc dùng mã ngành chính xác trong đề án tuyển sinh."
+        )
+
+    major_name = payload.get("matched_major_name") or requested_major
+    major_code = payload.get("matched_major_code") or "không rõ mã"
+    lines = [
+        f"Điểm chuẩn ngành {major_name} ({major_code}) của {_display_university_name(university_code)} ({university_code}) năm {year}:",
+        "",
+    ]
+    for item in payload["cutoffs"]:
+        method = item.get("method_tag") or "Không rõ phương thức"
+        alias = item.get("method_alias")
+        score = float(item.get("score") or 0)
+        method_label = f"{method} ({alias})" if alias else method
+        lines.append(f"- {method_label}: {score:.2f} điểm")
+    lines.append("")
+    lines.append("Lưu ý: các phương thức có thể dùng thang điểm khác nhau, nên chỉ so sánh trực tiếp khi cùng phương thức.")
+    return "\n".join(lines)
+
+
+def _is_gibberish(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query).replace(" ", "")
+    if len(normalized) < 8:
+        return False
+    vowels = sum(1 for ch in normalized if ch in "aeiouy")
+    return " " not in query.strip() and vowels / max(len(normalized), 1) < 0.18
+
+
+def _is_admission_related(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    if not normalized:
+        return False
+    if any(keyword in normalized for keyword in BLOCKLIST_KEYWORDS):
+        return False
+    if _is_gibberish(query):
+        return False
+    if any(keyword in normalized for keyword in ADMISSION_KEYWORDS):
+        return True
+    if re.search(r"\b\d+(?:\.\d+)?\s*diem\b", normalized):
+        return True
+    return False
+
+
+def _is_methods_lookup(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return (
+        ("phuong thuc" in normalized or "cach xet" in normalized)
+        and ("nao" in normalized or "nhung" in normalized or "cac" in normalized)
+        and ("tuyen sinh" in normalized or "xet tuyen" in normalized or "truong" in normalized)
+    )
+
+
+def _is_comparison_query(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    comparison_terms = [
+        "so voi",
+        "cai nao hon",
+        "truong nao hon",
+        "nganh nao hon",
+        "cao hon",
+        "thap hon",
+        "nen chon",
+        "khac gi",
+        "tot hon",
+        "hon nhau",
+    ]
+    return any(term in normalized for term in comparison_terms)
+
+
+def _is_major_cutoff_comparison_query(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return (
+        "diem" in normalized
+        and any(term in normalized for term in ["cao hon", "thap hon", "hon nganh", "so voi", "so sanh"])
+        and ("nganh" in normalized or "diem chuan" in normalized)
+    )
+
+
+def _is_cutoff_ranking_query(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return (
+        "nganh" in normalized
+        and any(
+            term in normalized
+            for term in [
+                "diem cao nhat",
+                "diem chuan cao nhat",
+                "cao nhat",
+                "diem thap nhat",
+                "diem chuan thap nhat",
+                "thap nhat",
+            ]
+        )
+    )
+
+
+def _is_subjective_best_major_query(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return (
+        "nganh" in normalized
+        and any(term in normalized for term in ["tot nhat", "nen hoc nganh nao", "nganh nao tot"])
+        and "diem" not in normalized
+    )
+
+
+def _extract_plain_score(query: str) -> float | None:
+    normalized = normalize_vietnamese_text(query)
+    match = re.search(r"\b(\d+(?:\.\d+)?)\s*diem\b", normalized)
+    if not match:
+        match = re.search(r"\bem co\s*(\d+(?:\.\d+)?)\b", normalized)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+
+def _is_eligible_major_query(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    score = _extract_plain_score(query)
+    if score is None:
+        return False
+    intent_terms = ["do nganh nao", "vao nganh nao", "nganh nao", "co the do", "co the vao", "du nganh"]
+    return any(term in normalized for term in intent_terms)
+
+
+def _make_final_message(content: str, pending_clarification: dict | None = None) -> dict:
+    return {
+        "messages": [AIMessage(content=content, name="Synthesis")],
+        "next_agent": "END",
+        "pending_clarification": pending_clarification,
+    }
+
+
+def _format_eligible_major_result(target_uni: str, score: float, method_tag: str, year: str | None, result: str) -> str:
+    try:
+        data = json.loads(result)
+        data_year = data.get("year")
+        data_year_text = f", năm {data_year}" if data_year else ""
+        data_year_text_no_comma = f" năm {data_year}" if data_year else ""
+        if data.get("status") == "success" and data.get("eligible_majors"):
+            lines = [
+                f"Mình đã lọc các ngành của {_display_university_name(target_uni)} ({target_uni}) theo điểm {score:g}, "
+                f"phương thức {method_tag}{data_year_text}.",
+                "",
+                "Các ngành có điểm chuẩn không vượt quá mức điểm này, sắp theo mức gần điểm của bạn nhất:",
+            ]
+            for item in data["eligible_majors"]:
+                major_name = item.get("major_name") or "Chưa có tên ngành"
+                major_code = item.get("major_code") or "N/A"
+                cutoff = item.get("cutoff_score")
+                lines.append(f"- {major_name} ({major_code}): {cutoff} điểm")
+            lines.append("")
+            lines.append("Lưu ý: đây là lọc theo dữ liệu điểm chuẩn lịch sử; bạn vẫn nên kiểm tra lại tổ hợp/phương thức trong đề án tuyển sinh của trường.")
+            return "\n".join(lines)
+        if data.get("status") == "not_found":
+            return (
+                f"Mình chưa tìm thấy ngành nào của {_display_university_name(target_uni)} ({target_uni}) có điểm chuẩn không vượt quá {score:g} "
+                f"theo phương thức {method_tag}{data_year_text_no_comma}. "
+                "Bạn có thể thử phương thức khác hoặc cung cấp thêm năm xét tuyển cụ thể."
+            )
+    except Exception:
+        pass
+    return (
+        f"Mình đã lọc các ngành của {_display_university_name(target_uni)} ({target_uni}) theo điểm {score:g}, "
+        f"phương thức {method_tag}{f', năm {year}' if year else ''}. Kết quả gần ngưỡng nhất được ưu tiên trước:\n\n{result}"
+    )
+
+
+def _missing_slots(data: dict, required_slots: list[str]) -> list[str]:
+    return [slot for slot in required_slots if data.get(slot) in (None, "", [])]
+
+
+def _build_pending(intent: str, required_slots: list[str], **slots) -> dict:
+    payload = {"intent": intent, **slots}
+    payload["missing_slots"] = _missing_slots(payload, required_slots)
+    return payload
+
+
+def _apply_followup_to_pending(pending: dict | None, query: str, state: AgentState, target_uni: str | None) -> dict | None:
+    if not pending:
+        return None
+
+    data = dict(pending)
+    data["target_university"] = data.get("target_university") or target_uni
+
+    year = _extract_year_from_query(query)
+    if year:
+        data["year"] = year
+
+    score = _extract_plain_score(query)
+    if score is not None:
+        data["score"] = score
+
+    from app.utils.taxonomy_engine import get_standard_method_tag
+
+    method_tag = get_standard_method_tag(query, str(data.get("target_university") or target_uni or ""))
+    if method_tag:
+        data["method_tag"] = method_tag
+
+    if data.get("intent") == "major_all_methods_cutoff":
+        major_name = _extract_single_major_name_for_cutoff(query)
+        if major_name:
+            data["major_name"] = major_name
+        required = ["target_university", "major_name", "year"]
+        data["missing_slots"] = _missing_slots(data, required)
+        if not data["missing_slots"]:
+            result = get_major_cutoffs_all_methods(
+                university=data["target_university"],
+                major_name=data["major_name"],
+                year=str(data["year"]),
+            )
+            return _make_final_message(
+                _format_major_all_methods_cutoffs(data["target_university"], str(data["year"]), result),
+                pending_clarification=None,
+            )
+        return _make_final_message(
+            "Mình đã nhận thêm thông tin, nhưng vẫn còn thiếu dữ kiện để tra điểm chuẩn. "
+            "Bạn vui lòng cung cấp nốt: " + ", ".join(data["missing_slots"]) + ".",
+            pending_clarification=data,
+        )
+
+    if data.get("intent") == "eligible_major_by_score":
+        required = ["target_university", "score", "method_tag"]
+        data["missing_slots"] = _missing_slots(data, required)
+        if not data["missing_slots"]:
+            result = find_eligible_majors_by_score(
+                university=data["target_university"],
+                score=float(data["score"]),
+                method_tag=data["method_tag"],
+                year=str(data["year"]) if data.get("year") else None,
+                limit=10,
+            )
+            return _make_final_message(
+                _format_eligible_major_result(
+                    data["target_university"],
+                    float(data["score"]),
+                    data["method_tag"],
+                    str(data["year"]) if data.get("year") else None,
+                    result,
+                ),
+                pending_clarification=None,
+            )
+        return _make_final_message(
+            "Mình đã nhận thêm thông tin, nhưng vẫn cần biết điểm này thuộc phương thức nào: "
+            "điểm thi THPT, học bạ, TSA/ĐGTD, HSA/ĐGNL hay phương thức khác?",
+            pending_clarification=data,
+        )
+
+    if data.get("intent") == "major_cutoff_comparison":
+        major_names = _extract_compared_major_names(query)
+        if len(major_names) >= 2:
+            data["major_names"] = major_names
+        required = ["target_university", "year", "method_tag", "major_names"]
+        data["missing_slots"] = _missing_slots(data, required)
+        if not data["missing_slots"]:
+            comparison_result = compare_major_cutoffs(
+                university=data["target_university"],
+                major_names=data["major_names"],
+                method_tag=data["method_tag"],
+                year=str(data["year"]),
+            )
+            return _make_final_message(
+                _format_major_cutoff_comparison(
+                    data["target_university"],
+                    str(data["year"]),
+                    data["method_tag"],
+                    comparison_result,
+                ),
+                pending_clarification=None,
+            )
+        return _make_final_message(
+            "Mình đã nhận thêm thông tin, nhưng vẫn cần đủ năm, phương thức và tên/mã hai ngành để so sánh điểm chuẩn.",
+            pending_clarification=data,
+        )
+
+    return None
+
+
+def preflight_node(state: AgentState) -> dict:
+    """Handle safety, context, and deterministic fast-path edge cases before LLM routing."""
+    query = _get_latest_user_query(state)
+    normalized = normalize_vietnamese_text(query)
+    current_uni = _current_university(state)
+    mentioned_universities = _detect_mentioned_universities(query)
+    mentioned_uni = mentioned_universities[0] if mentioned_universities else None
+    target_uni = str(current_uni or mentioned_uni or "").upper() or None
+
+    followup_result = _apply_followup_to_pending(
+        state.get("pending_clarification"),
+        query,
+        state,
+        target_uni,
+    )
+    if followup_result:
+        return followup_result
+
+    if not _is_admission_related(query):
+        return _make_final_message(
+            "Mình chỉ hỗ trợ các câu hỏi trong phạm vi tuyển sinh, ngành học, phương thức xét tuyển, điểm chuẩn và tư vấn chọn ngành. "
+            "Vui lòng đặt câu hỏi liên quan đến tuyển sinh đại học để mình hỗ trợ chính xác."
+        )
+
+    current_uni_code = str(current_uni).upper() if current_uni else None
+    other_mentioned_unis = [code for code in mentioned_universities if code != current_uni_code]
+
+    if current_uni_code and other_mentioned_unis:
+        mentioned_uni = other_mentioned_unis[0]
+        current_name = _display_university_name(str(current_uni))
+        mentioned_name = _display_university_name(mentioned_uni)
+        return _make_final_message(
+            f"Bạn đang ở hộp thoại tư vấn của {current_name} ({str(current_uni).upper()}). "
+            f"Câu hỏi của bạn lại nhắc đến {mentioned_name} ({mentioned_uni}). "
+            "Để tránh dùng nhầm dữ liệu tuyển sinh giữa hai trường, bạn nên chuyển sang hộp thoại của trường đó rồi hỏi tiếp."
+        )
+
+    if _is_comparison_query(query) and len(mentioned_universities) >= 2:
+        names = ", ".join(
+            f"{_display_university_name(code)} ({code})" for code in mentioned_universities[:3]
+        )
+        return _make_final_message(
+            f"Câu hỏi của bạn đang so sánh giữa nhiều trường/ngành: {names}. "
+            "Hệ thống hiện chỉ tư vấn chắc chắn trong phạm vi một trường ở mỗi hộp thoại để tránh đối chiếu sai mã ngành. "
+            "Ngoài ra, mã ngành giữa các trường không luôn tương đương nhau; ví dụ IT1 là mã của BKA, còn UET thường dùng mã khác như CN1. "
+            "Bạn vui lòng mở đúng hộp thoại của trường muốn tư vấn, hoặc nêu rõ hai ngành tương ứng cần so sánh."
+        )
+
+    if _is_major_all_methods_cutoff_query(query):
+        if not target_uni:
+            return _make_final_message(
+                "Bạn muốn xem điểm chuẩn của ngành này ở trường nào? Vui lòng chọn hoặc nhập mã trường trước."
+            )
+        year = _extract_year_from_query(query) or (state.get("user_profile", {}) or {}).get("target_year")
+        if not year:
+            return _make_final_message(
+                f"Mình hiểu bạn muốn xem điểm chuẩn theo tất cả phương thức tại {_display_university_name(target_uni)} ({target_uni}), "
+                "nhưng cần biết năm tuyển sinh để tra đúng dữ liệu. Ví dụ: “điểm ngành Công nghệ thông tin theo tất cả phương thức năm 2025”.",
+                pending_clarification=_build_pending(
+                    "major_all_methods_cutoff",
+                    ["target_university", "major_name", "year"],
+                    target_university=target_uni,
+                    major_name=_extract_single_major_name_for_cutoff(query),
+                    year=None,
+                ),
+            )
+        major_name = _extract_single_major_name_for_cutoff(query)
+        if not major_name:
+            return _make_final_message(
+                "Bạn muốn xem điểm chuẩn của ngành nào? Vui lòng nêu rõ tên ngành hoặc mã ngành.",
+                pending_clarification=_build_pending(
+                    "major_all_methods_cutoff",
+                    ["target_university", "major_name", "year"],
+                    target_university=target_uni,
+                    major_name=None,
+                    year=str(year),
+                ),
+            )
+        result = get_major_cutoffs_all_methods(
+            university=target_uni,
+            major_name=major_name,
+            year=str(year),
+        )
+        return _make_final_message(
+            _format_major_all_methods_cutoffs(target_uni, str(year), result)
+        )
+
+    if _is_major_cutoff_comparison_query(query):
+        if not target_uni:
+            return _make_final_message(
+                "Bạn muốn so sánh điểm chuẩn giữa các ngành của trường nào? Vui lòng chọn hoặc nhập mã trường trước."
+            )
+        from app.utils.taxonomy_engine import get_standard_method_tag
+
+        method_tag = get_standard_method_tag(query, target_uni)
+        year = _extract_year_from_query(query) or (state.get("user_profile", {}) or {}).get("target_year")
+        major_names = _extract_compared_major_names(query)
+        if method_tag and year and len(major_names) >= 2:
+            comparison_result = compare_major_cutoffs(
+                university=target_uni,
+                major_names=major_names,
+                method_tag=method_tag,
+                year=str(year),
+            )
+            return _make_final_message(
+                _format_major_cutoff_comparison(target_uni, str(year), method_tag, comparison_result)
+            )
+        return _make_final_message(
+            f"Mình hiểu bạn muốn so sánh điểm chuẩn giữa các ngành trong {_display_university_name(target_uni)} ({target_uni}). "
+            "Điểm chuẩn chỉ nên so sánh khi cùng năm và cùng phương thức xét tuyển. "
+            "Bạn vui lòng nêu rõ năm, phương thức và tên/mã hai ngành cần so sánh, ví dụ: "
+            "“So sánh điểm chuẩn THPT_QG năm 2025 của Marketing và Hệ thống thông tin”.",
+            pending_clarification=_build_pending(
+                "major_cutoff_comparison",
+                ["target_university", "year", "method_tag", "major_names"],
+                target_university=target_uni,
+                year=str(year) if year else None,
+                method_tag=method_tag,
+                major_names=major_names if len(major_names) >= 2 else None,
+            ),
+        )
+
+    if _is_cutoff_ranking_query(query):
+        if not target_uni:
+            return _make_final_message(
+                "Bạn muốn xem ngành có điểm chuẩn cao nhất của trường nào? Vui lòng chọn hoặc nhập mã trường trước."
+            )
+        return _make_final_message(
+            f"Mình có thể tìm ngành có điểm chuẩn cao nhất của {_display_university_name(target_uni)} ({target_uni}), "
+            "nhưng cần biết **năm** và **phương thức xét tuyển** để so sánh đúng. "
+            "Ví dụ: “Ngành nào điểm chuẩn THPT_QG cao nhất năm 2025?” hoặc “Ngành nào điểm HSA cao nhất năm 2024?”. "
+            "Không nên gộp mọi phương thức lại vì thang điểm và cách xét tuyển khác nhau."
+        )
+
+    if _is_subjective_best_major_query(query):
+        return _make_final_message(
+            "Không có một ngành “tốt nhất” tuyệt đối cho mọi học sinh. Ngành phù hợp phụ thuộc vào sở thích, năng lực, MBTI, điểm mạnh môn học và mục tiêu nghề nghiệp của bạn. "
+            "Bạn có thể cho mình biết thêm bạn thích lĩnh vực nào, điểm mạnh các môn, hoặc mục tiêu nghề nghiệp để mình tư vấn ngành phù hợp hơn."
+        )
+
+    if _is_rules_lookup(query):
+        if not target_uni:
+            return _make_final_message(
+                "Bạn muốn xem quy chế xét tuyển của trường nào? Vui lòng chọn hoặc nhập mã trường trước."
+            )
+        year = _latest_admission_year_for_lookup(state)
+        lookup_query = f"Quy chế xét tuyển của {target_uni} năm {year}"
+        result = search_admission_rules.invoke({
+            "query": lookup_query,
+            "university": target_uni,
+            "year": year,
+        })
+        summary = _summarize_admission_rules(target_uni, year, result)
+        return _make_final_message(
+            f"Tóm tắt quy chế xét tuyển của {_display_university_name(target_uni)} ({target_uni}) năm {year}:\n\n{summary}"
+        )
+
+    if _is_methods_lookup(query):
+        if not target_uni:
+            return _make_final_message(
+                "Bạn muốn xem phương thức tuyển sinh của trường nào? Vui lòng chọn hoặc nhập mã trường trước."
+            )
+        year = _latest_admission_year_for_lookup(state)
+        lookup_query = f"Các phương thức tuyển sinh của {target_uni} năm {year}"
+        result = search_admission_rules.invoke({
+            "query": lookup_query,
+            "university": target_uni,
+            "year": year,
+        })
+        summary = _summarize_admission_methods(target_uni, year, result)
+        return _make_final_message(
+            f"Các phương thức tuyển sinh của {_display_university_name(target_uni)} ({target_uni}) năm {year}:\n\n{summary}"
+        )
+
+    if _is_eligible_major_query(query):
+        if not target_uni:
+            return _make_final_message(
+                "Bạn muốn lọc ngành theo điểm cho trường nào? Vui lòng chọn hoặc nhập mã trường trước."
+            )
+
+        score = _extract_plain_score(query)
+        from app.utils.taxonomy_engine import get_standard_method_tag
+
+        method_tag = get_standard_method_tag(query, target_uni)
+        if not method_tag:
+            return _make_final_message(
+                f"Mình đã hiểu bạn có khoảng {score:g} điểm và muốn biết có thể đỗ ngành nào ở {_display_university_name(target_uni)} ({target_uni}). "
+                "Tuy nhiên cần biết điểm này thuộc phương thức nào để tránh lọc sai ngành: điểm thi THPT, học bạ, TSA/ĐGTD, HSA/ĐGNL hay phương thức khác?",
+                pending_clarification=_build_pending(
+                    "eligible_major_by_score",
+                    ["target_university", "score", "method_tag"],
+                    target_university=target_uni,
+                    score=score,
+                    method_tag=None,
+                    year=_extract_year_from_query(query) or (state.get("user_profile", {}) or {}).get("target_year"),
+                ),
+            )
+
+        year_match = re.search(r"\b(20\d{2}|19\d{2})\b", normalized)
+        year = year_match.group(1) if year_match else (state.get("user_profile", {}) or {}).get("target_year")
+        result = find_eligible_majors_by_score(
+            university=target_uni,
+            score=score,
+            method_tag=method_tag,
+            year=str(year) if year else None,
+            limit=10,
+        )
+        return _make_final_message(_format_eligible_major_result(target_uni, score, method_tag, year, result))
+
+    if current_uni:
+        profile = dict(state.get("user_profile", {}) or {})
+        profile.setdefault("target_university", str(current_uni).upper())
+        return {
+            "user_profile": profile,
+            "target_university": str(current_uni).upper(),
+            "next_agent": "receptionist",
+        }
+
+    return {"next_agent": "receptionist"}
 
 def career_profiler_node(state: AgentState) -> dict:
     """
@@ -1006,6 +1825,22 @@ def lookup_agent_node(state: AgentState) -> dict:
     logger.info(f"   📝 Query: {user_query}")
     logger.info(f"   🔧 Available tools: {[t.name for t in tools]}")
     
+    user_profile = state.get("user_profile", {}) or {}
+    target_uni = user_profile.get("target_university") or state.get("target_university")
+    if target_uni and messages:
+        context = (
+            f"Ngữ cảnh hội thoại hiện tại: người dùng đang hỏi trong hộp thoại của "
+            f"{get_university_name(str(target_uni))} (mã {str(target_uni).upper()}). "
+            "Nếu câu hỏi dùng từ 'trường' mà không nêu tên trường khác, hãy hiểu là trường này. "
+            "Chỉ dùng dữ liệu tuyển sinh của trường này khi gọi tool."
+        )
+        if isinstance(messages[0], tuple) and messages[0][0] == "user":
+            messages = [("user", f"{context}\n\nCâu hỏi: {messages[0][1]}")] + list(messages[1:])
+        elif hasattr(messages[0], "content"):
+            messages = [HumanMessage(content=f"{context}\n\nCâu hỏi: {messages[0].content}")] + list(messages[1:])
+        else:
+            messages = [("user", context)] + list(messages)
+
     result = lookup_agent.invoke({"messages": messages})
     
     # Log all messages to debug tool calls
@@ -1305,6 +2140,7 @@ def build_ai_workflow():
     graph_builder = StateGraph(AgentState)
 
     logger.info("Adding nodes...")
+    graph_builder.add_node("preflight", preflight_node)
     graph_builder.add_node("receptionist", receptionist_node)
     graph_builder.add_node("supervisor", supervisor_node)
     graph_builder.add_node("CareerProfiler", career_profiler_node)
@@ -1315,7 +2151,20 @@ def build_ai_workflow():
     graph_builder.add_node("synthesis", synthesis_node)
     logger.info("Nodes added")
 
-    graph_builder.add_edge(START, "receptionist")
+    graph_builder.add_edge(START, "preflight")
+
+    def route_from_preflight(state: AgentState) -> str:
+        next_agent = state.get("next_agent", "receptionist")
+        return next_agent
+
+    graph_builder.add_conditional_edges(
+        "preflight",
+        route_from_preflight,
+        {
+            "END": END,
+            "receptionist": "receptionist",
+        }
+    )
 
     def route_from_receptionist(state: AgentState) -> str:
         next_agent = state.get("next_agent", "supervisor")

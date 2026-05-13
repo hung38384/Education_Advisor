@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.connection import connect_to_mongo, close_mongo_connection
-from app.api.routes import advisor
+from app.api.routes import advisor, fast_predict
 
 # Configure logging
 logging.basicConfig(
@@ -78,6 +78,7 @@ app.add_middleware(
 # ==================== Routes ====================
 
 app.include_router(advisor.router, prefix="/api/v1")
+app.include_router(fast_predict.router, prefix="/api/v1")
 
 @app.get("/", tags=["Health"])
 async def root():
