@@ -76,10 +76,12 @@ def extract_target_year_from_text(text: str) -> Optional[str]:
 
 def normalize_vietnamese_text(text: str) -> str:
     """Normalize Vietnamese text for resilient dictionary matching."""
-    text = unicodedata.normalize("NFD", text or "")
+    text = (text or "").replace("đ", "d").replace("Đ", "D")
+    text = text.replace("Ä‘", "d").replace("Ä", "D")
+    text = unicodedata.normalize("NFD", text)
     text = "".join(char for char in text if unicodedata.category(char) != "Mn")
     text = text.replace("đ", "d").replace("Đ", "D")
-    text = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
+    text = re.sub(r"[^a-zA-Z0-9\s.]", " ", text)
     return re.sub(r"\s+", " ", text).lower().strip()
 
 
@@ -106,12 +108,84 @@ SUBJECT_SCORE_ALIASES = {
 }
 
 
+CANONICAL_SUBJECTS = {
+    "toan": "To\u00e1n",
+    "math": "To\u00e1n",
+    "van": "V\u0103n",
+    "ngu van": "V\u0103n",
+    "nguvan": "V\u0103n",
+    "literature": "V\u0103n",
+    "anh": "Anh",
+    "tieng anh": "Anh",
+    "english": "Anh",
+    "ly": "L\u00fd",
+    "vat ly": "L\u00fd",
+    "physics": "L\u00fd",
+    "hoa": "H\u00f3a",
+    "hoa hoc": "H\u00f3a",
+    "chemistry": "H\u00f3a",
+    "sinh": "Sinh",
+    "sinh hoc": "Sinh",
+    "biology": "Sinh",
+    "su": "S\u1eed",
+    "lich su": "S\u1eed",
+    "history": "S\u1eed",
+    "dia": "\u0110\u1ecba",
+    "dia ly": "\u0110\u1ecba",
+    "geography": "\u0110\u1ecba",
+    "gdcd": "GDCD",
+    "giao duc cong dan": "GDCD",
+}
+
+
+def canonical_subject_key(subject: Any) -> Optional[str]:
+    """Return the canonical Vietnamese subject key, avoiding duplicate aliases."""
+    raw = str(subject or "")
+    candidates = [raw]
+    try:
+        repaired = raw.encode("latin1").decode("utf-8")
+        if repaired != raw:
+            candidates.append(repaired)
+    except UnicodeError:
+        pass
+    for candidate in candidates:
+        normalized = normalize_vietnamese_text(candidate)
+        normalized = re.sub(r"\b0(?:\.0+)?$", "", normalized).strip()
+        canonical = CANONICAL_SUBJECTS.get(normalized)
+        if canonical:
+            return canonical
+    return None
+
+
+def merge_transcript_scores(*sources: Optional[Dict[str, Any]]) -> Dict[str, float]:
+    """Merge transcript dictionaries with later sources overriding earlier ones."""
+    merged: Dict[str, float] = {}
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        for raw_key, raw_value in source.items():
+            canonical_key = canonical_subject_key(raw_key)
+            if not canonical_key:
+                continue
+            try:
+                score = float(raw_value)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= score <= 10:
+                if score == 0 and merged.get(canonical_key, 0) > 0:
+                    continue
+                merged[canonical_key] = score
+    return merged
+
+
 def extract_scores_from_text(text: str) -> Dict[str, float]:
     """Deterministic fallback for common Vietnamese score phrases."""
     normalized = normalize_vietnamese_text(text)
     extracted: Dict[str, float] = {}
 
     for pattern in (r"\bielts\s*(\d+(?:\.\d+)?)\b", r"\b(\d+(?:\.\d+)?)\s*ielts\b"):
+        if "ielts" in extracted:
+            break
         match = re.search(pattern, normalized)
         if match:
             try:
@@ -154,7 +228,7 @@ def extract_scores_from_text(text: str) -> Dict[str, float]:
         rf"\b({subject_pattern})\s*(?:la|duoc|dat|:)?\s*(\d+(?:\.\d+)?)\b",
         rf"\b(\d+(?:\.\d+)?)\s*(?:diem)?\s*({subject_pattern})\b",
     ]
-    for pattern in patterns:
+    for pattern_index, pattern in enumerate(patterns):
         for match in re.finditer(pattern, normalized):
             if match.group(1).replace(".", "", 1).isdigit():
                 value_text, subject_text = match.group(1), match.group(2)
@@ -165,7 +239,11 @@ def extract_scores_from_text(text: str) -> Dict[str, float]:
             except ValueError:
                 continue
             if 0 <= value <= 10:
-                extracted[SUBJECT_SCORE_ALIASES[subject_text]] = value
+                output_key = SUBJECT_SCORE_ALIASES[subject_text]
+                output_canonical = canonical_subject_key(output_key)
+                if pattern_index == 1 and any(canonical_subject_key(key) == output_canonical for key in extracted):
+                    continue
+                extracted[output_key] = value
 
     return extracted
 
@@ -464,17 +542,38 @@ def find_major_code_by_name(uni_code: str, major_name: str) -> Optional[str]:
     # Chuẩn hóa tên ngành để so sánh
     major_normalized = major_name.lower().strip()
     major_search_key = normalize_vietnamese_text(major_name)
+
+    exact_overrides = {
+        "LPH": {
+            "luat": "7380101",
+            "luat kinh te": "7380107",
+            "luat thuong mai quoc te": "7380108",
+            "ngon ngu anh": "7220201",
+        }
+    }
+    override_code = exact_overrides.get(str(uni_code or "").upper(), {}).get(major_search_key)
+    if override_code:
+        return override_code
     
     # Kiểm tra trong mock database
     if uni_code in MAJOR_DATABASE:
+        normalized_items = [
+            (normalize_vietnamese_text(key), key, code)
+            for key, code in MAJOR_DATABASE[uni_code].items()
+        ]
         for key, code in MAJOR_DATABASE[uni_code].items():
             if key.lower() == major_normalized:
                 return code
-            normalized_key = normalize_vietnamese_text(key)
+        for normalized_key, _key, code in normalized_items:
             if normalized_key == major_search_key:
                 return code
-            if normalized_key in major_search_key or major_search_key in normalized_key:
-                return code
+        fuzzy_candidates = [
+            (len(normalized_key), code)
+            for normalized_key, _key, code in normalized_items
+            if normalized_key and (normalized_key in major_search_key or major_search_key in normalized_key)
+        ]
+        if fuzzy_candidates:
+            return max(fuzzy_candidates, key=lambda item: item[0])[1]
     
     # Nếu không tìm thấy chính xác, trả về None
     return None
@@ -603,12 +702,15 @@ def receptionist_node(state: Dict[str, Any]) -> Dict[str, Any]:
             user_profile["scores"] = {}
         user_profile["scores"].update(merged_scores)
 
-        transcript = dict(user_profile.get("transcript") or {})
+        transcript_updates: Dict[str, float] = {}
+        transcript = transcript_updates
         for score_key, score_value in merged_scores.items():
             normalized_score_key = normalize_vietnamese_text(score_key)
             if normalized_score_key == "ielts":
                 user_profile["ielts"] = score_value
-            elif normalized_score_key in {"tsa", "dgtd", "hsa", "dgnl", "vsat", "v sat"}:
+            elif normalized_score_key in {"hsa", "dgnl", "danh gia nang luc"}:
+                user_profile["hsa_score"] = score_value
+            elif normalized_score_key in {"tsa", "dgtd", "danh gia tu duy", "vsat", "v sat"}:
                 user_profile["tsa_score"] = score_value
             elif normalized_score_key in {"toan", "math"}:
                 transcript["Toán"] = score_value
@@ -629,6 +731,7 @@ def receptionist_node(state: Dict[str, Any]) -> Dict[str, Any]:
             elif score_key in SUBJECT_SCORE_ALIASES.values():
                 transcript[score_key] = score_value
 
+        transcript = merge_transcript_scores(user_profile.get("transcript"), transcript_updates)
         if transcript:
             user_profile["transcript"] = transcript
     
@@ -652,6 +755,12 @@ def receptionist_node(state: Dict[str, Any]) -> Dict[str, Any]:
             logger.warning(f"      ⚠️  Không tìm được mã ngành cho: {extracted.target_major_name}")
     
     # Cập nhật state
+    if not user_profile.get("target_major") and user_profile.get("target_major_name") and lookup_university:
+        major_code = find_major_code_by_name(lookup_university, str(user_profile.get("target_major_name")))
+        if major_code:
+            user_profile["target_major_code"] = major_code
+            user_profile["target_major"] = major_code
+
     state["user_profile"] = user_profile
     state["next_agent"] = "supervisor"
     logger.info(f"   ✅ Receptionist: Dữ liệu rõ ràng, chuyển đến supervisor")

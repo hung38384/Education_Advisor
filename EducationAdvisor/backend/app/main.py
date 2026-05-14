@@ -6,9 +6,15 @@ and core routes. Handles database connection lifecycle and application setup.
 """
 
 import logging
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 from app.core.config import settings
 from app.db.connection import connect_to_mongo, close_mongo_connection
