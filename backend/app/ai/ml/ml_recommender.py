@@ -36,6 +36,7 @@ from typing import Optional
 
 import numpy as np
 import torch
+import unicodedata
 from pytorch_tabnet.tab_model import TabNetClassifier
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,57 @@ SUBJECT_ALIAS: dict[str, str] = {
     "Địa":   "Dia",
     "Anh":   "Anh",
 }
+
+NORMALIZED_SUBJECT_ALIAS: dict[str, str] = {
+    "toan": "Toan",
+    "math": "Toan",
+    "ly": "Ly",
+    "vat ly": "Ly",
+    "physics": "Ly",
+    "hoa": "Hoa",
+    "hoa hoc": "Hoa",
+    "chemistry": "Hoa",
+    "van": "Van",
+    "ngu van": "Van",
+    "literature": "Van",
+    "sinh": "Sinh",
+    "sinh hoc": "Sinh",
+    "biology": "Sinh",
+    "su": "Su",
+    "lich su": "Su",
+    "history": "Su",
+    "dia": "Dia",
+    "dia ly": "Dia",
+    "geography": "Dia",
+    "anh": "Anh",
+    "tieng anh": "Anh",
+    "english": "Anh",
+}
+
+MOJIBAKE_SUBJECT_ALIAS: dict[str, str] = {
+    "ToÃ¡n": "Toan",
+    "VÄƒn": "Van",
+    "Ngá»¯ vÄƒn": "Van",
+    "LÃ½": "Ly",
+    "HÃ³a": "Hoa",
+    "Sá»­": "Su",
+    "Äá»‹a": "Dia",
+}
+
+
+def _normalize_subject_key(raw_key: str) -> str:
+    raw_text = str(raw_key or "")
+    if raw_text in MOJIBAKE_SUBJECT_ALIAS:
+        return MOJIBAKE_SUBJECT_ALIAS[raw_text]
+    try:
+        raw_text = raw_text.encode("latin1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    text = unicodedata.normalize("NFD", raw_text)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    text = text.replace("đ", "d").replace("Đ", "D")
+    text = " ".join(text.lower().strip().split())
+    return NORMALIZED_SUBJECT_ALIAS.get(text, SUBJECT_ALIAS.get(str(raw_key), str(raw_key)))
 
 
 def _ielts_to_english_score(ielts: float) -> float:
@@ -218,12 +270,16 @@ class CareerRecommender:
         # ---- Chuan hoa key cua transcript (ho tro ca co dau lan khong dau) ----
         norm_transcript: dict[str, float] = {}
         for raw_key, raw_val in transcript.items():
-            normalized = SUBJECT_ALIAS.get(raw_key, raw_key)
+            normalized = _normalize_subject_key(raw_key)
             try:
-                norm_transcript[normalized] = float(raw_val)
+                score_value = float(raw_val)
             except (TypeError, ValueError):
                 logger.warning(f"Invalid score for '{raw_key}': '{raw_val}', using 0.0")
-                norm_transcript[normalized] = 0.0
+                score_value = 0.0
+
+            current_value = norm_transcript.get(normalized)
+            if current_value is None or (current_value <= 0 < score_value):
+                norm_transcript[normalized] = score_value
 
         # ---- Lay 8 diem mon theo thu tu SUBJECT_MAP ----
         scores: dict[str, float] = {}

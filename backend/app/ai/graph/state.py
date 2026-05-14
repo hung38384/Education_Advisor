@@ -27,6 +27,9 @@ class AgentState(TypedDict):
         calculated_score: Total admission score calculated by ScoreCalculator (TSA + IELTS bonus)
         calculated_details: Dictionary with breakdown:
                            - tsa_score, ielts_score, ielts_bonus, total_score
+        admission_assessment: Deterministic cutoff comparison from DataStrategist.
+        pending_clarification: Short-lived structured slot-filling state used
+                               for follow-up answers like "năm 2024 ạ".
     """
     
     messages: Annotated[list, add_messages]
@@ -35,3 +38,5 @@ class AgentState(TypedDict):
     called_agents: list[str]
     calculated_score: float | None
     calculated_details: dict[str, Any]
+    admission_assessment: dict[str, Any] | None
+    pending_clarification: dict[str, Any] | None

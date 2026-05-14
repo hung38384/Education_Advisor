@@ -3,6 +3,8 @@ Node Lễ tân (Receptionist) - Trích xuất và chuẩn hóa thông tin từ c
 Sử dụng Gemini 2.5 Flash để Entity Extraction và Decision Making
 """
 
+import re
+import unicodedata
 from typing import Optional, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field
@@ -36,6 +38,11 @@ class ExtractedEntities(BaseModel):
         default=None,
         description="Tên ngành học thô từ người dùng (VD: 'quản trị kinh doanh', 'khoa học máy tính')"
     )
+
+    target_year: Optional[str] = Field(
+        default=None,
+        description="Năm xét tuyển hoặc năm điểm thi/quy chế được người dùng nhắc đến (VD: '2024')"
+    )
     
     extracted_scores: Dict[str, float] = Field(
         default_factory=dict,
@@ -56,6 +63,201 @@ class ExtractedEntities(BaseModel):
         default=None,
         description="Câu hỏi để làm rõ thêm nếu is_ambiguous=True"
     )
+
+
+YEAR_PATTERN = re.compile(r"\b(20\d{2}|19\d{2})\b")
+
+
+def extract_target_year_from_text(text: str) -> Optional[str]:
+    """Deterministic fallback for target_year extraction."""
+    match = YEAR_PATTERN.search(text or "")
+    return match.group(1) if match else None
+
+
+def normalize_vietnamese_text(text: str) -> str:
+    """Normalize Vietnamese text for resilient dictionary matching."""
+    text = unicodedata.normalize("NFD", text or "")
+    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
+    text = text.replace("đ", "d").replace("Đ", "D")
+    text = re.sub(r"[^a-zA-Z0-9\s.]", " ", text)
+    return re.sub(r"\s+", " ", text).lower().strip()
+
+
+SUBJECT_SCORE_ALIASES = {
+    "toan": "Toán",
+    "math": "Toán",
+    "van": "Văn",
+    "ngu van": "Văn",
+    "anh": "Anh",
+    "tieng anh": "Anh",
+    "english": "Anh",
+    "ly": "Lý",
+    "vat ly": "Lý",
+    "physics": "Lý",
+    "hoa": "Hóa",
+    "hoa hoc": "Hóa",
+    "chemistry": "Hóa",
+    "sinh": "Sinh",
+    "sinh hoc": "Sinh",
+    "su": "Sử",
+    "lich su": "Sử",
+    "dia": "Địa",
+    "dia ly": "Địa",
+}
+
+
+CANONICAL_SUBJECT_KEYS = {
+    "toan": "To\u00e1n",
+    "math": "To\u00e1n",
+    "van": "V\u0103n",
+    "ngu van": "V\u0103n",
+    "nguvan": "V\u0103n",
+    "literature": "V\u0103n",
+    "anh": "Anh",
+    "tieng anh": "Anh",
+    "english": "Anh",
+    "ly": "L\u00fd",
+    "vat ly": "L\u00fd",
+    "physics": "L\u00fd",
+    "hoa": "H\u00f3a",
+    "hoa hoc": "H\u00f3a",
+    "chemistry": "H\u00f3a",
+    "sinh": "Sinh",
+    "sinh hoc": "Sinh",
+    "biology": "Sinh",
+    "su": "S\u1eed",
+    "lich su": "S\u1eed",
+    "history": "S\u1eed",
+    "dia": "\u0110\u1ecba",
+    "dia ly": "\u0110\u1ecba",
+    "geography": "\u0110\u1ecba",
+    "toa n": "To\u00e1n",
+    "va n": "V\u0103n",
+    "la": "L\u00fd",
+    "ha a": "H\u00f3a",
+}
+
+MOJIBAKE_SUBJECT_KEYS = {
+    "ToÃ¡n": "To\u00e1n",
+    "VÄƒn": "V\u0103n",
+    "Ngá»¯ vÄƒn": "V\u0103n",
+    "LÃ½": "L\u00fd",
+    "HÃ³a": "H\u00f3a",
+    "Sá»­": "S\u1eed",
+    "Äá»‹a": "\u0110\u1ecba",
+}
+
+
+def canonical_subject_key(raw_key: str) -> Optional[str]:
+    """Return the single transcript key used across ML and score calculation."""
+    raw_text = str(raw_key or "")
+    if raw_text in MOJIBAKE_SUBJECT_KEYS:
+        return MOJIBAKE_SUBJECT_KEYS[raw_text]
+    normalized = normalize_vietnamese_text(raw_text)
+    canonical = CANONICAL_SUBJECT_KEYS.get(normalized)
+    if canonical:
+        return canonical
+
+    # Some existing files/logs contain mojibake keys such as "VÄƒn".
+    try:
+        repaired = raw_text.encode("latin1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        repaired = raw_text
+    if repaired != raw_text:
+        return CANONICAL_SUBJECT_KEYS.get(normalize_vietnamese_text(repaired))
+    return None
+
+
+def merge_transcript_scores(existing: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, float]:
+    """
+    Merge transcript-like dictionaries without letting stale default zeroes override
+    scores that were explicitly present in the latest user query.
+    """
+    merged: Dict[str, float] = {}
+
+    def add_items(items: Dict[str, Any], prefer_new_value: bool) -> None:
+        for key, raw_value in (items or {}).items():
+            canonical = canonical_subject_key(key)
+            if not canonical:
+                continue
+            try:
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                continue
+            current = merged.get(canonical)
+            if current is None or prefer_new_value or (current <= 0 < value):
+                merged[canonical] = value
+
+    add_items(existing or {}, prefer_new_value=False)
+    add_items(incoming or {}, prefer_new_value=True)
+    return merged
+
+
+def extract_scores_from_text(text: str) -> Dict[str, float]:
+    """Deterministic fallback for common Vietnamese score phrases."""
+    normalized = normalize_vietnamese_text(text)
+    extracted: Dict[str, float] = {}
+
+    for pattern_index, pattern in enumerate((r"\bielts\s*(\d+(?:\.\d+)?)\b", r"\b(\d+(?:\.\d+)?)\s*ielts\b")):
+        match = re.search(pattern, normalized)
+        if match:
+            try:
+                value = float(match.group(1))
+                if 0 <= value <= 9:
+                    if pattern_index == 0 or "ielts" not in extracted:
+                        extracted["ielts"] = value
+            except ValueError:
+                pass
+
+    assessment_aliases = {
+        "tsa": "tsa",
+        "dgtd": "tsa",
+        "danh gia tu duy": "tsa",
+        "hsa": "hsa",
+        "dgnl": "dgnl",
+        "danh gia nang luc": "dgnl",
+        "vsat": "vsat",
+        "v sat": "vsat",
+    }
+    assessment_pattern = "|".join(sorted((re.escape(k) for k in assessment_aliases), key=len, reverse=True))
+    assessment_patterns = [
+        rf"\b({assessment_pattern})\s*(?:la|duoc|dat|:)?\s*(\d+(?:\.\d+)?)\b",
+        rf"\b(\d+(?:\.\d+)?)\s*(?:diem)?\s*({assessment_pattern})\b",
+    ]
+    for pattern in assessment_patterns:
+        for match in re.finditer(pattern, normalized):
+            if match.group(1).replace(".", "", 1).isdigit():
+                value_text, label_text = match.group(1), match.group(2)
+            else:
+                label_text, value_text = match.group(1), match.group(2)
+            try:
+                value = float(value_text)
+            except ValueError:
+                continue
+            if 0 <= value <= 1200:
+                extracted[assessment_aliases[label_text]] = value
+
+    subject_pattern = "|".join(sorted((re.escape(k) for k in SUBJECT_SCORE_ALIASES), key=len, reverse=True))
+    patterns = [
+        rf"\b({subject_pattern})\s*(?:la|duoc|dat|:)?\s*(\d+(?:\.\d+)?)\b",
+        rf"\b(\d+(?:\.\d+)?)\s*(?:diem)?\s*({subject_pattern})\b",
+    ]
+    for pattern_index, pattern in enumerate(patterns):
+        for match in re.finditer(pattern, normalized):
+            if match.group(1).replace(".", "", 1).isdigit():
+                value_text, subject_text = match.group(1), match.group(2)
+            else:
+                subject_text, value_text = match.group(1), match.group(2)
+            try:
+                value = float(value_text)
+            except ValueError:
+                continue
+            if 0 <= value <= 10:
+                subject_key = SUBJECT_SCORE_ALIASES[subject_text]
+                if pattern_index == 0 or subject_key not in extracted:
+                    extracted[subject_key] = value
+
+    return extracted
 
 
 # ============================================================================
@@ -126,8 +328,11 @@ Nhiệm vụ của bạn là trích xuất và chuẩn hóa thông tin từ câu
    - CHỈ đánh dấu is_ambiguous=True KHI VÀ CHỈ KHI điểm số không rõ nguồn gốc (VD: "24 điểm" nhưng không rõ là thi THPT, ĐGNL hay Học bạ).
    - TUYỆT ĐỐI KHÔNG đánh dấu is_ambiguous=True khi người dùng dùng các từ lệnh như "hãy tính điểm", "hãy tư vấn", "trích xuất công thức". 
    - Nếu người dùng yêu cầu tính toán, bạn cứ lẳng lặng trích xuất dữ liệu, đặt intent="TU_VAN", đặt is_ambiguous=False. Việc tính toán sẽ có các bộ phận khác ở tuyến sau lo, bạn không cần phải xin lỗi hay giải thích!
-   
-6. **Ưu tiên:**
+
+6. **LƯU Ý QUAN TRỌNG VỀ THỜI GIAN (TARGET_YEAR):**
+    - Bạn CẦN ĐỌC KỸ câu hỏi của người dùng. Nếu họ nhắc đến một năm cụ thể (Ví dụ: "Điểm thi THPT Quốc gia 2024", "Năm 2024", "2023"), bạn PHẢI trích xuất và cập nhật trường `target_year` thành năm đó.
+
+7. **Ưu tiên:**
    - Nếu người dùng rõ ràng: is_ambiguous = False, clarification_question = None
    - Nếu bất kỳ phần nào mơ hồ: is_ambiguous = True, tạo câu hỏi làm rõ
 
@@ -199,6 +404,11 @@ def find_major_code_by_name(uni_code: str, major_name: str) -> Optional[str]:
             "kỹ thuật phần mềm": "IT-E6", # Tiên tiến
             "an toàn không gian số": "IT-E15",
             "phân tích dữ liệu": "IT-E10",
+            "công nghệ dệt may": "TX1",
+            "cong nghe det may": "TX1",
+            "kỹ thuật dệt may": "TX1",
+            "ky thuat det may": "TX1",
+            "textile technology": "TX1",
         },
         
         # 2. ĐẠI HỌC KINH TẾ QUỐC DÂN (KHA)
@@ -232,7 +442,7 @@ def find_major_code_by_name(uni_code: str, major_name: str) -> Optional[str]:
         # 4. ĐẠI HỌC LUẬT HÀ NỘI (LPH)
         "LPH": {
             "luật": "7380101",
-            "luật kinh tế": "7380107",
+            "luật kinh tế": "7380101",
             "luật thương mại quốc tế": "7380108",
             "ngôn ngữ anh": "7220201",
         },
@@ -348,12 +558,22 @@ def find_major_code_by_name(uni_code: str, major_name: str) -> Optional[str]:
     }    
     # Chuẩn hóa tên ngành để so sánh
     major_normalized = major_name.lower().strip()
+    major_search_key = normalize_vietnamese_text(major_name)
     
     # Kiểm tra trong mock database
     if uni_code in MAJOR_DATABASE:
+        partial_matches = []
         for key, code in MAJOR_DATABASE[uni_code].items():
             if key.lower() == major_normalized:
                 return code
+            normalized_key = normalize_vietnamese_text(key)
+            if normalized_key == major_search_key:
+                return code
+            if normalized_key in major_search_key or major_search_key in normalized_key:
+                partial_matches.append((len(normalized_key), code))
+        if partial_matches:
+            partial_matches.sort(reverse=True)
+            return partial_matches[0][1]
     
     # Nếu không tìm thấy chính xác, trả về None
     return None
@@ -389,6 +609,9 @@ def receptionist_node(state: Dict[str, Any]) -> Dict[str, Any]:
     for msg in reversed(messages):
         if isinstance(msg, HumanMessage):
             user_message = msg.content
+            break
+        if isinstance(msg, tuple) and len(msg) >= 2 and msg[0] == "user":
+            user_message = msg[1]
             break
     
     if not user_message:
@@ -426,6 +649,7 @@ def receptionist_node(state: Dict[str, Any]) -> Dict[str, Any]:
         logger.info(f"   ✅ Gemini extraction successful")
         logger.info(f"      - University: {extracted.target_university}")
         logger.info(f"      - Major Name: {extracted.target_major_name}")
+        logger.info(f"      - Target Year: {extracted.target_year}")
         logger.info(f"      - Scores: {extracted.extracted_scores}")
         logger.info(f"      - Ambiguous: {extracted.is_ambiguous}")
     except Exception as e:
@@ -463,21 +687,61 @@ def receptionist_node(state: Dict[str, Any]) -> Dict[str, Any]:
     # Cập nhật mã trường nếu có
     if extracted.target_university:
         user_profile["target_university"] = extracted.target_university
+
+    target_year = extracted.target_year or extract_target_year_from_text(user_message)
+    if target_year:
+        user_profile["target_year"] = target_year
     
     # Cập nhật điểm số nếu có
-    if extracted.extracted_scores:
+    deterministic_scores = extract_scores_from_text(user_message)
+    merged_scores = dict(extracted.extracted_scores or {})
+    merged_scores.update(deterministic_scores)
+
+    if merged_scores:
         if "scores" not in user_profile:
             user_profile["scores"] = {}
-        user_profile["scores"].update(extracted.extracted_scores)
+        user_profile["scores"].update(merged_scores)
+
+        transcript = dict(user_profile.get("transcript") or {})
+        for score_key, score_value in merged_scores.items():
+            normalized_score_key = normalize_vietnamese_text(score_key)
+            if normalized_score_key == "ielts":
+                user_profile["ielts"] = score_value
+            elif normalized_score_key in {"tsa", "dgtd", "hsa", "dgnl", "vsat", "v sat"}:
+                user_profile["tsa_score"] = score_value
+            elif normalized_score_key in {"toan", "math"}:
+                transcript["Toán"] = score_value
+            elif normalized_score_key in {"van", "ngu van", "nguvan"}:
+                transcript["Văn"] = score_value
+            elif normalized_score_key in {"anh", "tieng anh", "english"}:
+                transcript["Anh"] = score_value
+            elif normalized_score_key in {"ly", "vat ly", "physics"}:
+                transcript["Lý"] = score_value
+            elif normalized_score_key in {"hoa", "hoa hoc", "chemistry"}:
+                transcript["Hóa"] = score_value
+            elif normalized_score_key in {"sinh", "sinh hoc"}:
+                transcript["Sinh"] = score_value
+            elif normalized_score_key in {"su", "lich su"}:
+                transcript["Sử"] = score_value
+            elif normalized_score_key in {"dia", "dia ly"}:
+                transcript["Địa"] = score_value
+            elif score_key in SUBJECT_SCORE_ALIASES.values():
+                transcript[score_key] = score_value
+
+        transcript = merge_transcript_scores({}, transcript)
+        if transcript:
+            user_profile["transcript"] = transcript
     
     # Cập nhật ý định
     user_profile["intent"] = extracted.intent
     
     # Tìm mã ngành nếu có tên ngành và trường
-    if extracted.target_major_name and extracted.target_university:
-        logger.info(f"   🔍 Tìm mã ngành: {extracted.target_major_name} tại {extracted.target_university}")
+    lookup_university = extracted.target_university or user_profile.get("target_university")
+    if extracted.target_major_name and lookup_university:
+        user_profile["target_major_name"] = extracted.target_major_name
+        logger.info(f"   🔍 Tìm mã ngành: {extracted.target_major_name} tại {lookup_university}")
         major_code = find_major_code_by_name(
-            extracted.target_university,
+            lookup_university,
             extracted.target_major_name
         )
         if major_code:

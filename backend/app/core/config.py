@@ -7,7 +7,7 @@ across different environments (development, staging, production).
 """
 
 from typing import List
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str | None = None
     GROQ_API_KEY: str | None = None
     LLAMA_CLOUD_API_KEY: str | None = None
+    DEEPSEEK_API_KEY: str | None = None
+    DEEPSEEK_TEMPERATURE: float = 1.0
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Security Configuration
     SECRET_KEY: str = Field(default="your-secret-key-change-this-in-production")
@@ -56,10 +59,6 @@ class Settings(BaseSettings):
 
     # Logging Configuration
     LOG_LEVEL: str = Field(default="INFO")
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 # Global settings instance - instantiated once and reused throughout the application
