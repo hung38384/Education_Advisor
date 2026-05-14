@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI advisor API routes.
 
 This module exposes the LangGraph-based education advisor through FastAPI while
@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from app.ai.graph.workflow import get_ai_workflow
+from app.ai.nodes.receptionist import merge_transcript_scores
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,12 @@ class AdviceRequest(BaseModel):
     mbti: Optional[str] = Field(default=None, max_length=255)
     ielts: Optional[float] = Field(default=None, ge=0, le=9)
     tsa_score: Optional[float] = Field(default=None, ge=0)
+    hsa_score: Optional[float] = Field(default=None, ge=0)
+    subject_combination: Optional[str] = Field(default=None, max_length=20)
+    academic_scores: Optional[Dict[str, float]] = Field(default=None)
     transcript: Optional[Dict[str, float]] = Field(default=None)
     student_profile: Optional[Dict[str, Any]] = Field(default=None)
+    user_profile: Optional[Dict[str, Any]] = Field(default=None)
 
 
 class AdviceResponse(BaseModel):
@@ -53,8 +58,9 @@ class AdviceResponse(BaseModel):
 
 def _session_key(request: AdviceRequest) -> Optional[str]:
     raw_key = request.session_id or request.conversation_id
-    if not raw_key and request.student_profile:
-        raw_key = request.student_profile.get("session_id") or request.student_profile.get("conversation_id")
+    profile = request.user_profile or request.student_profile
+    if not raw_key and profile:
+        raw_key = profile.get("session_id") or profile.get("conversation_id")
     if not raw_key:
         return None
     return str(raw_key).strip()[:128] or None
@@ -97,6 +103,15 @@ def _store_pending_clarification(session_key: Optional[str], pending: Optional[D
 
 def _build_user_profile(request: AdviceRequest) -> Dict[str, Any]:
     profile = dict(request.student_profile or {})
+    profile.update(dict(request.user_profile or {}))
+
+    transcript = merge_transcript_scores(
+        profile.get("transcript"),
+        profile.get("academic_scores"),
+        profile.get("national_exam_scores"),
+        request.academic_scores,
+        request.transcript,
+    )
 
     for key in (
         "target_university",
@@ -106,11 +121,15 @@ def _build_user_profile(request: AdviceRequest) -> Dict[str, Any]:
         "mbti",
         "ielts",
         "tsa_score",
-        "transcript",
+        "hsa_score",
+        "subject_combination",
     ):
         value = getattr(request, key)
         if value is not None:
             profile[key] = value
+
+    if transcript:
+        profile["transcript"] = transcript
 
     if "target_year" not in profile:
         year_match = YEAR_PATTERN.search(request.query)
@@ -120,12 +139,46 @@ def _build_user_profile(request: AdviceRequest) -> Dict[str, Any]:
     return profile
 
 
+def _repair_mojibake_text(text: str) -> str:
+    """Repair common UTF-8 text that was accidentally decoded as cp1252."""
+    markers = ("Ã", "Ä", "Æ", "á»", "áº", "â€™", "â€œ", "â€", "ðŸ", "Â")
+    if not any(marker in text for marker in markers):
+        return text
+
+    repaired = text
+    for _ in range(4):
+        try:
+            candidate = repaired.encode("cp1252").decode("utf-8")
+        except UnicodeError:
+            repaired_lines = []
+            changed = False
+            for line in repaired.splitlines(keepends=True):
+                if not any(marker in line for marker in markers):
+                    repaired_lines.append(line)
+                    continue
+                try:
+                    fixed_line = line.encode("cp1252").decode("utf-8")
+                except UnicodeError:
+                    repaired_lines.append(line)
+                    continue
+                repaired_lines.append(fixed_line)
+                changed = changed or fixed_line != line
+            candidate = "".join(repaired_lines)
+            if not changed:
+                break
+        if candidate == repaired:
+            break
+        repaired = candidate
+    return repaired
+
+
 def _extract_final_message(result: Dict[str, Any]) -> str:
     messages: List[Any] = result.get("messages", []) if isinstance(result, dict) else []
 
     def clean_message(content: Any) -> str:
         text = str(content).strip()
-        return re.sub(r"^\[[^\]\n]{0,100}\]:\s*", "", text).strip()
+        text = re.sub(r"^\[[^\]\n]{0,100}\]:\s*", "", text).strip()
+        return _repair_mojibake_text(text)
 
     for message in reversed(messages):
         name = getattr(message, "name", None)
@@ -150,6 +203,7 @@ def _invoke_graph(request: AdviceRequest, pending_clarification: Optional[Dict[s
         "called_agents": [],
         "calculated_score": None,
         "calculated_details": {},
+        "admission_assessment": None,
         "pending_clarification": pending_clarification,
     }
 

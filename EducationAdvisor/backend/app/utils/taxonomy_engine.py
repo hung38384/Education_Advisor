@@ -135,7 +135,9 @@ from thefuzz import fuzz
 
 
 def _normalize_text(text: str) -> str:
-    text = unicodedata.normalize("NFD", text or "")
+    text = (text or "").replace("đ", "d").replace("Đ", "D")
+    text = text.replace("Ä‘", "d").replace("Ä", "D")
+    text = unicodedata.normalize("NFD", text)
     text = "".join(char for char in text if unicodedata.category(char) != "Mn")
     text = text.replace("đ", "d").replace("Đ", "D")
     text = re.sub(r"[^a-zA-Z0-9_\s]", " ", text)
@@ -144,6 +146,49 @@ def _normalize_text(text: str) -> str:
 
 def _to_alias_slug(text: str) -> str:
     return _normalize_text(text).replace("_", " ").replace(" ", "-")
+
+
+TAG_SUPPORT_KEYWORDS = {
+    "THPT_QG": {
+        "thpt", "thptqg", "thpt_qg", "diem thi thpt", "thi thpt",
+        "tot nghiep thpt", "thpt quoc gia",
+    },
+    "HOC_BA": {"hoc ba", "xet hoc ba", "diem hoc ba"},
+    "DGTD_TSA": {"tsa", "dgtd", "danh gia tu duy", "dg tu duy", "tu duy bach khoa"},
+    "DGNL_HSA": {
+        "hsa", "dgnl hn", "dgnl ha noi", "dgnl dhqg hn", "dgnl dhqghn",
+        "danh gia nang luc ha noi", "dai hoc quoc gia ha noi", "dhqg ha noi",
+    },
+    "DGNL_CHUNG": {
+        "dgnl qg hcm", "dgnl hcm", "dhqg hcm", "dai hoc quoc gia hcm",
+        "dai hoc quoc gia tp hcm", "vnu hcm", "vnuhcm",
+    },
+    "DGNL_APT": {"apt", "dgnl su pham", "danh gia nang luc su pham"},
+    "CHUNG_CHI_QUOC_TE": {
+        "xet tuyen ket hop", "phuong thuc ket hop", "chung chi quoc te",
+        "ccqt", "chung chi tieng anh", "ielts", "toefl", "sat", "act",
+    },
+    "KY_THI_RIENG": {"vsat", "v sat", "ky thi rieng", "thi rieng", "xet tuyen thang"},
+    "NGOAI_NGU_KET_HOP": {"ngoai ngu ket hop"},
+    "TOT_NGHIEP_QUOC_TE": {"tot nghiep quoc te", "a level", "alevel", "ib diploma"},
+}
+
+
+def _tag_supported_by_query(tag: Optional[str], normalized_query: str) -> bool:
+    canonical_tag = normalize_method_tag(tag)
+    if not canonical_tag:
+        return False
+    return any(keyword in normalized_query for keyword in TAG_SUPPORT_KEYWORDS.get(canonical_tag, set()))
+
+
+def _has_explicit_method_signal(normalized_query: str) -> bool:
+    broad_signals = {
+        "phuong thuc", "theo phuong thuc", "bang diem", "diem thi",
+        "diem chuan", "xet tuyen", "danh gia", "thpt", "hoc ba",
+        "tsa", "hsa", "dgnl", "dgtd", "vsat", "ielts", "ccqt",
+        "chung chi", "ky thi rieng",
+    }
+    return any(signal in normalized_query for signal in broad_signals)
 
 
 def _has_explicit_thpt_method(query: str) -> bool:
@@ -337,7 +382,8 @@ def get_standard_method_tag(user_query: str, university_code: str) -> Optional[s
         logger.warning("Taxonomy collection unavailable and no deterministic method match; returning None")
         return None
         
-    query_lower = user_query.lower()
+    query_normalized = _normalize_text(user_query)
+    query_lower = query_normalized
     best_tag = None
     
     try:
@@ -359,7 +405,6 @@ def get_standard_method_tag(user_query: str, university_code: str) -> Optional[s
             for keyword in exact_keywords:
                 normalized_keyword = _normalize_text(str(keyword))
                 keyword_slug = _to_alias_slug(str(keyword))
-                query_normalized = _normalize_text(query_lower)
                 query_slug = _to_alias_slug(query_lower)
                 if keyword and (normalized_keyword in query_normalized or keyword_slug in query_slug):
                     logger.info(f"   🎯 [Exact Match] Taxonomy Engine chốt ngay tag: '{tag}' nhờ keyword: '{keyword}'")
@@ -399,13 +444,23 @@ def get_standard_method_tag(user_query: str, university_code: str) -> Optional[s
             # Tính weighted score: nhân raw score với trọng số ưu tiên
             weighted_score = raw_score * (1 + (priority / 100))
             
-            if raw_score > 60 and weighted_score > highest_weighted_score:
+            if raw_score > 78 and weighted_score > highest_weighted_score:
                 highest_weighted_score = weighted_score
                 best_raw_score = raw_score
                 best_priority = priority
                 best_tag = tag
         
         if highest_weighted_score > 0:
+            supported = _tag_supported_by_query(best_tag, query_normalized)
+            if not supported and (_has_explicit_method_signal(query_normalized) or best_raw_score < 88):
+                logger.warning(
+                    "   ⚠️ [Fuzzy Guard] Rejecting weak/unsupported method tag '%s' "
+                    "(raw_score=%s) for query='%s'",
+                    best_tag,
+                    best_raw_score,
+                    query_normalized,
+                )
+                return None
             logger.info(
                 f"   ⚖️ [Weighted Fuzzy] Taxonomy Engine chọn tag: '{best_tag}' "
                 f"(raw_score={best_raw_score}, priority={best_priority}, weighted={highest_weighted_score:.2f})"

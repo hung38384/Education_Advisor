@@ -719,12 +719,35 @@ def extract_method_tag(text: str) -> str:
     from app.utils.taxonomy_engine import normalize_method_tag
     return normalize_method_tag(text)
 
+def _parse_subject_combinations(raw_value: Any) -> list[str]:
+    if raw_value is None:
+        return []
+    raw_items = raw_value if isinstance(raw_value, list) else [raw_value]
+    combinations: list[str] = []
+    for item in raw_items:
+        if item is None:
+            continue
+        for part in re.split(r"[;,\|\s]+", str(item).upper()):
+            part = part.strip()
+            if part:
+                combinations.append(part)
+    return list(dict.fromkeys(combinations))
+
+
+def _record_score(record: dict) -> float:
+    try:
+        return float(record.get("score") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 @tool
 def get_historical_scores(
     university: str,
     major: str,
     year: Optional[str] = None,
     method_tag: Optional[str] = None,
+    subject_combination: Optional[str] = None,
 ) -> str:
     """
     Truy vấn Điểm Chuẩn Lịch Sử từ MongoDB.
@@ -756,8 +779,13 @@ def get_historical_scores(
     processed_method_tag = extract_method_tag(method_tag) if method_tag else None
     from app.utils.taxonomy_engine import get_method_aliases
     method_aliases = get_method_aliases(processed_method_tag) if processed_method_tag else []
+    requested_combination = str(subject_combination or "").strip().upper() or None
     
-    logger.info(f"📊 Fetching historical scores | University: {university} | Major: {major} | Year: {year} | Method: {processed_method_tag} (Original: {method_tag})")
+    logger.info(
+        f"📊 Fetching historical scores | University: {university} | Major: {major} | "
+        f"Year: {year} | Method: {processed_method_tag} (Original: {method_tag}) | "
+        f"Subject combo: {requested_combination}"
+    )
     
     # REFACTOR: Normalize + Regex khử nhiễu mã trường do LLM sinh ra
     # Ví dụ: "BBKA" -> "BKA", "TTMU" -> "TMU", "QQHI" -> "QHI"
@@ -815,7 +843,7 @@ def get_historical_scores(
         results = list(
             collection.find(query_filter)
             .sort("year", -1)
-            .limit(3 if not year else 5)  # Khi có year cụ thể cho limit cao hơn để đa phương thức
+            .limit(20 if not year else 100)  # Lấy đủ các tổ hợp/cơ sở để match subject_combination trong Python
         )
         
         if not results:
@@ -829,19 +857,62 @@ def get_historical_scores(
         
         # TEMPORAL: Format kết quả dạng JSON gọn gàng cho DataStrategist
         # RÚT GỌN: Chỉ lấy những field cần thiết để tránh vượt quá token limit
+        selected_record = None
+        fallback_used = False
+        subject_combination_found = False
+        if requested_combination:
+            for record in results:
+                parsed_combinations = _parse_subject_combinations(record.get("subject_combinations"))
+                logger.info(
+                    "   Candidate combo | major=%s | score=%s | combos=%s",
+                    record.get("major_code"),
+                    record.get("score"),
+                    parsed_combinations,
+                )
+                if requested_combination in parsed_combinations:
+                    selected_record = record
+                    subject_combination_found = True
+                    break
+            if selected_record is None:
+                unknown_combo_records = [
+                    record for record in results
+                    if not _parse_subject_combinations(record.get("subject_combinations"))
+                ]
+                selected_record = max(unknown_combo_records or results, key=_record_score)
+                fallback_used = True
+        else:
+            selected_record = max(results, key=_record_score)
+            fallback_used = True
+            subject_combination_found = False
+        selected_index = results.index(selected_record) if selected_record in results else -1
+
         history_items = []
-        for record in results:
+        for index, record in enumerate(results):
             score_val = record.get("score", 0)
             history_items.append({
                 "year": record.get("year"),
                 "major_code": record.get("major_code"),
+                "major_name": record.get("major_name"),
                 "method_tag": record.get("method_tag", "N/A"),
                 "method_alias": record.get("method_alias"),
                 "score": float(score_val) if isinstance(score_val, (int, float)) else 0,
+                "subject_combinations": _parse_subject_combinations(record.get("subject_combinations")),
+                "selected": index == selected_index,
             })
         
         json_result = json_lib.dumps(
-            {"status": "success", "university": university, "total_records": len(results), "history": history_items},
+            {
+                "status": "success",
+                "university": university,
+                "total_records": len(results),
+                "subject_combination": requested_combination,
+                "selected_cutoff_score": _record_score(selected_record) if selected_record else None,
+                "selected_major_name": selected_record.get("major_name") if selected_record else None,
+                "selected_major_code": selected_record.get("major_code") if selected_record else None,
+                "fallback_used": fallback_used,
+                "subject_combination_found": subject_combination_found,
+                "history": history_items,
+            },
             ensure_ascii=False,
             indent=2,
         )

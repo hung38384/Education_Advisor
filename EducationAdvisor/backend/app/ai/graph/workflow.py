@@ -22,6 +22,10 @@ import json
 from pathlib import Path
 from typing import Literal
 
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # =============================================================================
 # TEMPORAL ANCHORING: "Đồng hồ sinh học" cho toàn bộ hệ thống Agent
 # Khi user không nhập năm, hệ thống tự neo vào năm hiện tại
@@ -67,7 +71,12 @@ from app.ai.prompts.system_prompts import (
 )
 
 # Import Receptionist Node (Entity Extraction & Disambiguation)
-from app.ai.nodes.receptionist import normalize_vietnamese_text, receptionist_node
+from app.ai.nodes.receptionist import (
+    canonical_subject_key,
+    merge_transcript_scores,
+    normalize_vietnamese_text,
+    receptionist_node,
+)
 
 # Import ML Recommender (Hybrid AI - TabNet)
 from app.ai.ml.ml_recommender import get_recommender
@@ -81,6 +90,50 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+def _repair_mojibake_text(text: str) -> str:
+    """Repair common UTF-8 text that was accidentally decoded as cp1252."""
+    markers = ("Ã", "Ä", "Æ", "á»", "áº", "â€™", "â€œ", "â€", "ðŸ", "Â")
+    if not any(marker in text for marker in markers):
+        return text
+
+    repaired = text
+    for _ in range(4):
+        try:
+            candidate = repaired.encode("cp1252").decode("utf-8")
+        except UnicodeError:
+            repaired_lines = []
+            changed = False
+            for line in repaired.splitlines(keepends=True):
+                if not any(marker in line for marker in markers):
+                    repaired_lines.append(line)
+                    continue
+                try:
+                    fixed_line = line.encode("cp1252").decode("utf-8")
+                except UnicodeError:
+                    repaired_lines.append(line)
+                    continue
+                repaired_lines.append(fixed_line)
+                changed = changed or fixed_line != line
+            candidate = "".join(repaired_lines)
+            if not changed:
+                break
+        if candidate == repaired:
+            break
+        repaired = candidate
+    return repaired
+
+
+class _MojibakeLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.msg = _repair_mojibake_text(record.getMessage())
+        record.args = ()
+        return True
+
+
+for _handler in logging.getLogger().handlers:
+    _handler.addFilter(_MojibakeLogFilter())
 
 
 # ============================================================================
@@ -153,12 +206,12 @@ def get_llms():
 def create_expert_agent(llm, tools, system_prompt):
     """
     Create a ReAct agent with a custom system prompt.
-    
+
     Args:
         llm: Language model
         tools: List of tools the agent can use
         system_prompt: System message template
-        
+
     Returns:
         Function that acts as an agent node
     """
@@ -241,26 +294,26 @@ UNIVERSITY_ALIAS_MAP = {
 }
 
 UNIVERSITY_DISPLAY_NAMES = {
-    "BKA": "Đại học Bách khoa Hà Nội",
-    "QSB": "Đại học Bách khoa - ĐHQG TP.HCM",
-    "QHI": "Đại học Công nghệ - ĐHQGHN",
-    "BVH": "Học viện Công nghệ Bưu chính Viễn thông",
-    "SPK": "Đại học Sư phạm Kỹ thuật TP.HCM",
-    "KHA": "Đại học Kinh tế Quốc dân",
-    "NTH": "Đại học Ngoại thương",
-    "KSA": "Đại học Kinh tế TP.HCM",
-    "TMU": "Đại học Thương mại",
-    "LPH": "Đại học Luật Hà Nội",
-    "YHB": "Đại học Y Hà Nội",
-    "DKH": "Đại học Dược Hà Nội",
-    "YDS": "Đại học Y Dược TP.HCM",
-    "QHX": "Đại học Khoa học Xã hội và Nhân văn - ĐHQGHN",
-    "QHF": "Đại học Ngoại ngữ - ĐHQGHN",
-    "SPH": "Đại học Sư phạm Hà Nội",
-    "HQT": "Học viện Ngoại giao",
-    "TCT": "Đại học Cần Thơ",
-    "DDT": "Đại học Duy Tân",
-    "DTT": "Đại học Tôn Đức Thắng",
+    "BKA": "\u0110\u1ea1i h\u1ecdc B\u00e1ch khoa H\u00e0 N\u1ed9i",
+    "QSB": "\u0110\u1ea1i h\u1ecdc B\u00e1ch khoa - \u0110HQG TP.HCM",
+    "QHI": "\u0110\u1ea1i h\u1ecdc C\u00f4ng ngh\u1ec7 - \u0110HQGHN",
+    "BVH": "H\u1ecdc vi\u1ec7n C\u00f4ng ngh\u1ec7 B\u01b0u ch\u00ednh Vi\u1ec5n th\u00f4ng",
+    "SPK": "\u0110\u1ea1i h\u1ecdc S\u01b0 ph\u1ea1m K\u1ef9 thu\u1eadt TP.HCM",
+    "KHA": "\u0110\u1ea1i h\u1ecdc Kinh t\u1ebf Qu\u1ed1c d\u00e2n",
+    "NTH": "\u0110\u1ea1i h\u1ecdc Ngo\u1ea1i th\u01b0\u01a1ng",
+    "KSA": "\u0110\u1ea1i h\u1ecdc Kinh t\u1ebf TP.HCM",
+    "TMU": "\u0110\u1ea1i h\u1ecdc Th\u01b0\u01a1ng m\u1ea1i",
+    "LPH": "\u0110\u1ea1i h\u1ecdc Lu\u1eadt H\u00e0 N\u1ed9i",
+    "YHB": "\u0110\u1ea1i h\u1ecdc Y H\u00e0 N\u1ed9i",
+    "DKH": "\u0110\u1ea1i h\u1ecdc D\u01b0\u1ee3c H\u00e0 N\u1ed9i",
+    "YDS": "\u0110\u1ea1i h\u1ecdc Y D\u01b0\u1ee3c TP.HCM",
+    "QHX": "\u0110\u1ea1i h\u1ecdc Khoa h\u1ecdc X\u00e3 h\u1ed9i v\u00e0 Nh\u00e2n v\u0103n - \u0110HQGHN",
+    "QHF": "\u0110\u1ea1i h\u1ecdc Ngo\u1ea1i ng\u1eef - \u0110HQGHN",
+    "SPH": "\u0110\u1ea1i h\u1ecdc S\u01b0 ph\u1ea1m H\u00e0 N\u1ed9i",
+    "HQT": "H\u1ecdc vi\u1ec7n Ngo\u1ea1i giao",
+    "TCT": "\u0110\u1ea1i h\u1ecdc C\u1ea7n Th\u01a1",
+    "DDT": "\u0110\u1ea1i h\u1ecdc Duy T\u00e2n",
+    "DTT": "\u0110\u1ea1i h\u1ecdc T\u00f4n \u0110\u1ee9c Th\u1eafng",
 }
 
 ADMISSION_KEYWORDS = {
@@ -278,6 +331,122 @@ BLOCKLIST_KEYWORDS = {
     "prompt", "huong dan noi bo", "noi bo he thong", "cau hinh he thong",
     "source code", "ma nguon", "core cua he thong",
 }
+
+SUBJECT_COMBINATIONS = {
+    "A00": ("To\u00e1n", "L\u00fd", "H\u00f3a"),
+    "A01": ("To\u00e1n", "L\u00fd", "Anh"),
+    "B00": ("To\u00e1n", "H\u00f3a", "Sinh"),
+    "C00": ("V\u0103n", "S\u1eed", "\u0110\u1ecba"),
+    "D01": ("To\u00e1n", "V\u0103n", "Anh"),
+    "D07": ("To\u00e1n", "H\u00f3a", "Anh"),
+}
+
+SUBJECT_DISPLAY = {
+    "To\u00e1n": "To\u00e1n",
+    "V\u0103n": "V\u0103n",
+    "Anh": "Anh",
+    "L\u00fd": "L\u00fd",
+    "H\u00f3a": "H\u00f3a",
+    "Sinh": "Sinh",
+    "S\u1eed": "S\u1eed",
+    "\u0110\u1ecba": "\u0110\u1ecba",
+}
+
+
+def _normalized_transcript(user_profile: dict) -> dict[str, float]:
+    return merge_transcript_scores(user_profile.get("transcript"), user_profile.get("academic_scores"), user_profile.get("national_exam_scores"))
+
+
+def _extract_requested_subject_combination(query: str, user_profile: dict | None = None) -> str | None:
+    profile_combo = (user_profile or {}).get("subject_combination")
+    if profile_combo:
+        return str(profile_combo).strip().upper()
+    normalized = normalize_vietnamese_text(query)
+    match = re.search(r"\b(?:khoi|to hop|tohop)?\s*(A00|A01|B00|C00|D01|D04|D07)\b", normalized, re.IGNORECASE)
+    return match.group(1).upper() if match else None
+
+
+def _query_with_profile_combination(query: str, user_profile: dict | None = None) -> str:
+    combination = _extract_requested_subject_combination(query, user_profile)
+    return f"{query} {combination}" if combination else query
+
+
+def _extract_thpt_scores_from_query(query: str) -> dict[str, float]:
+    from app.ai.nodes.receptionist import extract_scores_from_text
+
+    extracted = extract_scores_from_text(query)
+    return {
+        canonical_subject_key(key): float(value)
+        for key, value in extracted.items()
+        if canonical_subject_key(key) and isinstance(value, (int, float))
+    }
+
+
+def _best_thpt_combination(transcript: dict[str, float], requested_combination: str | None = None) -> tuple[str | None, dict[str, float], list[str]]:
+    if requested_combination:
+        combinations = [requested_combination]
+    else:
+        combinations = list(SUBJECT_COMBINATIONS.keys())
+
+    complete_candidates: list[tuple[str, dict[str, float], float]] = []
+    first_missing: tuple[str, list[str]] | None = None
+    for combination in combinations:
+        subjects = SUBJECT_COMBINATIONS.get(str(combination or "").upper())
+        if not subjects:
+            continue
+        missing = [subject for subject in subjects if subject not in transcript]
+        if not missing:
+            subject_scores = {subject: float(transcript[subject]) for subject in subjects}
+            complete_candidates.append((str(combination).upper(), subject_scores, sum(subject_scores.values())))
+        elif requested_combination and first_missing is None:
+            first_missing = (str(combination).upper(), missing)
+    if complete_candidates:
+        combination, subject_scores, _ = max(complete_candidates, key=lambda item: item[2])
+        return combination, subject_scores, []
+    if requested_combination and requested_combination in SUBJECT_COMBINATIONS:
+        combination, missing = first_missing or (requested_combination, list(SUBJECT_COMBINATIONS[requested_combination]))
+        return combination, {}, missing
+    return None, {}, []
+
+
+def _bka_tsa_ielts_bonus(ielts: float | None) -> float:
+    if ielts is None:
+        return 0.0
+    if ielts >= 7.0:
+        return 5.0
+    if ielts >= 6.5:
+        return 4.0
+    if ielts >= 6.0:
+        return 3.0
+    if ielts >= 5.5:
+        return 2.0
+    if ielts >= 5.0:
+        return 1.0
+    return 0.0
+
+
+def _kha_ielts_conversion_score(ielts: float | None) -> float:
+    if ielts is None:
+        return 0.0
+    if 7.5 <= ielts <= 9.0:
+        return 10.0
+    if ielts >= 7.0:
+        return 9.5
+    if ielts >= 6.5:
+        return 9.0
+    if ielts >= 6.0:
+        return 8.5
+    if ielts >= 5.5:
+        return 8.0
+    return 0.0
+
+
+def _is_personalized_admission_query(query: str, state: dict | None = None) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    profile = (state or {}).get("user_profile", {}) if state else {}
+    has_scores = bool(_extract_thpt_scores_from_query(query) or profile.get("transcript") or profile.get("tsa_score") or profile.get("hsa_score") or profile.get("ielts"))
+    has_target = bool(profile.get("target_major") or profile.get("target_major_name") or any(term in normalized for term in ["nganh", "major"]))
+    return has_scores and any(term in normalized for term in ["xet tuyen", "co hoi", "dang ky", "do", "truot", "tinh diem", "thpt", "tsa", "hsa", "ielts"]) and has_target
 
 
 def _get_latest_user_query(state: dict) -> str:
@@ -321,7 +490,9 @@ def _detect_mentioned_universities(query: str) -> list[str]:
 
 def _display_university_name(code: str) -> str:
     normalized_code = str(code or "").upper()
-    return UNIVERSITY_DISPLAY_NAMES.get(normalized_code) or get_university_name(normalized_code)
+    return _repair_mojibake_text(
+        UNIVERSITY_DISPLAY_NAMES.get(normalized_code) or get_university_name(normalized_code)
+    )
 
 
 def _latest_admission_year_for_lookup(state: dict) -> str:
@@ -411,6 +582,31 @@ def _extract_year_from_query(query: str) -> str | None:
     return match.group(1) if match else None
 
 
+def _resolve_lookup_method_tag(query: str, target_uni: str | None = None) -> str | None:
+    normalized = normalize_vietnamese_text(query)
+    target_uni = str(target_uni or "").upper()
+    if any(term in normalized for term in ["xet tuyen ket hop", "phuong thuc ket hop", "chung chi quoc te", "ccqt"]):
+        return "CHUNG_CHI_QUOC_TE"
+    if any(term in normalized for term in ["diem thi thpt", "thi thpt", "thpt quoc gia", "thptqg", "thpt_qg"]):
+        return "THPT_QG"
+    if any(term in normalized for term in ["tsa", "dgtd", "danh gia tu duy", "dg tu duy", "tu duy bach khoa"]):
+        return "DGTD_TSA" if target_uni == "BKA" else "KY_THI_RIENG"
+    if any(term in normalized for term in ["dgnl qg hcm", "dgnl hcm", "dhqg hcm", "dai hoc quoc gia hcm", "dai hoc quoc gia tp hcm", "vnu hcm"]):
+        return "DGNL_CHUNG"
+    if any(term in normalized for term in ["dgnl su pham", "danh gia nang luc su pham", "apt"]):
+        return "DGNL_APT"
+    if any(term in normalized for term in ["hsa", "dgnl hn", "dgnl ha noi", "dgnl dhqg hn", "dgnl dhqghn", "danh gia nang luc ha noi", "dai hoc quoc gia ha noi", "dhqg ha noi"]):
+        return "DGNL_HSA" if target_uni in {"KHA", "QHI", "QHX", "QHF", "NTH", "LPH", "HQT", "SPH"} else "DGNL_CHUNG"
+    if any(term in normalized for term in ["dgnl", "danh gia nang luc"]):
+        return "DGNL_HSA" if target_uni in {"KHA", "QHI", "QHX", "QHF", "NTH", "LPH", "HQT", "SPH"} else "DGNL_CHUNG"
+    if any(term in normalized for term in ["hoc ba", "xet hoc ba"]):
+        return "HOC_BA"
+
+    from app.utils.taxonomy_engine import get_standard_method_tag
+
+    return get_standard_method_tag(query, str(target_uni or ""))
+
+
 def _extract_compared_major_names(query: str) -> list[str]:
     normalized = normalize_vietnamese_text(query)
     normalized = re.sub(r"\b(20\d{2}|19\d{2})\b", " ", normalized)
@@ -494,6 +690,13 @@ def _is_major_all_methods_cutoff_query(query: str) -> bool:
     )
 
 
+def _is_single_major_cutoff_query(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    if _is_major_all_methods_cutoff_query(query) or _is_major_cutoff_comparison_query(query):
+        return False
+    return "diem chuan" in normalized and "nganh" in normalized
+
+
 def _extract_single_major_name_for_cutoff(query: str) -> str | None:
     normalized = normalize_vietnamese_text(query)
     normalized = re.sub(r"\b(20\d{2}|19\d{2})\b", " ", normalized)
@@ -547,6 +750,77 @@ def _format_major_all_methods_cutoffs(university_code: str, year: str, result_te
     lines.append("")
     lines.append("Lưu ý: các phương thức có thể dùng thang điểm khác nhau, nên chỉ so sánh trực tiếp khi cùng phương thức.")
     return "\n".join(lines)
+
+
+def _extract_json_payload(text: str) -> dict | None:
+    decoder = json.JSONDecoder()
+    raw = str(text or "")
+    for index, char in enumerate(raw):
+        if char != "{":
+            continue
+        try:
+            payload, _ = decoder.raw_decode(raw[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
+def _format_single_major_cutoff_result(
+    university_code: str,
+    major_code: str,
+    major_name: str | None,
+    year: str | None,
+    method_tag: str,
+    result_text: str,
+) -> str:
+    payload = _extract_json_payload(result_text)
+    display_major = major_name or major_code
+    if not payload or payload.get("status") != "success":
+        year_text = f" năm {year}" if year else ""
+        return (
+            f"Mình chưa tìm thấy điểm chuẩn ngành {display_major} của "
+            f"{_display_university_name(university_code)} ({university_code}){year_text} "
+            f"theo phương thức {method_tag}. Bạn vui lòng kiểm tra lại mã ngành, năm hoặc phương thức xét tuyển."
+        )
+
+    history = payload.get("history") or []
+    selected = next((item for item in history if item.get("selected")), None) or (history[0] if history else None)
+    cutoff = payload.get("selected_cutoff_score")
+    if cutoff is None and selected:
+        cutoff = selected.get("score")
+    if cutoff is None:
+        year_text = f" năm {year}" if year else ""
+        return (
+            f"Mình chưa tìm thấy điểm chuẩn ngành {display_major} của "
+            f"{_display_university_name(university_code)} ({university_code}){year_text} theo phương thức {method_tag}."
+        )
+
+    selected_year = selected.get("year") if selected else year
+    selected_major_name = payload.get("selected_major_name") or (selected.get("major_name") if selected else None)
+    selected_major_code = payload.get("selected_major_code") or (selected.get("major_code") if selected else None) or major_code
+    display_major = selected_major_name or display_major
+    subject_combinations = selected.get("subject_combinations") if selected else None
+    combo_text = f"\n- Tổ hợp ghi nhận: {', '.join(subject_combinations)}" if subject_combinations else ""
+    requested_combination = payload.get("subject_combination")
+    fallback_note = ""
+    if payload.get("fallback_used"):
+        if requested_combination:
+            fallback_note = (
+                f"\nLưu ý: hệ thống chưa tìm thấy bản ghi có tổ hợp {requested_combination} cho ngành/phương thức này "
+                "trong dữ liệu hiện có, nên đang hiển thị bản ghi điểm cao nhất còn lại để tham khảo."
+            )
+        else:
+            fallback_note = "\nLưu ý: hệ thống chọn bản ghi điểm cao nhất trong nhóm kết quả phù hợp để tránh lấy nhầm điểm thấp."
+
+    return (
+        f"Điểm chuẩn ngành {display_major} ({selected_major_code}) của {_display_university_name(university_code)} ({university_code}):\n"
+        f"- Năm: {selected_year}\n"
+        f"- Phương thức: {method_tag}\n"
+        f"- Điểm chuẩn: {float(cutoff):g}{combo_text}"
+        f"{fallback_note}"
+    )
 
 
 def _is_gibberish(query: str) -> bool:
@@ -657,6 +931,7 @@ def _is_eligible_major_query(query: str) -> bool:
 
 
 def _make_final_message(content: str, pending_clarification: dict | None = None) -> dict:
+    content = _repair_mojibake_text(str(content))
     return {
         "messages": [AIMessage(content=content, name="Synthesis")],
         "next_agent": "END",
@@ -724,9 +999,7 @@ def _apply_followup_to_pending(pending: dict | None, query: str, state: AgentSta
     if score is not None:
         data["score"] = score
 
-    from app.utils.taxonomy_engine import get_standard_method_tag
-
-    method_tag = get_standard_method_tag(query, str(data.get("target_university") or target_uni or ""))
+    method_tag = _resolve_lookup_method_tag(query, str(data.get("target_university") or target_uni or ""))
     if method_tag:
         data["method_tag"] = method_tag
 
@@ -829,8 +1102,9 @@ def preflight_node(state: AgentState) -> dict:
 
     if not _is_admission_related(query):
         return _make_final_message(
-            "Mình chỉ hỗ trợ các câu hỏi trong phạm vi tuyển sinh, ngành học, phương thức xét tuyển, điểm chuẩn và tư vấn chọn ngành. "
-            "Vui lòng đặt câu hỏi liên quan đến tuyển sinh đại học để mình hỗ trợ chính xác."
+            "M\u00ecnh ch\u1ec9 h\u1ed7 tr\u1ee3 c\u00e1c c\u00e2u h\u1ecfi trong ph\u1ea1m vi tuy\u1ec3n sinh, ng\u00e0nh h\u1ecdc, "
+            "ph\u01b0\u01a1ng th\u1ee9c x\u00e9t tuy\u1ec3n, \u0111i\u1ec3m chu\u1ea9n v\u00e0 t\u01b0 v\u1ea5n ch\u1ecdn ng\u00e0nh. "
+            "Vui l\u00f2ng \u0111\u1eb7t c\u00e2u h\u1ecfi li\u00ean quan \u0111\u1ebfn tuy\u1ec3n sinh \u0111\u1ea1i h\u1ecdc \u0111\u1ec3 m\u00ecnh h\u1ed7 tr\u1ee3 ch\u00ednh x\u00e1c."
         )
 
     current_uni_code = str(current_uni).upper() if current_uni else None
@@ -856,6 +1130,9 @@ def preflight_node(state: AgentState) -> dict:
             "Ngoài ra, mã ngành giữa các trường không luôn tương đương nhau; ví dụ IT1 là mã của BKA, còn UET thường dùng mã khác như CN1. "
             "Bạn vui lòng mở đúng hộp thoại của trường muốn tư vấn, hoặc nêu rõ hai ngành tương ứng cần so sánh."
         )
+
+    if _is_personalized_admission_query(query, state):
+        return {"next_agent": "receptionist"}
 
     if _is_major_all_methods_cutoff_query(query):
         if not target_uni:
@@ -901,9 +1178,7 @@ def preflight_node(state: AgentState) -> dict:
             return _make_final_message(
                 "Bạn muốn so sánh điểm chuẩn giữa các ngành của trường nào? Vui lòng chọn hoặc nhập mã trường trước."
             )
-        from app.utils.taxonomy_engine import get_standard_method_tag
-
-        method_tag = get_standard_method_tag(query, target_uni)
+        method_tag = _resolve_lookup_method_tag(query, target_uni)
         year = _extract_year_from_query(query) or (state.get("user_profile", {}) or {}).get("target_year")
         major_names = _extract_compared_major_names(query)
         if method_tag and year and len(major_names) >= 2:
@@ -990,9 +1265,7 @@ def preflight_node(state: AgentState) -> dict:
             )
 
         score = _extract_plain_score(query)
-        from app.utils.taxonomy_engine import get_standard_method_tag
-
-        method_tag = get_standard_method_tag(query, target_uni)
+        method_tag = _resolve_lookup_method_tag(query, target_uni)
         if not method_tag:
             return _make_final_message(
                 f"Mình đã hiểu bạn có khoảng {score:g} điểm và muốn biết có thể đỗ ngành nào ở {_display_university_name(target_uni)} ({target_uni}). "
@@ -1201,7 +1474,7 @@ def academic_expert_node(state: dict) -> dict:
     logger = logging.getLogger(__name__)
     logger.info("📚 Academic Expert: Retrieving context and analyzing...")
     time.sleep(3)  # Rate limiting
-    
+
     # 1. Trích xuất câu hỏi và hồ sơ
     query = ""
     for msg in state["messages"]:
@@ -1211,13 +1484,13 @@ def academic_expert_node(state: dict) -> dict:
         elif hasattr(msg, "type") and msg.type == "human":
             query = msg.content
             break
-            
+
     if not query:
         query = state["messages"][-1].content if state["messages"] else ""
-        
+
     user_profile = state.get("user_profile", {})
     user_profile_str = str(user_profile)
-    
+
     # =====================================================================
     # 2. MULTI-UNIVERSITY: Lấy thông tin trường từ user_profile + registry
     # =====================================================================
@@ -1239,7 +1512,7 @@ def academic_expert_node(state: dict) -> dict:
     target_year = str(user_profile.get("target_year", CURRENT_YEAR))
     uni_info = get_university_info(target_uni)
     uni_name = uni_info["name"]
-    
+
     logger.info(f"   🏫 Target: {uni_name} ({target_uni}) - Năm {target_year} (system clock: {CURRENT_YEAR})")
 
     # =====================================================================
@@ -1253,13 +1526,13 @@ def academic_expert_node(state: dict) -> dict:
             optimized_query = query.replace(user_term, doc_term)
             logger.info(f"   🔧 Vocabulary map: '{user_term}' → '{doc_term}'")
             break
-    
+
     retrieved_docs = search_admission_rules.invoke({
-        "query": optimized_query, 
-        "university": target_uni, 
+        "query": optimized_query,
+        "university": target_uni,
         "year": target_year
     })
-    
+
     # DEBUG log
     print(f"\n{'='*60}")
     print(f"📥 [DEBUG] DỮ LIỆU TỪ CHROMADB ({target_uni}) TRẢ VỀ CHO AI:")
@@ -1289,281 +1562,114 @@ LỆNH BẮT BUỘC:
 
     from langchain_core.messages import HumanMessage, AIMessage
     context_msg = HumanMessage(content=forced_context)
-    
+
     # 5. Gọi LLM
     result = get_expert_agents()["academic_agent"].invoke({"messages": [context_msg]})
-    
+
     final_msg = result["messages"][-1] if isinstance(result, dict) and "messages" in result else result
-    
+
     # KÝ TÊN VÀ ĐÁNH DẤU BÁO CÁO
     signed_msg = AIMessage(
-        content=f"[Báo cáo từ AcademicExpert — Trường {target_uni}]:\n{final_msg.content}", 
+        content=f"[Báo cáo từ AcademicExpert — Trường {target_uni}]:\n{final_msg.content}",
         name="AcademicExpert"
     )
     logger.info(f"   ✅ Academic Expert response added ({target_uni})")
-    
+
     called_agents = state.get("called_agents", [])
     if "AcademicExpert" not in called_agents:
         called_agents = called_agents + ["AcademicExpert"]
-    
+
     return {"messages": [signed_msg], "called_agents": called_agents}
 
 
 def data_strategist_node(state: AgentState) -> dict:
-    logger.info("📊 Data Strategist: Analyzing admission chances...")
-    time.sleep(3)  # Rate limiting
-    
-    # Extract query
-    query = ""
-    for msg in state["messages"]:
-        if isinstance(msg, tuple) and msg[0] == "user":
-            query = msg[1]
-            break
-        elif hasattr(msg, "type") and msg.type == "human":
-            query = msg.content
-            break
-    
-    if not query:
-        query = state["messages"][-1].content if state["messages"] else ""
-    
-    user_profile = state.get("user_profile", {})
-    user_profile_str = str(user_profile)
-    
-    # MULTI-UNIVERSITY: Inject university info
-    target_uni = user_profile.get("target_university")
-    if not target_uni:
-        signed_msg = AIMessage(
-            content=(
-                "[Báo cáo từ DataStrategist]:\n"
-                "Hệ thống chưa xác định được trường mục tiêu, nên không tra cứu điểm chuẩn để tránh dùng nhầm dữ liệu của trường khác."
-            ),
-            name="DataStrategist",
-        )
-        called_agents = state.get("called_agents", [])
-        if "DataStrategist" not in called_agents:
-            called_agents = called_agents + ["DataStrategist"]
-        return {"messages": [signed_msg], "called_agents": called_agents}
-    uni_info = get_university_info(target_uni)
-    uni_name = uni_info["name"]
-    
-    # TEMPORAL ANCHORING: Nếu user không nhập năm → mặc định = năm hiện tại
+    logger.info("Data Strategist: deterministic admission assessment")
+    query = _get_latest_user_query(state)
+    user_profile = state.get("user_profile", {}) or {}
+    target_uni = str(user_profile.get("target_university") or "").upper()
     target_year = str(user_profile.get("target_year", CURRENT_YEAR))
-    logger.info(f"   📅 Temporal Lock: target_year={target_year} cho {target_uni} (system clock: {CURRENT_YEAR})")
-    
-    # Chuẩn hóa tham số: Lấy major_code
-    major_code = user_profile.get("target_major", "")
-    if not major_code:
-        logger.warning("   Missing target_major; skipping cutoff comparison to avoid cross-major score lookup")
-        signed_msg = AIMessage(
-            content=(
-                f"[Báo cáo từ DataStrategist — Trường {target_uni}]:\n"
-                f"Hệ thống chưa xác định được mã ngành cụ thể cho trường {target_uni}. "
-                "Vì vậy, hệ thống không so sánh điểm chuẩn để tránh lấy nhầm điểm của ngành khác. "
-                "Vui lòng cung cấp mã ngành hoặc tên ngành rõ hơn."
-            ),
-            name="DataStrategist",
-        )
-        called_agents = state.get("called_agents", [])
-        if "DataStrategist" not in called_agents:
-            called_agents = called_agents + ["DataStrategist"]
-        return {"messages": [signed_msg], "called_agents": called_agents}
-    
-    # 🆕 LẤY ĐIỂM ĐÃ TÍNH TỪ SCORE CALCULATOR
-    calculated_details = state.get("calculated_details", {})
+    major_code = user_profile.get("target_major") or user_profile.get("target_major_code")
+    calculated_details = state.get("calculated_details", {}) or {}
     calculated_score = state.get("calculated_score")
-    
-    # =================================================================
-    # REFACTOR: Chuyển quyền quyết định 100% cho Taxonomy Engine
-    # Để đảm bảo khả năng scale lên 20+ trường, không hardcode "DGTD_TSA" hay "CHUNG_CHI_QUOC_TE".
-    # =================================================================
-    from app.utils.taxonomy_engine import get_standard_method_tag
-    confirmed_method_tag = get_standard_method_tag(query, target_uni)
-    logger.info(f"   🔍 Taxonomy Engine resolved method_tag: {confirmed_method_tag} cho trường {target_uni}")
-    
-    if not confirmed_method_tag:
-        signed_msg = AIMessage(
-            content=(
-                f"[Báo cáo từ DataStrategist — Trường {target_uni}]:\n"
-                "Hệ thống chưa xác định chắc chắn phương thức xét tuyển từ câu hỏi. "
-                "Vì vậy, hệ thống không tra cứu điểm chuẩn để tránh so sánh nhầm phương thức. "
-                "Vui lòng nêu rõ phương thức, ví dụ: THPT_QG, học bạ, TSA, HSA, hoặc xét tuyển kết hợp chứng chỉ quốc tế."
-            ),
-            name="DataStrategist",
-        )
-        called_agents = state.get("called_agents", [])
-        if "DataStrategist" not in called_agents:
-            called_agents = called_agents + ["DataStrategist"]
-        return {"messages": [signed_msg], "called_agents": called_agents}
+    method_tag = calculated_details.get("method_tag")
+    if not method_tag:
+        method_tag = _resolve_lookup_method_tag(_query_with_profile_combination(query, user_profile), target_uni)
+    subject_combination = calculated_details.get("subject_combination") or _extract_requested_subject_combination(query, user_profile)
 
-    tsa = calculated_details.get("tsa_score")
-    ielts = calculated_details.get("ielts_score")
-    bonus = calculated_details.get("ielts_bonus", 0)
-    
-    # CẢNH BÁO DEBUG: Nếu hồ sơ có điểm thi đặc thù nhưng Taxonomy Engine lại trả về xét điểm thi phổ thông
-    if confirmed_method_tag == "THPT_QG" and (tsa is not None and float(tsa) > 0):
-        logger.warning(
-            f"   ⚠️ LƯU Ý DEBUG: Taxonomy Engine trả về 'THPT_QG' nhưng hồ sơ "
-            f"có tsa={tsa}. Kiểm tra lại logic mapping của "
-            f"Taxonomy Engine cho trường {target_uni} nếu thấy bất thường."
-        )
-    
-    # Tóm tắt điểm đã tính (nếu có) — nằm NGOÀI việc resolve method_tag
-    calculation_summary = ""
-    if calculated_score is not None:
-        display_tsa = tsa if tsa is not None and str(tsa).strip() != "" else "Không có"
-        display_ielts = ielts if ielts is not None and str(ielts).strip() != "" else "Không có"
-        
-        calculation_summary = f"""
-[✅ ĐIỂM ĐÃ ĐƯỢC TÍNH TOÁN BỞI SCORE CALCULATOR]
-- Điểm TSA/ĐGTD gốc: {display_tsa}
-- Điểm IELTS: {display_ielts}
-- Phương thức xét tuyển: {confirmed_method_tag}
-- 🎯 TỔNG ĐIỂM CUỐI CÙNG (dùng để so sánh): {calculated_score}
-"""
-    
-    # Lấy báo cáo của Academic Expert
-    academic_report = ""
-    for msg in reversed(state.get("messages", [])):
-        msg_name = getattr(msg, "name", "")
-        msg_content = getattr(msg, "content", str(msg))
-        if msg_name == "AcademicExpert" or "[Báo cáo từ AcademicExpert]" in msg_content:
-            academic_report = msg_content
-            break
-    
-    # 🆕 Lấy báo cáo tính toán từ ScoreCalculator
-    score_calc_report = ""
-    for msg in reversed(state.get("messages", [])):
-        msg_name = getattr(msg, "name", "")
-        msg_content = getattr(msg, "content", str(msg))
-        if msg_name == "ScoreCalculator":
-            score_calc_report = msg_content
-            break
-            
-    # =================================================================
-    # FIX DOMAIN LOGIC: Gọi tool trực tiếp bằng Python, BỎ QUA LLM
-    # -----------------------------------------------------------------
-    # Trước đây: ReAct agent (LLM) tự gọi get_historical_scores
-    #   → LLM truyền sai method_tag (VD: THPT_QG thay vì DGTD_TSA)
-    #   → So sánh chéo thang: 83.0 (TSA/100) vs 28.53 (THPT/30) = "AN TOÀN" (SAI!)
-    # 
-    # Bây giờ: Python gọi tool trực tiếp với tham số chính xác từ Taxonomy Engine
-    #   → Đảm bảo 100% đúng method_tag, không hallucination
-    # =================================================================
-    import re
-    import json
-    
-    logger.info(f"   🎯 [Direct Call] get_historical_scores(university='{target_uni}', major='{major_code}', year='{target_year}', method_tag='{confirmed_method_tag}')")
-    
-    try:
-        tool_result = get_historical_scores.invoke({
-            "university": target_uni,
-            "major": major_code,
-            "year": target_year,
-            "method_tag": confirmed_method_tag,
-        })
-        logger.info(f"   📊 Tool result (first 300 chars): {str(tool_result)[:300]}")
-    except Exception as e:
-        logger.error(f"   ❌ Direct tool call failed: {e}")
-        tool_result = ""
-    
-    # Parse JSON từ kết quả tool (tool trả về text + JSON)
-    cutoff = None
-    result_text = str(tool_result)
-    json_start = result_text.find("{")
-    json_text = result_text[json_start:].strip() if json_start >= 0 else ""
-    if json_text:
-        try:
-            data = json.loads(json_text)
-            if data.get("status") == "success" and data.get("history"):
-                cutoff = float(data["history"][0].get("score", 0))
-                logger.info(f"   ✅ Parsed cutoff_score = {cutoff} from JSON history")
-        except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
-            logger.warning(f"   ⚠️ Failed to parse JSON history: {e}")
-    
-    # Fallback: thử regex số từ text output
-    if cutoff is None or cutoff == 0:
-        score_match = re.search(r'=\s*([\d.]+)\s*điểm', str(tool_result))
-        if score_match:
-            try:
-                cutoff = float(score_match.group(1))
-                logger.info(f"   ✅ Parsed cutoff_score = {cutoff} from text regex")
-            except ValueError:
-                pass
-    
-    # =================================================================
-    # SCALE MISMATCH GUARD: Phát hiện so sánh chéo thang điểm
-    # -----------------------------------------------------------------
-    # TSA/ĐGTD: thang 100 (điểm thường 50-95)
-    # THPT/Học bạ: thang 30 (điểm thường 15-30)
-    # Nếu calculated > 40 mà cutoff < 40 → chắc chắn sai thang!
-    # =================================================================
-    final_msg_content = ""
-    
-    if cutoff is not None and cutoff > 0 and calculated_score is not None:
-        # Guard: phát hiện sai thang điểm
-        is_scale_mismatch = (
-            (calculated_score > 40 and cutoff < 40) or  # TSA vs THPT
-            (calculated_score < 40 and cutoff > 40)      # THPT vs TSA
-        )
-        
-        if is_scale_mismatch:
-            logger.error(
-                f"   🚨 SCALE MISMATCH DETECTED! "
-                f"calculated={calculated_score} vs cutoff={cutoff} "
-                f"(method_tag={confirmed_method_tag})"
-            )
-            final_msg_content = (
-                f"⚠️ CẢNH BÁO: Hệ thống phát hiện sai lệch thang điểm!\n"
-                f"- Điểm xét tuyển của bạn: {calculated_score} (phương thức {confirmed_method_tag})\n"
-                f"- Điểm chuẩn truy xuất được: {cutoff}\n"
-                f"- Hai con số này có vẻ thuộc 2 thang điểm khác nhau.\n"
-                f"- Vui lòng kiểm tra lại phương thức xét tuyển và liên hệ bộ phận tuyển sinh."
-            )
-        else:
-            # So sánh hợp lệ — cùng thang điểm
-            diff = calculated_score - cutoff
-            
-            if diff >= 0:
-                label = "AN TOÀN"
-            elif diff >= -1.0:
-                label = "THỬ THÁCH"
-            else:
-                label = "TRƯỢT"
-                
-            final_msg_content = (
-                f"- Điểm xét tuyển của học sinh: {calculated_score}\n"
-                f"- Điểm chuẩn thực tế ({confirmed_method_tag}, năm {target_year}): {cutoff}\n"
-                f"- Chênh lệch: {diff:.2f}\n"
-                f"- Đánh giá cơ hội đỗ: BẮT BUỘC DÁN NHÃN **{label}**"
-            )
-            logger.info(f"   ✅ Comparison: {calculated_score} vs {cutoff} = {label} (diff={diff:.2f})")
-    
-    elif cutoff is None or cutoff == 0:
-        final_msg_content = (
-            f"Hệ thống không tìm thấy điểm chuẩn phương thức {confirmed_method_tag} "
-            f"năm {target_year} cho trường {target_uni} ngành {major_code}. "
-            f"Không thể đánh giá cơ hội đỗ."
-        )
-        logger.warning(f"   ⚠️ No cutoff found for {confirmed_method_tag}")
-    else:
-        # calculated_score is None — chưa có điểm tính toán
-        final_msg_content = (
-            f"Thông tin điểm chuẩn {confirmed_method_tag} năm {target_year}: {cutoff}\n"
-            f"(Chưa có điểm xét tuyển của học sinh để so sánh)"
-        )
-            
-    signed_msg = AIMessage(
-        content=f"[Báo cáo từ DataStrategist — Trường {target_uni}]:\n{final_msg_content}", 
-        name="DataStrategist"
-    )
-    logger.info(f"   ✅ Data Strategist response added ({target_uni})")
-    
     called_agents = state.get("called_agents", [])
     if "DataStrategist" not in called_agents:
         called_agents = called_agents + ["DataStrategist"]
-    
-    return {"messages": [signed_msg], "called_agents": called_agents}
 
+    def _message(content: str, assessment: dict | None = None) -> dict:
+        payload = {"messages": [AIMessage(content=f"[Bao cao tu DataStrategist - Truong {target_uni}]:\n{content}", name="DataStrategist")], "called_agents": called_agents}
+        if assessment is not None:
+            payload["admission_assessment"] = assessment
+        return payload
+
+    if calculated_score is None:
+        missing = calculated_details.get("missing_subjects") or []
+        if missing:
+            return _message(f"Khong du mon/tổ hợp để tính điểm xét tuyển. Thiếu: {', '.join(missing)}.")
+        return _message("Chua co diem xet tuyen deterministic de so sanh diem chuan.")
+    if not target_uni or not major_code or not method_tag:
+        return _message("Thieu truong, ma nganh hoac phuong thuc xet tuyen nen khong tra diem chuan.")
+
+    try:
+        tool_args = {"university": target_uni, "major": major_code, "year": target_year, "method_tag": method_tag}
+        if subject_combination:
+            tool_args["subject_combination"] = subject_combination
+        tool_result = get_historical_scores.invoke(tool_args)
+    except Exception as exc:
+        logger.error("get_historical_scores failed: %s", exc, exc_info=True)
+        return _message(f"Loi tra cuu diem chuan: {exc}")
+
+    result_text = str(tool_result)
+    payload = None
+    json_start = result_text.find("{")
+    if json_start >= 0:
+        try:
+            payload = json.loads(result_text[json_start:])
+        except json.JSONDecodeError:
+            payload = None
+    if not payload or payload.get("status") != "success":
+        return _message("Khong tim thay diem chuan phu hop de so sanh.")
+
+    cutoff = payload.get("selected_cutoff_score")
+    if cutoff is None:
+        selected = next((item for item in payload.get("history", []) if item.get("selected")), None)
+        cutoff = selected.get("score") if selected else None
+    if cutoff is None:
+        return _message("Khong tim thay selected_cutoff_score trong ket qua diem chuan.")
+
+    cutoff = float(cutoff)
+    student_score = float(calculated_score)
+    diff = student_score - cutoff
+    if diff >= 0:
+        label = "AN TO\u00c0N"
+    elif diff >= -1:
+        label = "TH\u1eec TH\u00c1CH"
+    else:
+        label = "TR\u01af\u1ee2T"
+
+    assessment = {
+        "student_score": student_score,
+        "cutoff_score": cutoff,
+        "diff": diff,
+        "label": label,
+        "method_tag": method_tag,
+        "year": target_year,
+        "university": target_uni,
+        "major_code": str(major_code),
+        "subject_combination": subject_combination,
+        "fallback_used": bool(payload.get("fallback_used")),
+    }
+    content = (
+        f"Diem xet tuyen cua hoc sinh: {student_score}\n"
+        f"Diem chuan selected ({method_tag}, nam {target_year}): {cutoff}\n"
+        f"Chenh lech: {diff:.2f}\n"
+        f"Ket luan: {label}"
+    )
+    return _message(content, assessment)
 
 class ScoreCalculationResult(BaseModel):
     extracted_formula: str = Field(description="Công thức tính điểm được trích xuất từ quy chế. Ghi rõ các thành phần điểm và hệ số nếu có.")
@@ -1574,7 +1680,7 @@ class ScoreCalculationResult(BaseModel):
 def score_calculator_node(state: AgentState) -> dict:
     """
     🧮 Score Calculator Node - Dynamic Calculation Bridge using LLM Structured Output
-    
+
     Trách nhiệm:
     1. Trích xuất điểm từ hồ sơ học sinh
     2. Tìm công thức xét tuyển từ ChromaDB dựa trên trường/phương thức
@@ -1585,7 +1691,7 @@ def score_calculator_node(state: AgentState) -> dict:
     logger = logging.getLogger(__name__)
     logger.info("🧮 Score Calculator: Tính toán điểm xét tuyển...")
     time.sleep(3)  # Rate limiting
-    
+
     # 1. Trích xuất dữ liệu từ hồ sơ
     user_profile = state.get("user_profile", {})
     target_uni = user_profile.get("target_university")
@@ -1608,7 +1714,7 @@ def score_calculator_node(state: AgentState) -> dict:
         }
     target_uni = str(target_uni)
     target_year = str(user_profile.get("target_year", CURRENT_YEAR))
-    
+
     # Prefer values provided in the user's latest question; fall back to profile
     query_text = ""
     for msg in reversed(state.get("messages", [])):
@@ -1622,6 +1728,7 @@ def score_calculator_node(state: AgentState) -> dict:
     import re
     assessment_from_query = None
     tsa_from_query = None
+    hsa_from_query = None
     ielts_from_query = None
     if query_text:
         # Try to extract TSA from explicit mention first
@@ -1656,8 +1763,16 @@ def score_calculator_node(state: AgentState) -> dict:
             except Exception:
                 ielts_from_query = None
 
+        match_hsa = re.search(r"(?:HSA|ĐGNL|DGNL|đánh giá năng lực|danh gia nang luc)[^\d]*(\d+(?:\.\d+)?)", query_text, re.IGNORECASE)
+        if match_hsa:
+            try:
+                hsa_from_query = float(match_hsa.group(1))
+                logger.info(f"   📖 Trích xuất từ query: HSA/ĐGNL = {hsa_from_query}")
+            except Exception:
+                hsa_from_query = None
+
     # Prefer query values when present; otherwise use profile
-    if assessment_from_query is not None:
+    if assessment_from_query is not None and hsa_from_query is None:
         tsa_score = assessment_from_query
         tsa_source = "query"
     elif tsa_from_query is not None:
@@ -1675,10 +1790,72 @@ def score_calculator_node(state: AgentState) -> dict:
         ielts_source = "profile" if user_profile.get("ielts") is not None else "unknown"
 
     logger.info(f"   📊 Dữ liệu học sinh: TSA={tsa_score} (from {tsa_source}), IELTS={ielts_score} (from {ielts_source})")
-    
+
     # 2. Tìm công thức xét tuyển và bảng điểm IELTS từ ChromaDB
     logger.info(f"   🔍 Tìm quy chế và bảng quy đổi điểm từ ChromaDB ({target_uni})...")
-    
+
+    hsa_score = hsa_from_query if hsa_from_query is not None else user_profile.get("hsa_score")
+    resolved_method_tag = _resolve_lookup_method_tag(_query_with_profile_combination(query_text, user_profile), target_uni)
+    if target_uni.upper() == "KHA" and hsa_score is not None and ielts_score is not None:
+        resolved_method_tag = "CHUNG_CHI_QUOC_TE"
+
+    def _score_return(report: str, total: float | None, details: dict) -> dict:
+        calculation_msg = AIMessage(content=report, name="ScoreCalculator")
+        called_agents = state.get("called_agents", [])
+        if "ScoreCalculator" not in called_agents:
+            called_agents = called_agents + ["ScoreCalculator"]
+        return {"messages": [calculation_msg], "called_agents": called_agents, "calculated_score": total, "calculated_details": details}
+
+    transcript = _normalized_transcript(user_profile)
+    transcript.update(_extract_thpt_scores_from_query(query_text))
+    requested_combination = _extract_requested_subject_combination(query_text, user_profile)
+
+    if resolved_method_tag == "THPT_QG":
+        normalized_major_name = normalize_vietnamese_text(str(user_profile.get("target_major_name") or ""))
+        is_bka_textile = (
+            target_uni.upper() == "BKA"
+            and (
+                str(user_profile.get("target_major") or "").upper() == "TX1"
+                or "det may" in normalized_major_name
+                or "detmay" in normalized_major_name
+            )
+        )
+        if is_bka_textile and not requested_combination:
+            bka_complete = []
+            for candidate in ("A00", "A01", "D07"):
+                candidate_subjects = SUBJECT_COMBINATIONS[candidate]
+                if all(subject in transcript for subject in candidate_subjects):
+                    bka_complete.append(candidate)
+            if not bka_complete:
+                missing = sorted({subject for candidate in ("A00", "A01", "D07") for subject in SUBJECT_COMBINATIONS[candidate] if subject not in transcript})
+                report = f"[SCORE CALCULATION REPORT]\nPhuong thuc: THPT_QG\nKhong du mon de tinh cac to hop BKA A00/A01/D07. Thieu: {', '.join(missing)}.\nKhong tu lay Van de tinh D01 khi nganh khong xet D01."
+                return _score_return(report, None, {"method_tag": "THPT_QG", "subject_combination": None, "subjects": {}, "missing_subjects": missing, "ielts_used": False, "total_score": None})
+            requested_combination = max(
+                bka_complete,
+                key=lambda combo: sum(float(transcript[subject]) for subject in SUBJECT_COMBINATIONS[combo])
+            )
+        combination, subjects, missing = _best_thpt_combination(transcript, requested_combination)
+        if missing:
+            report = f"[SCORE CALCULATION REPORT]\nPhuong thuc: THPT_QG\nTo hop: {combination}\nKhong du mon de tinh diem. Thieu: {', '.join(missing)}.\nIELTS chi la thong tin ho so, khong dung de thay diem Anh THPT."
+            return _score_return(report, None, {"method_tag": "THPT_QG", "subject_combination": combination, "subjects": subjects, "missing_subjects": missing, "ielts_used": False, "total_score": None})
+        if combination and subjects:
+            total_score = sum(subjects.values())
+            report = f"[SCORE CALCULATION REPORT]\nPhuong thuc: THPT_QG\nTo hop: {combination}\nMon tinh diem: {subjects}\nIELTS khong duoc dung trong phuong thuc xet diem thi THPT thuan.\nTong diem xet tuyen: {total_score}"
+            return _score_return(report, total_score, {"method_tag": "THPT_QG", "subject_combination": combination, "subjects": subjects, "ielts_used": False, "total_score": total_score})
+
+    if target_uni.upper() == "BKA" and resolved_method_tag == "DGTD_TSA":
+        tsa_value = float(tsa_score) if tsa_score is not None else None
+        bonus = _bka_tsa_ielts_bonus(float(ielts_score)) if ielts_score is not None else 0.0
+        total_score = tsa_value + bonus if tsa_value is not None else None
+        report = f"[SCORE CALCULATION REPORT]\nPhuong thuc: DGTD_TSA\nTSA: {tsa_value}\nIELTS: {ielts_score}; bonus: {bonus}\nTong diem xet tuyen: {total_score}"
+        return _score_return(report, total_score, {"method_tag": "DGTD_TSA", "tsa_score": tsa_value, "hsa_score": None, "ielts_score": ielts_score, "ielts_bonus": bonus, "total_score": total_score})
+
+    if target_uni.upper() == "KHA" and resolved_method_tag == "CHUNG_CHI_QUOC_TE" and hsa_score is not None:
+        hsa_converted = (float(hsa_score) * 30 / 150) * (2 / 3)
+        ielts_converted = _kha_ielts_conversion_score(float(ielts_score)) if ielts_score is not None else 0.0
+        total_score = hsa_converted + ielts_converted
+        report = f"[SCORE CALCULATION REPORT]\nPhuong thuc: CHUNG_CHI_QUOC_TE\nHSA quy doi: ({hsa_score} * 30 / 150) * (2/3) = {hsa_converted}\nIELTS quy doi: {ielts_score} = {ielts_converted}\nTong diem xet tuyen: {total_score}"
+        return _score_return(report, total_score, {"method_tag": "CHUNG_CHI_QUOC_TE", "hsa_score": float(hsa_score), "hsa_converted": hsa_converted, "ielts_score": ielts_score, "ielts_converted": ielts_converted, "total_score": total_score})
     formula_query = f"Công thức tính điểm xét tuyển của {target_uni} năm {target_year}"
     formula_rules = search_admission_rules.invoke({
         "query": formula_query,
@@ -1692,11 +1869,11 @@ def score_calculator_node(state: AgentState) -> dict:
         "university": target_uni,
         "year": target_year
     })
-    
+
     admission_rules = formula_rules + "\n\n--- THÔNG TIN QUY ĐỔI/THƯỞNG IELTS ---\n\n" + ielts_rules
-    
+
     logger.info(f"   📋 Đã lấy tài liệu quy chế để tính toán")
-    
+
     # Lấy báo cáo của Academic Expert để tránh ScoreCalculator bị ảo giác
     academic_report = ""
     for msg in reversed(state.get("messages", [])):
@@ -1739,7 +1916,7 @@ HƯỚNG DẪN BẮT BUỘC:
     try:
         structured_llm = get_llms()["strict_llm"].with_structured_output(ScoreCalculationResult)
         result = structured_llm.invoke(prompt)
-        
+
         total_score = result.total_score
         calculation_report = f"""
 [📊 SCORE CALCULATION REPORT]
@@ -1770,16 +1947,15 @@ Dùng chính xác số {total_score} để so sánh với điểm chuẩn.
         total_score = None
 
     # 4. Lưu kết quả vào state
-    from langchain_core.messages import AIMessage
     calculation_msg = AIMessage(
         content=calculation_report,
         name="ScoreCalculator"
     )
-    
+
     called_agents = state.get("called_agents", [])
     if "ScoreCalculator" not in called_agents:
         called_agents = called_agents + ["ScoreCalculator"]
-    
+
     return {
         "messages": [calculation_msg],
         "called_agents": called_agents,
@@ -1802,7 +1978,7 @@ def lookup_agent_node(state: AgentState) -> dict:
     Luồng này bỏ qua Synthesis và đi thẳng đến END.
     """
     logger.info("🔎 LookupAgent: Đang xử lý tra cứu nhanh...")
-    
+
     # Dùng Gemini LLM để test (Groq gặp vấn đề HTTP 400)
     tools = [search_admission_rules, get_historical_scores]
     lookup_agent = create_expert_agent(
@@ -1810,21 +1986,21 @@ def lookup_agent_node(state: AgentState) -> dict:
         tools=tools,
         system_prompt=LOOKUP_AGENT_PROMPT,
     )
-    
+
     # Log query để debug - phải lấy từ state["messages"] đúng cách
     user_query = ""
     messages = state.get("messages", [])
-    
+
     # Try to find user query - state["messages"] có thể là tuple hoặc BaseMessage
     if messages:
         if isinstance(messages[0], tuple) and messages[0][0] == "user":
             user_query = messages[0][1]
         elif hasattr(messages[0], "content"):
             user_query = messages[0].content
-    
+
     logger.info(f"   📝 Query: {user_query}")
     logger.info(f"   🔧 Available tools: {[t.name for t in tools]}")
-    
+
     user_profile = state.get("user_profile", {}) or {}
     target_uni = user_profile.get("target_university") or state.get("target_university")
     if target_uni and messages:
@@ -1842,7 +2018,7 @@ def lookup_agent_node(state: AgentState) -> dict:
             messages = [("user", context)] + list(messages)
 
     result = lookup_agent.invoke({"messages": messages})
-    
+
     # Log all messages to debug tool calls
     if isinstance(result, dict) and "messages" in result:
         logger.info(f"   📊 Agent trả về {len(result['messages'])} messages")
@@ -1850,15 +2026,14 @@ def lookup_agent_node(state: AgentState) -> dict:
             msg_name = getattr(msg, "name", "")
             msg_type = getattr(msg, "type", "")
             logger.info(f"      [{i}] {msg_type} (name={msg_name})")
-    
+
     final_msg = result["messages"][-1] if isinstance(result, dict) and "messages" in result else result
-    
-    from langchain_core.messages import AIMessage
-    
+
+
     # In ra nội dung để debug
     final_content = getattr(final_msg, "content", str(final_msg))
     logger.info(f"   💬 Final response: {final_content[:200]}")
-    
+
     signed_msg = AIMessage(
         content=f"[Báo cáo từ LookupAgent]:\n{final_content}",
         name="LookupAgent"
@@ -1866,7 +2041,7 @@ def lookup_agent_node(state: AgentState) -> dict:
     called_agents = state.get("called_agents", [])
     if "LookupAgent" not in called_agents:
         called_agents = called_agents + ["LookupAgent"]
-    
+
     logger.info("   ✅ LookupAgent hoàn tất, đi thẳng đến END")
     return {"messages": [signed_msg], "called_agents": called_agents}
 
@@ -1885,20 +2060,23 @@ class RouteResponse(BaseModel):
 def supervisor_node(state: AgentState) -> dict:
     """
     Supervisor node - Routes queries to appropriate agents.
-    
-    Routing Logic:
-    1. Detect simple factual lookups → LookupAgent (Fast Lane)
-    2. Otherwise → Sequential routing: CareerProfiler → AcademicExpert → ScoreCalculator → DataStrategist → FINISH (Slow Lane)
+    Personalized admission requests must stay on the slow lane so ScoreCalculator
+    and DataStrategist can run deterministic scoring/comparison.
     """
-    logger.info("🧑‍💼 Supervisor analyzing request...")
-    time.sleep(3)  # Rate limiting: 3 seconds delay
-    
-    # =========================================================================
-    # BƯỚC 1: PHÁT HIỆN CÂU HỎI TRA CỨU ĐƠN THUẦN (FAST LANE)
-    # =========================================================================
+    logger.info("Supervisor analyzing request...")
+    time.sleep(3)
+
     called_agents = state.get("called_agents", [])
-    
-    # Lấy câu hỏi gốc
+    user_profile = state.get("user_profile", {}) or {}
+    has_target_major = bool(user_profile.get("target_major") or user_profile.get("target_major_name"))
+    has_admission_scores = bool(
+        user_profile.get("transcript")
+        or user_profile.get("scores")
+        or user_profile.get("ielts") is not None
+        or user_profile.get("tsa_score") is not None
+        or user_profile.get("hsa_score") is not None
+    )
+
     user_query = ""
     for msg in state.get("messages", []):
         if isinstance(msg, tuple) and msg[0] == "user":
@@ -1907,61 +2085,75 @@ def supervisor_node(state: AgentState) -> dict:
         elif hasattr(msg, "type") and msg.type == "human":
             user_query = msg.content
             break
-    
-    # Nếu chưa gọi bất kỳ agent nào, kiểm tra xem là tra cứu hay tư vấn
-    if not called_agents and user_query:
-        # Keywords cho câu hỏi tra cứu đơn thuần (Factual Lookup)
-        lookup_keywords = [
-            "điểm chuẩn", "điểm chính thức", "điểm tối thiểu", "passing score",
-            "chỉ tiêu tuyển sinh", "quota", "năng lực", "capacity",
-            "ngành nào", "khối nào", "xét tuyển", "tuyển sinh",
-            "quy chế", "quy định", "regulation", "admission rules",
-            "hạn chót", "deadline", "deadline",
-            "yêu cầu", "requirement", "điều kiện", "condition"
+
+    if user_query and has_target_major and _is_single_major_cutoff_query(user_query):
+        target_uni = str(user_profile.get("target_university") or state.get("target_university") or "").upper()
+        major_code = user_profile.get("target_major_code") or user_profile.get("target_major")
+        major_name = user_profile.get("target_major_name")
+        year = _extract_year_from_query(user_query) or user_profile.get("target_year")
+        method_tag = _resolve_lookup_method_tag(user_query, target_uni)
+        if target_uni and major_code and method_tag:
+            logger.info(
+                "Deterministic cutoff lookup | university=%s | major=%s | year=%s | method=%s | query=%s",
+                target_uni,
+                major_code,
+                year,
+                method_tag,
+                normalize_vietnamese_text(user_query),
+            )
+            result = get_historical_scores.invoke(
+                {
+                    "university": target_uni,
+                    "major": str(major_code),
+                    "year": str(year) if year else None,
+                    "method_tag": method_tag,
+                    "subject_combination": _extract_requested_subject_combination(user_query, user_profile),
+                }
+            )
+            return _make_final_message(
+                _format_single_major_cutoff_result(
+                    target_uni,
+                    str(major_code),
+                    str(major_name) if major_name else None,
+                    str(year) if year else None,
+                    method_tag,
+                    result,
+                )
+            )
+
+    # Only pure factual lookups may use LookupAgent. Once Receptionist has a
+    # target major plus scores, this is an admission assessment, not lookup.
+    if not called_agents and user_query and not (has_target_major and has_admission_scores):
+        normalized_query = normalize_vietnamese_text(user_query)
+        lookup_terms = [
+            "diem chuan", "diem chinh thuc", "chi tieu", "quy che",
+            "quy dinh", "deadline", "han chot", "phuong thuc tuyen sinh",
         ]
-        
-        # Dấu hiệu câu hỏi TƯ VẤN CÁ NHÂN HÓA (Personalized Counseling)
-        personalized_keywords = [
-            "tôi có", "em có", "học sinh có", "profile",
-            "IELTS", "TOEFL", "MBTI", "tính cách", "personality",
-            "điểm THPT", "transcript", "GPA", "hoạch định", "planning",
-            "tương lai", "future", "cho em", "cho tôi", "lựa chọn", "suggestion"
+        personalized_terms = [
+            "em co", "toi co", "diem thpt", "ielts", "tsa", "hsa",
+            "dang ky xet tuyen", "co hoi do", "tinh diem",
         ]
-        
-        query_lower = user_query.lower()
-        
-        # Kiểm tra xem câu hỏi có phải TRA CỨU ĐƠN THUẦN không
-        is_lookup = any(kw in query_lower for kw in lookup_keywords)
-        is_personalized = any(kw in query_lower for kw in personalized_keywords)
-        
-        # Nếu là tra cứu đơn thuần VÀ KHÔNG phải tư vấn cá nhân hóa → LookupAgent
+        is_lookup = any(term in normalized_query for term in lookup_terms)
+        is_personalized = any(term in normalized_query for term in personalized_terms)
         if is_lookup and not is_personalized:
-            logger.info(f"   🚀 Detected FACTUAL LOOKUP → Routing to LookupAgent (Fast Lane)")
-            logger.info(f"      Query: {user_query[:100]}...")
+            logger.info("Detected factual lookup -> routing to LookupAgent")
+            logger.info(f"Query: {user_query[:100]}...")
             return {"next_agent": "LookupAgent"}
-    
-    # =========================================================================
-    # BƯỚC 2: TUẦN TỰ ĐỊNH TUYẾN (SLOW LANE)
-    # =========================================================================
-    logger.info(f"   🚀 Detected PERSONALIZED COUNSELING → Slow Lane")
-    
-    # Sequential routing: define the order (includes ScoreCalculator)
-    agent_sequence = ["CareerProfiler", "AcademicExpert", "ScoreCalculator", "DataStrategist"]
-    
-    # Find next agent to call
+
+    logger.info("Detected personalized admission flow -> slow lane")
+    agent_sequence = ["AcademicExpert", "ScoreCalculator", "DataStrategist"] if has_target_major else ["CareerProfiler", "AcademicExpert", "ScoreCalculator", "DataStrategist"]
+
     next_agent = None
     for agent in agent_sequence:
         if agent not in called_agents:
             next_agent = agent
             break
-    
-    # If all agents have been called, finish
+
     if next_agent is None:
         next_agent = "FINISH"
-    
-    logger.info(f"   📋 Routing to: {next_agent}")
-    logger.info(f"      (Already called: {called_agents})")
-    
+
+    logger.info(f"Routing to: {next_agent}")
+    logger.info(f"Already called: {called_agents}")
     return {"next_agent": next_agent}
 
 
@@ -2042,7 +2234,54 @@ def synthesis_node(state: AgentState) -> dict:
     """
     logger.info("✨ Synthesizing final response...")
     time.sleep(3)  # Rate limiting
-    
+    assessment = state.get("admission_assessment")
+    if assessment:
+        major_label = (state.get("user_profile", {}) or {}).get("target_major_name") or assessment.get("major_code") or "ng\u00e0nh m\u1ee5c ti\u00eau"
+        university = assessment.get("university") or (state.get("user_profile", {}) or {}).get("target_university") or "tr\u01b0\u1eddng m\u1ee5c ti\u00eau"
+        method_tag = assessment.get("method_tag") or "kh\u00f4ng x\u00e1c \u0111\u1ecbnh"
+        combination = assessment.get("subject_combination")
+        method_text = f"{method_tag} theo t\u1ed5 h\u1ee3p {combination}" if combination else str(method_tag)
+        student_score = float(assessment.get("student_score") or 0)
+        cutoff_score = float(assessment.get("cutoff_score") or 0)
+        diff = float(assessment.get("diff") or (student_score - cutoff_score))
+        year = assessment.get("year") or "kh\u00f4ng x\u00e1c \u0111\u1ecbnh"
+        label = assessment.get("label") or "CH\u01afA X\u00c1C \u0110\u1ecaNH"
+
+        normalized_label = normalize_vietnamese_text(str(label))
+        if normalized_label in {"truot", "truot"}:
+            conclusion = (
+                "V\u1edbi m\u1ee9c \u0111i\u1ec3m hi\u1ec7n t\u1ea1i, l\u1ef1a ch\u1ecdn n\u00e0y r\u1ea5t kh\u00f3. "
+                "B\u1ea1n \u0111ang th\u1ea5p h\u01a1n \u0111i\u1ec3m chu\u1ea9n kh\u00e1 nhi\u1ec1u, n\u00ean n\u00ean c\u00e2n nh\u1eafc "
+                "ph\u01b0\u01a1ng th\u1ee9c kh\u00e1c, ng\u00e0nh kh\u00e1c ho\u1eb7c th\u1ee9 t\u1ef1 nguy\u1ec7n v\u1ecdng d\u1ef1 ph\u00f2ng."
+            )
+        elif normalized_label in {"thu thach", "thu_thach"}:
+            conclusion = (
+                "\u0110\u00e2y l\u00e0 l\u1ef1a ch\u1ecdn c\u00f3 t\u00ednh c\u1ea1nh tranh cao. "
+                "\u0110i\u1ec3m c\u1ee7a b\u1ea1n \u0111ang s\u00e1t m\u1ee9c \u0111i\u1ec3m chu\u1ea9n, n\u00ean c\u1ea7n chu\u1ea9n b\u1ecb th\u00eam ph\u01b0\u01a1ng \u00e1n d\u1ef1 ph\u00f2ng."
+            )
+        else:
+            conclusion = (
+                "\u0110i\u1ec3m c\u1ee7a b\u1ea1n \u0111\u1ea1t ho\u1eb7c v\u01b0\u1ee3t \u0111i\u1ec3m chu\u1ea9n tham chi\u1ebfu. "
+                "B\u1ea1n c\u00f3 th\u1ec3 t\u1ef1 tin h\u01a1n khi s\u1eafp x\u1ebfp nguy\u1ec7n v\u1ecdng."
+            )
+
+        fallback_note = ""
+        if assessment.get("fallback_used") and not combination:
+            fallback_note = "\n\n(L\u01b0u \u00fd: H\u1ec7 th\u1ed1ng \u0111ang so s\u00e1nh v\u1edbi \u0111i\u1ec3m chu\u1ea9n cao nh\u1ea5t c\u1ee7a ng\u00e0nh do ch\u01b0a c\u00f3 \u0111\u1ee7 d\u1eef li\u1ec7u t\u1ed5 h\u1ee3p m\u00f4n c\u1ee5 th\u1ec3 c\u1ee7a b\u1ea1n)."
+        final_response = (
+            "Xin ch\u00e0o! M\u00ecnh \u0111\u00e3 ki\u1ec3m tra l\u1ea1i theo d\u1eef li\u1ec7u t\u00ednh to\u00e1n c\u1ee7a h\u1ec7 th\u1ed1ng.\n\n"
+            f"Ng\u00e0nh m\u1ee5c ti\u00eau: {major_label} t\u1ea1i {university}.\n\n"
+            "K\u1ebft qu\u1ea3 \u0111i\u1ec3m x\u00e9t tuy\u1ec3n:\n"
+            f"- Ph\u01b0\u01a1ng th\u1ee9c: {method_text}\n"
+            f"- \u0110i\u1ec3m x\u00e9t tuy\u1ec3n c\u1ee7a b\u1ea1n: {student_score:g}\n\n"
+            "\u0110\u00e1nh gi\u00e1 c\u01a1 h\u1ed9i:\n"
+            f"- \u0110i\u1ec3m chu\u1ea9n tham chi\u1ebfu n\u0103m {year}: {cutoff_score:g}\n"
+            f"- Ch\u00eanh l\u1ec7ch: {diff:.2f}\n"
+            f"- K\u1ebft lu\u1eadn: {label}. {conclusion}"
+            f"{fallback_note}"
+        )
+        return {"messages": [AIMessage(content=final_response, name="Synthesis")]}
+
     # 1. Trích xuất câu hỏi gốc của người dùng để Synthesis Agent nắm bối cảnh
     user_query = ""
     for msg in state.get("messages", []):
@@ -2052,7 +2291,7 @@ def synthesis_node(state: AgentState) -> dict:
         elif hasattr(msg, "type") and msg.type == "human":
             user_query = msg.content
             break
-            
+
     if not user_query and state.get("messages"):
         last_msg = state["messages"][0]
         user_query = getattr(last_msg, "content", str(last_msg))
@@ -2065,12 +2304,22 @@ def synthesis_node(state: AgentState) -> dict:
             if msg.name == "DataStrategist":
                 data_strategist_report = str(msg.content)
             expert_responses.append(f"--- BÁO CÁO TỪ {msg.name.upper()} ---\n{msg.content}")
-            
+
+    normalized_data_report = normalize_vietnamese_text(data_strategist_report)
+    if any(term in normalized_data_report for term in ["khong du mon", "chua co diem xet tuyen deterministic"]):
+        cleaned_report = re.sub(r"^\[[^\]\n]{0,120}\]:\s*", "", data_strategist_report.strip())
+        final_response = (
+            "M\u00ecnh ch\u01b0a th\u1ec3 t\u00ednh v\u00e0 so s\u00e1nh c\u01a1 h\u1ed9i \u0111\u1ed7 cho h\u1ed3 s\u01a1 n\u00e0y theo c\u00e1ch deterministic.\n\n"
+            f"{cleaned_report}\n\n"
+            "H\u1ec7 th\u1ed1ng kh\u00f4ng d\u00f9ng IELTS \u0111\u1ec3 thay m\u00f4n trong ph\u01b0\u01a1ng th\u1ee9c THPT thu\u1ea7n v\u00e0 kh\u00f4ng t\u1ef1 l\u1ea5y t\u1ed5 h\u1ee3p m\u00f4n kh\u00f4ng \u0111\u01b0\u1ee3c ng\u00e0nh x\u00e9t tuy\u1ec3n."
+        )
+        return {"messages": [AIMessage(content=final_response, name="Synthesis")]}
+
     if not expert_responses:
         final_response = "Xin lỗi, hệ thống không thu thập được đủ báo cáo từ các chuyên gia để đưa ra câu trả lời."
     else:
         combined_response = "\n\n".join(expert_responses)
-        
+
         # 3. Prompt tổng hợp với Bố cục rõ ràng
         synthesis_prompt = f"""Bạn là chuyên gia tư vấn tuyển sinh thân thiện, chuyên nghiệp và thấu cảm.
 Nhiệm vụ: Đọc câu hỏi của học sinh và tổng hợp các báo cáo chuyên gia thô cứng bên dưới thành MỘT bức thư tư vấn hoàn chỉnh, logic và dễ hiểu.
@@ -2080,18 +2329,18 @@ CÂU HỎI CỦA HỌC SINH:
 
 QUY TẮC BẮT BUỘC KHẮT KHE:
 1. NGÔN NGỮ TỰ NHIÊN: Khi nhận được kết quả phân loại từ Data Strategist, TUYỆT ĐỐI KHÔNG lặp lại các lệnh nội bộ như "BẮT BUỘC DÁN NHÃN". Hãy chuyển hóa thành lời khuyên thấu cảm:
-   - Nếu là AN TOÀN -> "Với mức điểm này, cơ hội đỗ của bạn ở ngưỡng **Rất An Toàn** 🎉. Bạn hoàn toàn có thể tự tin đặt nguyện vọng."
-   - Nếu là THỬ THÁCH -> "Đây là một lựa chọn **có tính cạnh tranh cao** ⚡. Điểm của bạn đang sát mức điểm chuẩn, hãy chuẩn bị thêm phương án dự phòng nhé."
-   - Nếu là TRƯỢT -> "Với mức điểm hiện tại, ngành này sẽ **rất khó khăn** 😥. Chênh lệch điểm khá lớn, bạn nên xem xét các phương thức khác hoặc tìm ngành thay thế."
+   - Nếu là AN_TOAN -> "Với mức điểm này, cơ hội đỗ của bạn ở ngưỡng **Rất An Toàn** 🎉. Bạn hoàn toàn có thể tự tin đặt nguyện vọng."
+   - Nếu là THU_THACH -> "Đây là một lựa chọn **có tính cạnh tranh cao** ⚡. Điểm của bạn đang sát mức điểm chuẩn, hãy chuẩn bị thêm phương án dự phòng nhé."
+   - Nếu là TRUOT -> "Với mức điểm hiện tại, ngành này sẽ **rất khó khăn** 😥. Chênh lệch điểm khá lớn, bạn nên xem xét các phương thức khác hoặc tìm ngành thay thế."
 2. TÔN TRỌNG SỐ LIỆU TUYỆT ĐỐI: Dùng ĐÚNG số điểm xét tuyển (từ ScoreCalculator) và điểm chuẩn (từ DataStrategist). KHÔNG tự tính lại, KHÔNG làm tròn sai, KHÔNG tự bịa tỷ lệ phần trăm (%).
-3. XỬ LÝ THIẾU DỮ LIỆU: 
+3. XỬ LÝ THIẾU DỮ LIỆU:
    - NẾU Data Strategist cung cấp điểm chuẩn cụ thể (ví dụ 26.5): Hãy lấy số đó để so sánh. TUYỆT ĐỐI KHÔNG dùng câu "Hệ thống hiện chưa truy xuất được...".
    - CHỈ KHI Data Strategist báo lỗi hoặc không có số liệu: MỚI ĐƯỢC phép nói "Hệ thống hiện chưa truy xuất được dữ liệu điểm chuẩn lịch sử của phương thức này để so sánh" và bỏ qua phần đánh giá cơ hội đỗ.
 4. TINH GỌN: Không copy y nguyên các phép tính dài dòng của Academic Expert. Chỉ lấy kết luận cuối cùng.
 
-5. NIỀM TIN TUYỆT ĐỐI VÀO PHƯƠNG THỨC: 
-   - Số liệu điểm chuẩn mà Data Strategist cung cấp CHÍNH LÀ của phương thức mà học sinh đang hỏi (hệ thống đã tự động map mã nội bộ như DGNL_HSA tương đương với phương thức kết hợp của trường). 
-   - TUYỆT ĐỐI KHÔNG ĐƯỢC bắt bẻ tên gọi phương thức. 
+5. NIỀM TIN TUYỆT ĐỐI VÀO PHƯƠNG THỨC:
+   - Số liệu điểm chuẩn mà Data Strategist cung cấp CHÍNH LÀ của phương thức mà học sinh đang hỏi (hệ thống đã tự động map mã nội bộ như DGNL_HSA tương đương với phương thức kết hợp của trường).
+   - TUYỆT ĐỐI KHÔNG ĐƯỢC bắt bẻ tên gọi phương thức.
    - TUYỆT ĐỐI KHÔNG ĐƯỢC tự ý kết luận "Hệ thống chưa tìm thấy thông tin điểm chuẩn" khi Data Strategist đã trả về một con số cụ thể.
 
 BỐ CỤC TRẢ LỜI YÊU CẦU (Bắt buộc dùng Markdown):
@@ -2107,7 +2356,7 @@ Câu trả lời tư vấn:"""
 
         # Gọi LLaMA (Groq) thay vì Gemini để tránh bị treo do quota/rate-limits
         final_msg = get_llms()["groq_llm"].invoke(synthesis_prompt)
-        
+
         # Xử lý trường hợp nội dung trả về
         if isinstance(final_msg.content, list):
             text_blocks = [item.get("text", "") for item in final_msg.content if isinstance(item, dict) and "text" in item]
@@ -2119,11 +2368,10 @@ Câu trả lời tư vấn:"""
             str(final_response),
             data_strategist_report,
         )
-            
+
         logger.info(f"   ✅ Synthesis completed")
-    
+
     # Ký tên "Synthesis" cho tin nhắn tổng hợp cuối cùng
-    from langchain_core.messages import AIMessage
     return {"messages": [AIMessage(content=final_response, name="Synthesis")]}
 
 
@@ -2193,6 +2441,7 @@ def build_ai_workflow():
             "ScoreCalculator": "ScoreCalculator",
             "DataStrategist": "DataStrategist",
             "FINISH": "synthesis",
+            "END": END,
         }
     )
 
@@ -2300,7 +2549,7 @@ def run_test(test_key: str):
     """Run a single test case by key (BKA, TMU, etc.)."""
     test_case = TEST_CASES.get(test_key.upper())
     if not test_case:
-        print(f"❌ Unknown test case: {test_key}. Available: {list(TEST_CASES.keys())}")
+        print(f"âŒ Unknown test case: {test_key}. Available: {list(TEST_CASES.keys())}")
         return
 
     profile = test_case["profile"]
@@ -2372,7 +2621,7 @@ if __name__ == "__main__":
     try:
         run_test(args.uni)
     except Exception as e:
-        logger.error(f"\n❌ Test failed: {e}")
+        logger.error(f"\nâŒ Test failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
