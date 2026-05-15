@@ -1,10 +1,23 @@
 import api from '@/config/axios';
 import { API_ROUTES } from '@/config/api-collection';
 
+export interface ReviewFeaturedMethod {
+    methodTag: string;
+    methodAlias: string | null;
+    latestYear: number | null;
+    latestScore: number | null;
+    shortComment: string;
+}
+
 export interface ReviewRecommendation {
     name: string;
     score: number;
     reason: string;
+    universityCode: string;
+    universityName: string | null;
+    majorCode: string;
+    majorName: string;
+    featuredMethod: ReviewFeaturedMethod | null;
 }
 
 export interface ReviewResult {

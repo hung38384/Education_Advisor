@@ -54,3 +54,15 @@ export function useAskQuestion() {
         },
     });
 }
+
+export function useAdviseQa() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: qaService.advise,
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: QA_CONVERSATIONS_QUERY_KEY });
+            queryClient.invalidateQueries({ queryKey: QA_MESSAGES_QUERY_KEY(data.conversationId) });
+        },
+    });
+}

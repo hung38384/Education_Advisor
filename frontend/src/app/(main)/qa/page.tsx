@@ -1,7 +1,8 @@
 'use client';
 
 import type { FormEvent } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button, Card, Textarea } from '@/components/ui';
 import {
     useAskQuestion,
@@ -59,13 +60,26 @@ function getToolsUsed(metadata: QAMessageMetadata | null): string[] {
         .filter((item) => item.length > 0);
 }
 
-export default function QAPage() {
+function QAContent() {
+    const searchParams = useSearchParams();
+    const requestedConversationId = useMemo(() => {
+        const rawConversationId = searchParams.get('conversationId');
+        if (!rawConversationId) {
+            return undefined;
+        }
+
+        const parsedConversationId = Number(rawConversationId);
+        return Number.isInteger(parsedConversationId) && parsedConversationId > 0
+            ? parsedConversationId
+            : undefined;
+    }, [searchParams]);
     const conversationsQuery = useQaConversations();
     const createConversationMutation = useCreateConversation();
     const deleteConversationMutation = useDeleteConversation();
     const askMutation = useAskQuestion();
 
     const [selectedConversationId, setSelectedConversationId] = useState<number | undefined>(undefined);
+    const [ignoredRequestedConversationId, setIgnoredRequestedConversationId] = useState<number | undefined>(undefined);
     const [question, setQuestion] = useState('');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -74,8 +88,21 @@ export default function QAPage() {
         () => conversationsQuery.data?.conversations ?? [],
         [conversationsQuery.data?.conversations]
     );
+    const effectiveRequestedConversationId = requestedConversationId === ignoredRequestedConversationId
+        ? undefined
+        : requestedConversationId;
 
     useEffect(() => {
+        if (effectiveRequestedConversationId !== undefined) {
+            setSelectedConversationId(effectiveRequestedConversationId);
+        }
+    }, [effectiveRequestedConversationId]);
+
+    useEffect(() => {
+        if (effectiveRequestedConversationId !== undefined) {
+            return;
+        }
+
         if (conversations.length === 0) {
             setSelectedConversationId(undefined);
             return;
@@ -87,7 +114,7 @@ export default function QAPage() {
         ) {
             setSelectedConversationId(conversations[0].id);
         }
-    }, [conversations, selectedConversationId]);
+    }, [conversations, effectiveRequestedConversationId, selectedConversationId]);
 
     const messagesQuery = useQaMessages(selectedConversationId);
     const messages = messagesQuery.data?.messages ?? [];
@@ -95,6 +122,21 @@ export default function QAPage() {
         () => conversations.find((item) => item.id === selectedConversationId),
         [conversations, selectedConversationId]
     );
+
+    useEffect(() => {
+        if (
+            effectiveRequestedConversationId === undefined ||
+            !conversationsQuery.isSuccess ||
+            !messagesQuery.isError ||
+            conversations.some((item) => item.id === effectiveRequestedConversationId)
+        ) {
+            return;
+        }
+
+        setIgnoredRequestedConversationId(effectiveRequestedConversationId);
+        setErrorMessage('Cuộc trò chuyện từ liên kết không còn tồn tại hoặc bạn không có quyền truy cập.');
+        setSelectedConversationId(conversations[0]?.id);
+    }, [conversations, conversationsQuery.isSuccess, effectiveRequestedConversationId, messagesQuery.isError]);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -235,7 +277,7 @@ export default function QAPage() {
                 <Card className="space-y-3">
                     <div className="flex items-center justify-between">
                         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                            {activeConversation?.title || 'Chưa chọn cuộc trò chuyện'}
+                            {activeConversation?.title || (selectedConversationId ? `Cuộc trò chuyện #${selectedConversationId}` : 'Chưa chọn cuộc trò chuyện')}
                         </h2>
                         {activeConversation && (
                             <Button
@@ -251,10 +293,12 @@ export default function QAPage() {
                     </div>
 
                     <div className="max-h-[420px] space-y-3 overflow-y-auto rounded-md border border-slate-200 p-3">
-                        {!activeConversation ? (
+                        {!selectedConversationId ? (
                             <p className="text-sm text-slate-700">Hãy tạo cuộc trò chuyện mới để bắt đầu.</p>
                         ) : messagesQuery.isLoading ? (
                             <p className="text-sm text-slate-700">Đang tải nội dung...</p>
+                        ) : messagesQuery.isError ? (
+                            <p className="text-sm text-red-700">Không tải được nội dung cuộc trò chuyện này.</p>
                         ) : messages.length === 0 ? (
                             <p className="text-sm text-slate-700">Cuộc trò chuyện này chưa có tin nhắn.</p>
                         ) : (
@@ -378,5 +422,13 @@ export default function QAPage() {
                 </Card>
             </div>
         </main>
+    );
+}
+
+export default function QAPage() {
+    return (
+        <Suspense fallback={<main className="space-y-5"><p className="text-sm text-slate-700">Đang tải trợ lý...</p></main>}>
+            <QAContent />
+        </Suspense>
     );
 }

@@ -13,6 +13,7 @@ export interface StudentProfile {
     grade10: number | null;
     grade11: number | null;
     grade12: number | null;
+    transcript: Record<string, number> | null;
     favoriteSubjects: string[];
     targetMajor: string | null;
     targetUniversity: string | null;
@@ -31,6 +32,7 @@ export interface UpsertProfilePayload {
     grade10?: number | null;
     grade11?: number | null;
     grade12?: number | null;
+    transcript?: Record<string, number> | null;
     favoriteSubjects?: string[];
     targetMajor?: string | null;
     targetUniversity?: string | null;

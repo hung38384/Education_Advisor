@@ -1,5 +1,11 @@
-import { StudentProfile, UpsertStudentProfileInput } from '../model/student-profile.model';
+import {
+    REQUIRED_TRANSCRIPT_SUBJECTS,
+    StudentProfile,
+    SubjectTranscript,
+    UpsertStudentProfileInput,
+} from '../model/student-profile.model';
 import { StudentProfileRepository } from '../repository/student-profile.repository';
+import { CacheStore } from '../cache-store';
 
 export interface StudentProfileResult {
     profile: StudentProfile | null;
@@ -15,22 +21,43 @@ export class StudentProfileServiceError extends Error {
     }
 }
 
+export interface StudentProfileCacheConfig {
+    admissionCatalogStore?: CacheStore;
+}
+
 export class StudentProfileService {
-    constructor(private repository: StudentProfileRepository) { }
+    constructor(
+        private repository: StudentProfileRepository,
+        private cacheConfig?: StudentProfileCacheConfig
+    ) { }
 
     getMyProfile(userId: number): StudentProfileResult {
         const profile = this.repository.findByUserId(userId) ?? null;
         return { profile };
     }
 
-    upsertMyProfile(userId: number, input: UpsertStudentProfileInput): StudentProfileResult {
+    async upsertMyProfile(userId: number, input: UpsertStudentProfileInput): Promise<StudentProfileResult> {
         const sanitized = this.sanitizeInput(input);
         const profile = this.repository.upsertByUserId(userId, sanitized);
         if (!profile) {
             throw new StudentProfileServiceError('Không thể lưu hồ sơ', 500);
         }
 
+        await this.invalidateAdmissionCatalogCache(userId);
         return { profile };
+    }
+
+    private async invalidateAdmissionCatalogCache(userId: number): Promise<void> {
+        const store = this.cacheConfig?.admissionCatalogStore;
+        if (!store || !store.enabled) {
+            return;
+        }
+
+        try {
+            await store.purgePrefix(`u:${userId}:`);
+        } catch (error) {
+            console.warn(`[profile] Failed to invalidate admission catalog cache for user ${userId}`, error);
+        }
     }
 
     private sanitizeInput(input: UpsertStudentProfileInput): UpsertStudentProfileInput {
@@ -42,6 +69,7 @@ export class StudentProfileService {
         const grade10 = this.normalizeScore(input.grade10);
         const grade11 = this.normalizeScore(input.grade11);
         const grade12 = this.normalizeScore(input.grade12);
+        const transcript = this.normalizeTranscript(input.transcript);
 
         const favoriteSubjects = (input.favoriteSubjects ?? [])
             .map((item) => item.trim())
@@ -58,6 +86,7 @@ export class StudentProfileService {
             grade10,
             grade11,
             grade12,
+            transcript,
             favoriteSubjects,
             targetMajor: this.normalizeOptionalText(input.targetMajor),
             targetUniversity: this.normalizeOptionalText(input.targetUniversity),
@@ -79,6 +108,26 @@ export class StudentProfileService {
             return null;
         }
 
+        return this.normalizeRequiredScore(value);
+    }
+
+    private normalizeTranscript(value: SubjectTranscript | null | undefined): SubjectTranscript {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            throw new StudentProfileServiceError('Vui lòng nhập điểm tất cả các môn học', 400);
+        }
+
+        const transcript: SubjectTranscript = {};
+        for (const subject of REQUIRED_TRANSCRIPT_SUBJECTS) {
+            if (value[subject] === null || value[subject] === undefined) {
+                throw new StudentProfileServiceError('Vui lòng nhập điểm tất cả các môn học', 400);
+            }
+            transcript[subject] = this.normalizeRequiredScore(value[subject]);
+        }
+
+        return transcript;
+    }
+
+    private normalizeRequiredScore(value: number): number {
         const normalized = Number(value);
         if (!Number.isFinite(normalized) || normalized < 0 || normalized > 10) {
             throw new StudentProfileServiceError('Điểm phải nằm trong khoảng từ 0 đến 10', 400);

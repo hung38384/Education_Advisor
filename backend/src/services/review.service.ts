@@ -1,6 +1,9 @@
-import { ReviewRecommendation, ReviewResult } from '../model/review.model';
-import { ReviewRepository } from '../repository/review.repository';
+import { AIAdmissionsClient } from '../clients/ai-admissions.client';
+import { AIPredictClient } from '../clients/ai-predict.client';
+import { AdmissionCatalogItem, AdmissionCatalogMethod } from '../model/admission.model';
+import { ReviewFeaturedMethod, ReviewRecommendation, ReviewResult } from '../model/review.model';
 import { PersonalityRepository } from '../repository/personality.repository';
+import { ReviewRepository } from '../repository/review.repository';
 import { StudentProfileRepository } from '../repository/student-profile.repository';
 
 export interface ReviewResultPayload {
@@ -25,16 +28,41 @@ function normalizeNameForLookup(name: string): string {
     return name.trim().toLowerCase();
 }
 
-interface RecommendationInput {
-    name: string;
-    priority: number;
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+    const result: string[] = [];
+    const seen = new Set<string>();
+    for (const value of values) {
+        if (typeof value !== 'string') {
+            continue;
+        }
+
+        const trimmed = value.trim();
+        const key = normalizeNameForLookup(trimmed);
+        if (!key || seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        result.push(trimmed);
+    }
+
+    return result;
+}
+
+interface RankedCandidate {
+    item: AdmissionCatalogItem;
+    featuredMethod: ReviewFeaturedMethod | null;
+    score: number;
+    reason: string;
 }
 
 export class ReviewService {
     constructor(
         private reviewRepository: ReviewRepository,
         private profileRepository: StudentProfileRepository,
-        private personalityRepository: PersonalityRepository
+        private personalityRepository: PersonalityRepository,
+        private admissionsClient: AIAdmissionsClient,
+        private predictClient: AIPredictClient | null = null,
     ) { }
 
     getLatest(userId: number): ReviewResultPayload {
@@ -46,7 +74,7 @@ export class ReviewService {
         return { result };
     }
 
-    run(userId: number): ReviewResultPayload {
+    async run(userId: number): Promise<ReviewResultPayload> {
         const profile = this.profileRepository.findByUserId(userId);
         if (!profile) {
             throw new ReviewServiceError('Cần cập nhật hồ sơ trước khi chạy đánh giá', 400);
@@ -57,42 +85,123 @@ export class ReviewService {
             throw new ReviewServiceError('Cần hoàn thành bài đánh giá tính cách trước khi chạy đánh giá', 400);
         }
 
-        const recommendationTargets = this.buildFallbackTargets(profile.targetMajor, profile.targetUniversity, personality.mbtiType);
-        const recommendationInputs: RecommendationInput[] = recommendationTargets.map((name, index) => ({
-                name,
-                priority: index + 1,
-            }));
+        const academicScores: Record<string, number> = {};
+        if (typeof profile.grade10 === 'number' && Number.isFinite(profile.grade10)) academicScores.grade10 = profile.grade10;
+        if (typeof profile.grade11 === 'number' && Number.isFinite(profile.grade11)) academicScores.grade11 = profile.grade11;
+        if (typeof profile.grade12 === 'number' && Number.isFinite(profile.grade12)) academicScores.grade12 = profile.grade12;
 
-        const availableScores = [profile.grade10, profile.grade11, profile.grade12]
-            .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+        const availableScores = Object.values(academicScores);
         const averageScore = availableScores.length > 0
             ? availableScores.reduce((sum, value) => sum + value, 0) / availableScores.length
             : 6;
 
-        const academicBase = (averageScore / 10) * 70;
-        const recommendations: ReviewRecommendation[] = recommendationInputs.map((item) => {
-            const personalityBonus = this.getPersonalityBonus(item.name, personality.mbtiType);
-            const priorityBonus = Math.max(0, 15 - (item.priority - 1) * 3);
-            const score = clampScore(academicBase + personalityBonus + priorityBonus);
+        const fallbackTargets = this.buildFallbackTargets(profile.targetMajor, profile.targetUniversity, personality.mbtiType);
+        let predictionTargets: string[] = [];
+        let recommendationSource = 'profile-fallback';
 
-            return {
-                name: item.name,
-                score,
-                reason: `Điểm học tập nền tảng ${averageScore.toFixed(1)}, MBTI ${personality.mbtiType} và mức ưu tiên mục tiêu ${item.priority}.`,
-            };
-        })
-            .sort((first, second) => second.score - first.score)
-            .slice(0, 5);
+        if (this.predictClient) {
+            try {
+                const prediction = await this.predictClient.predict({
+                    mbti: personality.mbtiType,
+                    academic_scores: academicScores,
+                });
+                predictionTargets = uniqueStrings(prediction.predictions).slice(0, 6);
+                if (predictionTargets.length > 0) {
+                    recommendationSource = 'predict+profile';
+                }
+            } catch {
+                recommendationSource = 'predict-failed-fallback';
+            }
+        }
 
-        if (recommendations.length === 0) {
+        const targetMajors = uniqueStrings([
+            ...predictionTargets,
+            profile.targetMajor,
+            ...fallbackTargets,
+        ]);
+
+        const searchQueries = uniqueStrings([
+            ...predictionTargets,
+            profile.targetMajor,
+            profile.targetUniversity ? `${profile.targetMajor || 'ngành'} ${profile.targetUniversity}` : null,
+            ...fallbackTargets,
+        ]).slice(0, 8);
+
+        const universityCode = this.toUniversityCode(profile.targetUniversity);
+        const fetchedItems = new Map<string, AdmissionCatalogItem>();
+
+        if (searchQueries.length === 0) {
+            searchQueries.push('công nghệ thông tin');
+        }
+
+        for (const query of searchQueries) {
+            const response = await this.admissionsClient.searchAdmissions({
+                q: query,
+                universityCode: universityCode || undefined,
+                page: 1,
+                pageSize: 50,
+            });
+
+            for (const item of response.items) {
+                const key = `${item.universityCode}::${item.majorCode}`;
+                if (!fetchedItems.has(key)) {
+                    fetchedItems.set(key, item);
+                }
+            }
+
+            if (fetchedItems.size >= 40) {
+                break;
+            }
+        }
+
+        const ranked = Array.from(fetchedItems.values())
+            .map((item) => this.rankCandidate(item, {
+                averageScore,
+                mbtiType: personality.mbtiType,
+                targetUniversity: profile.targetUniversity,
+                targetMajor: profile.targetMajor,
+                targetMajors,
+            }))
+            .sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+
+                const nameCompare = a.item.majorName.localeCompare(b.item.majorName, 'vi');
+                if (nameCompare !== 0) {
+                    return nameCompare;
+                }
+
+                const universityCompare = a.item.universityCode.localeCompare(b.item.universityCode);
+                if (universityCompare !== 0) {
+                    return universityCompare;
+                }
+
+                return a.item.majorCode.localeCompare(b.item.majorCode);
+            })
+            .slice(0, 15);
+
+        if (ranked.length === 0) {
             throw new ReviewServiceError('Không thể tạo danh sách gợi ý phù hợp', 500);
         }
+
+        const recommendations: ReviewRecommendation[] = ranked.map((candidate) => ({
+            name: `${candidate.item.majorName} - ${candidate.item.universityName || candidate.item.universityCode}`,
+            score: candidate.score,
+            reason: candidate.reason,
+            universityCode: candidate.item.universityCode,
+            universityName: candidate.item.universityName,
+            majorCode: candidate.item.majorCode,
+            majorName: candidate.item.majorName,
+            featuredMethod: candidate.featuredMethod,
+        }));
 
         const overallScore = clampScore(
             recommendations.reduce((sum, item) => sum + item.score, 0) / recommendations.length
         );
 
-        const summary = `Gợi ý phù hợp nhất: ${recommendations[0].name} (${recommendations[0].score}/100).`;
+        const best = recommendations[0];
+        const summary = `Gợi ý phù hợp nhất: ${best.majorName} tại ${best.universityName || best.universityCode} (${best.score}/100).`;
 
         const result = this.reviewRepository.create({
             userId,
@@ -114,8 +223,10 @@ export class ReviewService {
                     mbtiType: personality.mbtiType,
                     scores: personality.scores,
                 },
-                recommendationSource: 'profile-fallback',
-                targets: recommendationTargets,
+                recommendationSource,
+                predictions: predictionTargets,
+                targets: targetMajors,
+                queries: searchQueries,
             },
         });
 
@@ -124,6 +235,19 @@ export class ReviewService {
         }
 
         return { result };
+    }
+
+    private toUniversityCode(value: string | null | undefined): string | null {
+        if (!value) {
+            return null;
+        }
+
+        const trimmed = value.trim();
+        if (!trimmed || trimmed.includes(' ')) {
+            return null;
+        }
+
+        return trimmed.toUpperCase();
     }
 
     private buildFallbackTargets(
@@ -140,26 +264,14 @@ export class ReviewService {
         }
 
         if (major && university) {
-            candidates.push(`${major} tại ${university}`);
+            candidates.push(`${major} ${university}`);
         } else if (university) {
-            candidates.push(`Các chương trình tại ${university}`);
+            candidates.push(`ngành phù hợp tại ${university}`);
         }
 
         candidates.push(...this.getMbtiFallbackTargets(mbtiType));
-        candidates.push('Lộ trình khám phá nghề nghiệp');
 
-        const deduped: string[] = [];
-        const seen = new Set<string>();
-        for (const candidate of candidates) {
-            const normalized = normalizeNameForLookup(candidate);
-            if (!normalized || seen.has(normalized)) {
-                continue;
-            }
-            seen.add(normalized);
-            deduped.push(candidate.trim());
-        }
-
-        return deduped.slice(0, 8);
+        return uniqueStrings(candidates).slice(0, 8);
     }
 
     private normalizeText(value: string | null | undefined): string | null {
@@ -176,7 +288,7 @@ export class ReviewService {
         const targets: string[] = [];
 
         if (upperMbti.includes('N') && upperMbti.includes('T')) {
-            targets.push('Kỹ thuật phần mềm', 'Khoa học dữ liệu', 'Kỹ thuật máy tính');
+            targets.push('Khoa học máy tính', 'Hệ thống thông tin', 'Kỹ thuật phần mềm');
         }
 
         if (upperMbti.includes('F')) {
@@ -184,7 +296,7 @@ export class ReviewService {
         }
 
         if (upperMbti.startsWith('E')) {
-            targets.push('Tiếp thị', 'Quản trị kinh doanh', 'Truyền thông');
+            targets.push('Marketing', 'Quản trị kinh doanh', 'Truyền thông');
         }
 
         if (targets.length === 0) {
@@ -194,19 +306,134 @@ export class ReviewService {
         return targets;
     }
 
+    private selectFeaturedMethod(methods: AdmissionCatalogMethod[]): ReviewFeaturedMethod | null {
+        if (!methods.length) {
+            return null;
+        }
+
+        const candidates = methods.map((method, index) => {
+            const sortedScores = [...method.yearlyScores].sort((a, b) => b.year - a.year);
+            const latest = sortedScores[0] || null;
+            return {
+                method,
+                index,
+                latestYear: latest?.year ?? null,
+                latestScore: latest?.score ?? null,
+            };
+        });
+
+        const hasAnyLatestScore = candidates.some((candidate) => candidate.latestYear != null && candidate.latestScore != null);
+        const picked = hasAnyLatestScore
+            ? [...candidates].sort((a, b) => {
+                const yearA = a.latestYear ?? -1;
+                const yearB = b.latestYear ?? -1;
+                if (yearB !== yearA) {
+                    return yearB - yearA;
+                }
+
+                const scoreA = a.latestScore ?? -1;
+                const scoreB = b.latestScore ?? -1;
+                if (scoreB !== scoreA) {
+                    return scoreB - scoreA;
+                }
+
+                return a.index - b.index;
+            })[0]
+            : candidates[0];
+
+        return {
+            methodTag: picked.method.methodTag,
+            methodAlias: picked.method.methodAlias,
+            latestYear: picked.latestYear,
+            latestScore: picked.latestScore,
+            shortComment: picked.method.shortComment,
+        };
+    }
+
+    private rankCandidate(
+        item: AdmissionCatalogItem,
+        context: {
+            averageScore: number;
+            mbtiType: string;
+            targetUniversity: string | null;
+            targetMajor: string | null;
+            targetMajors: string[];
+        }
+    ): RankedCandidate {
+        const featuredMethod = this.selectFeaturedMethod(item.methods);
+        const majorName = normalizeNameForLookup(item.majorName);
+
+        const majorMatchScore = context.targetMajors.reduce((best, target) => {
+            const normalizedTarget = normalizeNameForLookup(target);
+            if (!normalizedTarget) return best;
+            if (majorName === normalizedTarget) return Math.max(best, 30);
+            if (majorName.includes(normalizedTarget) || normalizedTarget.includes(majorName)) return Math.max(best, 22);
+            const overlap = normalizedTarget.split(' ').some((token) => token.length > 2 && majorName.includes(token));
+            return Math.max(best, overlap ? 14 : 0);
+        }, 0);
+
+        const cutoffDistance = this.getCutoffDistance(featuredMethod?.latestScore ?? null, context.averageScore);
+        const cutoffDistanceScore = cutoffDistance.score;
+
+        const mbtiBonus = this.getPersonalityBonus(item.majorName, context.mbtiType);
+
+        const targetMajorBonus = context.targetMajor
+            && majorName.includes(normalizeNameForLookup(context.targetMajor))
+            ? 10
+            : 0;
+
+        const universityBonus = context.targetUniversity
+            && (normalizeNameForLookup(item.universityName || '').includes(normalizeNameForLookup(context.targetUniversity))
+                || item.universityCode.toLowerCase() === context.targetUniversity.toLowerCase())
+            ? 8
+            : 0;
+
+        const score = clampScore(20 + majorMatchScore + cutoffDistanceScore + mbtiBonus + targetMajorBonus + universityBonus);
+
+        const distanceText = cutoffDistance.distance != null
+            ? `chênh lệch điểm chuẩn ~${cutoffDistance.distance.toFixed(1)}`
+            : 'chưa có điểm chuẩn gần nhất';
+
+        return {
+            item,
+            featuredMethod,
+            score,
+            reason: `Phù hợp theo mục tiêu ngành, ${distanceText}, MBTI ${context.mbtiType} và ưu tiên hồ sơ cá nhân.`,
+        };
+    }
+
+    private getCutoffDistance(latestScore: number | null, averageScore: number): { score: number; distance: number | null } {
+        if (latestScore == null || !Number.isFinite(latestScore) || !Number.isFinite(averageScore)) {
+            return { score: 12, distance: null };
+        }
+
+        if (latestScore >= 0 && latestScore <= 10) {
+            const distance = Math.abs(latestScore - averageScore);
+            return { score: Math.max(0, 30 - distance * 8), distance };
+        }
+
+        if (latestScore > 10 && latestScore <= 30) {
+            const normalizedAverage = averageScore * 3;
+            const distance = Math.abs(latestScore - normalizedAverage);
+            return { score: Math.max(0, 30 - distance * 8), distance };
+        }
+
+        return { score: 12, distance: null };
+    }
+
     private getPersonalityBonus(targetName: string, mbtiType: string): number {
         const normalizedName = normalizeNameForLookup(targetName);
         const upperMbti = mbtiType.toUpperCase();
 
-        let bonus = 5;
+        let bonus = 0;
 
         if (upperMbti.includes('N') && upperMbti.includes('T')) {
             if (
-                normalizedName.includes('it')
-                || normalizedName.includes('software')
-                || normalizedName.includes('engineer')
-                || normalizedName.includes('cong nghe')
-                || normalizedName.includes('ky thuat')
+                normalizedName.includes('công nghệ')
+                || normalizedName.includes('khoa học máy tính')
+                || normalizedName.includes('phần mềm')
+                || normalizedName.includes('hệ thống thông tin')
+                || normalizedName.includes('kỹ thuật')
             ) {
                 bonus += 12;
             }
@@ -214,11 +441,9 @@ export class ReviewService {
 
         if (upperMbti.includes('F')) {
             if (
-                normalizedName.includes('law')
-                || normalizedName.includes('giao duc')
-                || normalizedName.includes('su pham')
-                || normalizedName.includes('tam ly')
-                || normalizedName.includes('social')
+                normalizedName.includes('giáo dục')
+                || normalizedName.includes('tâm lý')
+                || normalizedName.includes('xã hội')
             ) {
                 bonus += 10;
             }
@@ -228,8 +453,7 @@ export class ReviewService {
             if (
                 normalizedName.includes('marketing')
                 || normalizedName.includes('kinh doanh')
-                || normalizedName.includes('management')
-                || normalizedName.includes('truyen thong')
+                || normalizedName.includes('truyền thông')
             ) {
                 bonus += 8;
             }

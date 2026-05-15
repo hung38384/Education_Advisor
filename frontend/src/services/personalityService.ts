@@ -1,14 +1,18 @@
 import api from '@/config/axios';
 import { API_ROUTES } from '@/config/api-collection';
 
-export type PersonalityAnswer = 'A' | 'B';
+export type PersonalityAnswer = 'A' | 'B' | 'C' | 'D';
+
+export interface PersonalityChoice {
+    value: PersonalityAnswer;
+    label: string;
+}
 
 export interface PersonalityQuestion {
     id: string;
     prompt: string;
     dimension: 'E/I' | 'S/N' | 'T/F' | 'J/P';
-    optionA: string;
-    optionB: string;
+    choices: PersonalityChoice[];
 }
 
 export interface PersonalityScores {

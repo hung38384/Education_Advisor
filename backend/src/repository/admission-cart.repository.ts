@@ -1,5 +1,9 @@
 import { Database } from 'better-sqlite3';
-import { AdmissionCartItem, CreateAdmissionCartItemInput } from '../model/admission.model';
+import {
+    AdmissionCartItem,
+    AdmissionFavoriteSnapshot,
+    CreateAdmissionCartItemInput,
+} from '../model/admission.model';
 
 export interface AdmissionCartRepository {
     listByUserId(userId: number): AdmissionCartItem[];
@@ -20,7 +24,43 @@ interface AdmissionCartItemRow {
     schoolId: string;
     majorId: string;
     methodId: string;
+    snapshot: string | null;
     createdAt: string;
+}
+
+function parseSnapshot(raw: string | null): AdmissionFavoriteSnapshot | null {
+    if (!raw || typeof raw !== 'string') {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        if (!parsed || typeof parsed !== 'object') {
+            return null;
+        }
+
+        const schoolName = typeof parsed.schoolName === 'string' ? parsed.schoolName.trim() : '';
+        const majorName = typeof parsed.majorName === 'string' ? parsed.majorName.trim() : '';
+        const methodName = typeof parsed.methodName === 'string' ? parsed.methodName.trim() : '';
+        const description = typeof parsed.description === 'string' ? parsed.description.trim() : '';
+        const requiredAverage = typeof parsed.requiredAverage === 'number' && Number.isFinite(parsed.requiredAverage)
+            ? parsed.requiredAverage
+            : null;
+
+        if (!schoolName || !majorName || !methodName || !description || requiredAverage === null) {
+            return null;
+        }
+
+        return {
+            schoolName,
+            majorName,
+            methodName,
+            requiredAverage,
+            description,
+        };
+    } catch {
+        return null;
+    }
 }
 
 function toModel(row: AdmissionCartItemRow): AdmissionCartItem {
@@ -30,6 +70,7 @@ function toModel(row: AdmissionCartItemRow): AdmissionCartItem {
         schoolId: row.schoolId,
         majorId: row.majorId,
         methodId: row.methodId,
+        snapshot: parseSnapshot(row.snapshot),
         createdAt: row.createdAt,
     };
 }
@@ -86,11 +127,17 @@ export class SQLiteAdmissionCartRepository implements AdmissionCartRepository {
 
     create(userId: number, input: CreateAdmissionCartItemInput): AdmissionCartItem | undefined {
         const stmt = this.db.prepare(`
-            INSERT INTO admission_cart_item (userId, schoolId, majorId, methodId)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO admission_cart_item (userId, schoolId, majorId, methodId, snapshot)
+            VALUES (?, ?, ?, ?, ?)
         `);
 
-        const result = stmt.run(userId, input.schoolId, input.majorId, input.methodId);
+        const result = stmt.run(
+            userId,
+            input.schoolId,
+            input.majorId,
+            input.methodId,
+            JSON.stringify(input.snapshot)
+        );
         return this.findByIdForUser(Number(result.lastInsertRowid), userId);
     }
 

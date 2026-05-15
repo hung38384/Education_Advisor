@@ -31,6 +31,10 @@ import { SQLiteAdmissionCartRepository } from './repository/admission-cart.repos
 import { AdmissionService } from './services/admission.service';
 import { AdmissionController } from './controllers/admission.controller';
 import { createQAInferenceClientFromEnv, QAInferenceClient } from './clients/ai.client';
+import { AIAdmissionsClient, createAIAdmissionsClientFromEnv } from './clients/ai-admissions.client';
+import { AIPredictClient, createAIPredictClientFromEnv } from './clients/ai-predict.client';
+import { AdvisorClient, createAdvisorClientFromEnv } from './clients/advisor.client';
+import { CacheStore, createCacheStore } from './cache-store';
 
 dotenv.config();
 
@@ -49,6 +53,13 @@ export interface AppDependencies {
 
 export interface DependencyOverrides {
     qaInferenceClient?: QAInferenceClient | null;
+    aiAdmissionsClient?: AIAdmissionsClient;
+    aiPredictClient?: AIPredictClient | null;
+    advisorClient?: AdvisorClient | null;
+    qaAnswerCacheStore?: CacheStore;
+    qaConversationsCacheStore?: CacheStore;
+    qaMessagesCacheStore?: CacheStore;
+    admissionCatalogCacheStore?: CacheStore;
 }
 
 export function createDependencies(
@@ -64,37 +75,93 @@ export function createDependencies(
     const adminUserService = new AdminUserService(userRepository);
     const adminUserController = new AdminUserController(adminUserService);
 
+    const qaWebCacheEnabled = process.env.QA_WEB_CACHE_ENABLED
+        ? isEnabled(process.env.QA_WEB_CACHE_ENABLED)
+        : true;
+    const qaWebCacheRedisUrl = (process.env.QA_WEB_CACHE_REDIS_URL || 'redis://localhost:6379').trim();
+
+    const qaAnswerCacheStore = overrides.qaAnswerCacheStore ?? createCacheStore({
+        enabled: qaWebCacheEnabled,
+        redisUrl: qaWebCacheRedisUrl,
+        namespace: (process.env.QA_WEB_CACHE_NAMESPACE || 'qa:web:v1').trim(),
+    });
+
+    const qaConversationsCacheStore = overrides.qaConversationsCacheStore ?? createCacheStore({
+        enabled: qaWebCacheEnabled,
+        redisUrl: qaWebCacheRedisUrl,
+        namespace: (process.env.QA_CONVERSATIONS_CACHE_NAMESPACE || 'conversation:web:v1').trim(),
+    });
+
+    const qaMessagesCacheStore = overrides.qaMessagesCacheStore ?? qaConversationsCacheStore;
+
+    const admissionCatalogCacheStore = overrides.admissionCatalogCacheStore ?? createCacheStore({
+        enabled: qaWebCacheEnabled,
+        redisUrl: qaWebCacheRedisUrl,
+        namespace: (process.env.ADMISSION_CATALOG_CACHE_NAMESPACE || 'admission:web:v1').trim(),
+    });
+
     const studentProfileRepository = new SQLiteStudentProfileRepository(db);
-    const studentProfileService = new StudentProfileService(studentProfileRepository);
+    const studentProfileService = new StudentProfileService(studentProfileRepository, {
+        admissionCatalogStore: admissionCatalogCacheStore,
+    });
     const studentProfileController = new StudentProfileController(studentProfileService);
 
     const personalityRepository = new SQLitePersonalityRepository(db);
     const personalityService = new PersonalityService(personalityRepository);
     const personalityController = new PersonalityController(personalityService);
 
-    const reviewRepository = new SQLiteReviewRepository(db);
-    const reviewService = new ReviewService(
-        reviewRepository,
-        studentProfileRepository,
-        personalityRepository
-    );
-    const reviewController = new ReviewController(reviewService);
-
     const qaRepository = new SQLiteQARepository(db);
     const qaInferenceClient = overrides.qaInferenceClient === undefined
         ? createQAInferenceClientFromEnv()
         : overrides.qaInferenceClient;
+    const aiAdmissionsClient = overrides.aiAdmissionsClient ?? createAIAdmissionsClientFromEnv();
+    const aiPredictClient = overrides.aiPredictClient === undefined
+        ? createAIPredictClientFromEnv()
+        : overrides.aiPredictClient;
+    const advisorClient = overrides.advisorClient === undefined
+        ? createAdvisorClientFromEnv()
+        : overrides.advisorClient;
+
+    const reviewRepository = new SQLiteReviewRepository(db);
+    const reviewService = new ReviewService(
+        reviewRepository,
+        studentProfileRepository,
+        personalityRepository,
+        aiAdmissionsClient,
+        aiPredictClient
+    );
+    const reviewController = new ReviewController(reviewService);
+
+    void aiPredictClient;
+
     const qaService = new QAService(
         qaRepository,
         studentProfileRepository,
         personalityRepository,
         reviewRepository,
-        qaInferenceClient
+        qaInferenceClient,
+        advisorClient,
+        {
+            answerStore: qaAnswerCacheStore,
+            conversationsStore: qaConversationsCacheStore,
+            messagesStore: qaMessagesCacheStore,
+            answerTtlSeconds: parseTtlSeconds(process.env.QA_WEB_CACHE_TTL_SECONDS, 300),
+            conversationsTtlSeconds: parseTtlSeconds(process.env.QA_CONVERSATIONS_CACHE_TTL_SECONDS, 120),
+            messagesTtlSeconds: parseTtlSeconds(process.env.QA_MESSAGES_CACHE_TTL_SECONDS, 120),
+        }
     );
     const qaController = new QAController(qaService);
 
     const admissionCartRepository = new SQLiteAdmissionCartRepository(db);
-    const admissionService = new AdmissionService(admissionCartRepository, studentProfileRepository);
+    const admissionService = new AdmissionService(
+        admissionCartRepository,
+        studentProfileRepository,
+        aiAdmissionsClient,
+        {
+            store: admissionCatalogCacheStore,
+            ttlSeconds: parseTtlSeconds(process.env.ADMISSION_CATALOG_CACHE_TTL_SECONDS, 300),
+        }
+    );
     const admissionController = new AdmissionController(admissionService);
 
     const authenticateToken = createAuthenticateToken(userRepository);
@@ -173,6 +240,15 @@ export function initServer({
 function isEnabled(value: string | undefined): boolean {
     const normalized = (value || '').trim().toLowerCase();
     return ['1', 'true', 'yes', 'on'].includes(normalized);
+}
+
+function parseTtlSeconds(value: string | undefined, fallback: number): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return fallback;
+    }
+
+    return Math.round(parsed);
 }
 
 async function seedDevUser(authService: AuthService): Promise<void> {

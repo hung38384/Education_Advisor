@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # Redis Configuration
     REDIS_URL: str = Field(default="redis://localhost:6379")
 
+    # Q&A cache configuration
+    QA_CACHE_ENABLED: bool = Field(default=True)
+    QA_CACHE_TTL_SECONDS: int = Field(default=300)
+    QA_CACHE_NAMESPACE: str = Field(default="qa:answer:v1")
+
     # Vector Database (Chroma)
     CHROMA_HOST: str = Field(default="localhost")
     CHROMA_PORT: int = Field(default=8001)
@@ -59,6 +64,9 @@ class Settings(BaseSettings):
 
     # Logging Configuration
     LOG_LEVEL: str = Field(default="INFO")
+
+    # Internal service-to-service authentication
+    INTERNAL_API_KEY: str = Field(default="")
 
 
 # Global settings instance - instantiated once and reused throughout the application

@@ -7,20 +7,61 @@ the existing LangGraph workflow and tools (rules + historical scores).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
-import importlib.util
 import re
 import time
 import unicodedata
-from pathlib import Path
-from typing import Any, Dict, List
+from threading import Lock
+from typing import Any, Dict, Iterable, List
 
 from google.api_core.exceptions import ResourceExhausted
+from redis import Redis
+
 from app.ai.tools.tools import get_historical_scores, search_admission_rules
+from app.core.config import settings
+from app.core.redis_cache import QAResponseCache, RedisCacheClient
 
 logger = logging.getLogger(__name__)
 
 _GRAPH: Any | None = None
+_CACHE: QAResponseCache | None = None
+_CACHE_LOCK = Lock()
+_CACHE_RETRY_AFTER_TS = 0.0
+_CACHE_RETRY_DELAY_SECONDS = 15
+_CACHE_DISABLED_BY_BOOTSTRAP_FAILURE = False
+
+
+class _RedisClientAdapter:
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    def get(self, key: str | bytes) -> bytes | str | bytearray | None:
+        return self._client.get(key)
+
+    def set(self, key: str | bytes, value: str, ex: int | None = None) -> Any:
+        return self._client.set(key, value, ex=ex)
+
+    def scan_iter(self, match: str | bytes | None = None) -> Iterable[str | bytes]:
+        return self._client.scan_iter(match=match)
+
+    def delete(self, *keys: str | bytes) -> int:
+        return int(self._client.delete(*keys))
+
+
+class _NoopRedisClient:
+    def get(self, key: str | bytes) -> None:
+        return None
+
+    def set(self, key: str | bytes, value: str, ex: int | None = None) -> bool:
+        return True
+
+    def scan_iter(self, match: str | bytes | None = None) -> list[str]:
+        return []
+
+    def delete(self, *keys: str | bytes) -> int:
+        return 0
 
 
 class AIQAServiceError(Exception):
@@ -37,23 +78,151 @@ def _load_graph() -> Any:
         return _GRAPH
 
     try:
-        graph_file = Path(__file__).resolve().parent / "graph.py"
-        spec = importlib.util.spec_from_file_location("app_ai_graph_file", graph_file)
-        if spec is None or spec.loader is None:
-            raise RuntimeError(f"Cannot load graph module from {graph_file}")
+        from app.ai.graph.workflow import get_ai_workflow
 
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        loaded_graph = getattr(module, "graph", None)
-        if loaded_graph is None:
-            raise RuntimeError(f"Module {graph_file} does not expose variable 'graph'")
-
-        _GRAPH = loaded_graph
+        _GRAPH = get_ai_workflow()
         return _GRAPH
     except Exception as exc:
         logger.error("Failed to initialize AI graph: %s", exc)
         raise AIQAServiceError(f"AI backend is not ready: {exc}", 503) from exc
+
+
+def _get_qa_cache() -> QAResponseCache:
+    global _CACHE, _CACHE_RETRY_AFTER_TS, _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE
+
+    if not settings.QA_CACHE_ENABLED:
+        if (
+            _CACHE is not None
+            and not _CACHE.enabled
+            and not _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE
+        ):
+            return _CACHE
+
+        with _CACHE_LOCK:
+            if (
+                _CACHE is not None
+                and not _CACHE.enabled
+                and not _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE
+            ):
+                return _CACHE
+
+            config_noop_client: RedisCacheClient = _NoopRedisClient()
+            _CACHE = QAResponseCache(
+                client=config_noop_client,
+                enabled=False,
+                namespace=settings.QA_CACHE_NAMESPACE,
+                ttl_seconds=settings.QA_CACHE_TTL_SECONDS,
+            )
+            _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE = False
+            _CACHE_RETRY_AFTER_TS = float("inf")
+            return _CACHE
+
+    now = time.time()
+    if _CACHE is not None:
+        if _CACHE.enabled:
+            return _CACHE
+        if _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE and now < _CACHE_RETRY_AFTER_TS:
+            return _CACHE
+
+    with _CACHE_LOCK:
+        now = time.time()
+        if _CACHE is not None:
+            if _CACHE.enabled:
+                return _CACHE
+            if _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE and now < _CACHE_RETRY_AFTER_TS:
+                return _CACHE
+
+        try:
+            client = Redis.from_url(settings.REDIS_URL, decode_responses=False)
+            cache_client: RedisCacheClient = _RedisClientAdapter(client)
+            _CACHE = QAResponseCache(
+                client=cache_client,
+                enabled=True,
+                namespace=settings.QA_CACHE_NAMESPACE,
+                ttl_seconds=settings.QA_CACHE_TTL_SECONDS,
+            )
+            _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE = False
+            _CACHE_RETRY_AFTER_TS = 0.0
+        except Exception as exc:
+            logger.warning("QA cache bootstrap failed, using disabled cache: %s", exc)
+            failure_noop_client: RedisCacheClient = _NoopRedisClient()
+            _CACHE = QAResponseCache(
+                client=failure_noop_client,
+                enabled=False,
+                namespace=settings.QA_CACHE_NAMESPACE,
+                ttl_seconds=settings.QA_CACHE_TTL_SECONDS,
+            )
+            _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE = True
+            _CACHE_RETRY_AFTER_TS = now + _CACHE_RETRY_DELAY_SECONDS
+
+        return _CACHE
+
+
+def _mark_cache_runtime_failure(cache: QAResponseCache | None) -> None:
+    global _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE, _CACHE_RETRY_AFTER_TS
+
+    with _CACHE_LOCK:
+        if cache is not None:
+            cache.enabled = False
+        _CACHE_DISABLED_BY_BOOTSTRAP_FAILURE = True
+        _CACHE_RETRY_AFTER_TS = time.time() + _CACHE_RETRY_DELAY_SECONDS
+
+
+def _make_cache_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    if isinstance(value, dict):
+        return {
+            str(key): _make_cache_safe(val)
+            for key, val in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+
+    if isinstance(value, (list, tuple)):
+        return [_make_cache_safe(item) for item in value]
+
+    if isinstance(value, set):
+        normalized_items = [_make_cache_safe(item) for item in value]
+        return sorted(
+            normalized_items,
+            key=lambda item: json.dumps(
+                item, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ),
+        )
+
+    if hasattr(value, "__dict__"):
+        try:
+            return {
+                "__type__": f"{type(value).__module__}.{type(value).__qualname__}",
+                "__dict__": _make_cache_safe(vars(value)),
+            }
+        except Exception:
+            pass
+
+    return {
+        "__type__": f"{type(value).__module__}.{type(value).__qualname__}",
+        "__value__": str(value),
+    }
+
+
+def _build_cache_digest(question: str, context: Dict[str, Any] | None) -> str:
+    payload = {
+        "question": (question or "").strip(),
+        "context": context or {},
+    }
+    try:
+        raw = json.dumps(
+            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+    except TypeError:
+        safe_payload = _make_cache_safe(payload)
+        raw = json.dumps(
+            safe_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _extract_text(content: Any) -> str:
@@ -166,7 +335,11 @@ def _build_local_retrieval_answer(question: str) -> tuple[str, List[str]]:
         logger.warning("Local fallback tool search_admission_rules failed: %s", exc)
 
     needs_score_context = bool(
-        re.search(r"\b(điểm|diem|score|cutoff|trúng tuyển)\b", question, flags=re.IGNORECASE)
+        re.search(
+            r"\b(điểm|diem|score|cutoff|trúng tuyển)\b",
+            question,
+            flags=re.IGNORECASE,
+        )
     )
     if needs_score_context:
         try:
@@ -243,13 +416,94 @@ def _looks_like_uncertain_score_answer(answer_text: str) -> bool:
     return any(marker in normalized for marker in markers)
 
 
-def ask_admission_qa(question: str, context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def _derive_cache_key_version(namespace: str) -> str:
+    parts = [part.strip() for part in (namespace or "").split(":") if part.strip()]
+    if parts:
+        tail = parts[-1]
+        if re.fullmatch(r"v\d+", tail, flags=re.IGNORECASE):
+            return tail.lower()
+    return "v1"
+
+
+def _resolve_cache_ttl_seconds(cache: Any) -> int | None:
+    ttl_seconds = getattr(cache, "ttl_seconds", None)
+    if isinstance(ttl_seconds, int):
+        return ttl_seconds
+    return None
+
+
+def _build_cache_metadata(
+    status: str, ttl_seconds: int | None = None
+) -> Dict[str, Any]:
+    resolved_ttl = settings.QA_CACHE_TTL_SECONDS if ttl_seconds is None else ttl_seconds
+    if resolved_ttl <= 0:
+        resolved_ttl = 1
+
+    return {
+        "layer": "ai",
+        "status": status,
+        "keyVersion": _derive_cache_key_version(settings.QA_CACHE_NAMESPACE),
+        "ttlSeconds": resolved_ttl,
+    }
+
+
+def ask_admission_qa(
+    question: str, context: Dict[str, Any] | None = None
+) -> Dict[str, Any]:
     normalized_question = (question or "").strip()
     if not normalized_question:
         raise AIQAServiceError("Question is required", 400)
 
     if len(normalized_question) > 2000:
         raise AIQAServiceError("Question is too long", 400)
+
+    cache: QAResponseCache | None = None
+    try:
+        cache = _get_qa_cache()
+    except Exception as exc:
+        logger.warning("QA cache unavailable at request time, bypassing cache: %s", exc)
+
+    cache_status = "bypass"
+    cache_enabled = bool(cache is not None and getattr(cache, "enabled", True))
+
+    digest: str | None = None
+    if cache_enabled and cache is not None:
+        try:
+            digest = _build_cache_digest(normalized_question, context)
+        except Exception as exc:
+            logger.warning("QA cache digest build failed, bypassing cache: %s", exc)
+            cache_enabled = False
+            cache_status = "bypass"
+
+    cached: Any = None
+    if cache_enabled and cache is not None and digest is not None:
+        try:
+            cached = cache.get(digest)
+        except Exception as exc:
+            logger.warning("QA cache read failed, bypassing read: %s", exc)
+            cache_enabled = False
+            cache_status = "bypass"
+        else:
+            if getattr(cache, "enabled", True):
+                cache_status = "miss"
+            else:
+                _mark_cache_runtime_failure(cache)
+                cache_enabled = False
+                cache_status = "bypass"
+
+    if isinstance(cached, dict) and isinstance(cached.get("answer"), str):
+        cached_metadata = cached.get("metadata")
+        if isinstance(cached_metadata, dict):
+            cached_metadata = dict(cached_metadata)
+        else:
+            cached_metadata = {}
+        cached_metadata["cache"] = _build_cache_metadata(
+            "hit", _resolve_cache_ttl_seconds(cache)
+        )
+        return {
+            "answer": cached["answer"],
+            "metadata": cached_metadata,
+        }
 
     prompt = _build_prompt(normalized_question, context)
     started_at = time.perf_counter()
@@ -271,6 +525,9 @@ def ask_admission_qa(question: str, context: Dict[str, Any] | None = None) -> Di
             "toolsUsed": fallback_tools,
             "domain": "admission-rules-and-scores",
             "mode": "fallback-without-llm",
+            "cache": _build_cache_metadata(
+                cache_status, _resolve_cache_ttl_seconds(cache)
+            ),
         }
         if graph_error is not None:
             metadata["unavailableReason"] = str(graph_error)
@@ -333,7 +590,9 @@ def ask_admission_qa(question: str, context: Dict[str, Any] | None = None) -> Di
         )
         if should_lookup:
             try:
-                score_text = get_historical_scores.invoke({"query": normalized_question, "top_k": 5})
+                score_text = get_historical_scores.invoke(
+                    {"query": normalized_question, "top_k": 5}
+                )
                 if isinstance(score_text, str):
                     score_text = score_text.strip()
                     if _score_result_has_data(score_text):
@@ -342,14 +601,16 @@ def ask_admission_qa(question: str, context: Dict[str, Any] | None = None) -> Di
                             f"{score_text}\n\n"
                             "Nếu bạn muốn, mình có thể lọc tiếp theo mã ngành hoặc phương thức xét tuyển cụ thể."
                         )
-                        deduped_tools = list(dict.fromkeys([*deduped_tools, "get_historical_scores"]))
+                        deduped_tools = list(
+                            dict.fromkeys([*deduped_tools, "get_historical_scores"])
+                        )
                         score_recovery_applied = True
             except Exception as exc:
                 logger.warning("Score guardrail lookup failed: %s", exc)
 
     latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
 
-    return {
+    result = {
         "answer": answer,
         "metadata": {
             "provider": "langgraph",
@@ -358,5 +619,24 @@ def ask_admission_qa(question: str, context: Dict[str, Any] | None = None) -> Di
             "toolsUsed": deduped_tools,
             "domain": "admission-rules-and-scores",
             "scoreRecoveryApplied": score_recovery_applied,
+            "cache": _build_cache_metadata(
+                cache_status, _resolve_cache_ttl_seconds(cache)
+            ),
         },
     }
+    if (
+        cache_enabled
+        and cache is not None
+        and digest is not None
+        and cache_status == "miss"
+    ):
+        try:
+            cache.set(
+                digest, {"answer": result["answer"], "metadata": result["metadata"]}
+            )
+            if not getattr(cache, "enabled", True):
+                _mark_cache_runtime_failure(cache)
+        except Exception as exc:
+            _mark_cache_runtime_failure(cache)
+            logger.warning("QA cache write failed, skipping write: %s", exc)
+    return result

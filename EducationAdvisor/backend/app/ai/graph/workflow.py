@@ -203,6 +203,30 @@ def get_llms():
 # 2. Create Expert Agents with Proper System Prompts
 # ============================================================================
 
+def _bound_tools_match_create_react_agent(candidate_llm, tools) -> bool:
+    kwargs = getattr(candidate_llm, "kwargs", None)
+    if not isinstance(kwargs, dict):
+        return False
+
+    bound_tools = kwargs.get("tools")
+    if not isinstance(bound_tools, list) or len(bound_tools) != len(tools):
+        return False
+
+    expected_names = {tool.name for tool in tools}
+    bound_names = set()
+    for bound_tool in bound_tools:
+        if not isinstance(bound_tool, dict):
+            continue
+        if bound_tool.get("type") == "function":
+            function = bound_tool.get("function")
+            if isinstance(function, dict) and isinstance(function.get("name"), str):
+                bound_names.add(function["name"])
+        elif isinstance(bound_tool.get("name"), str):
+            bound_names.add(bound_tool["name"])
+
+    return expected_names == bound_names
+
+
 def create_expert_agent(llm, tools, system_prompt):
     """
     Create a ReAct agent with a custom system prompt.
@@ -215,12 +239,15 @@ def create_expert_agent(llm, tools, system_prompt):
     Returns:
         Function that acts as an agent node
     """
-    # FIX: Tắt parallel_tool_calls để tránh Groq gọi tool hàng chục lần song song
-    # Groq LLaMA mặc định bật parallel_tool_calls → gây loop 50+ lần → nổ token
+    llm_with_tools = llm
     if tools:
-        llm_with_tools = llm.bind_tools(tools, parallel_tool_calls=False)
-    else:
-        llm_with_tools = llm
+        try:
+            candidate_llm = llm.bind_tools(tools, parallel_tool_calls=False)
+        except Exception as exc:
+            logger.warning("Provider-side tool binding failed; letting LangGraph bind tools: %s", exc)
+        else:
+            if _bound_tools_match_create_react_agent(candidate_llm, tools):
+                llm_with_tools = candidate_llm
     return create_react_agent(model=llm_with_tools, tools=tools, state_modifier=system_prompt)
 
 

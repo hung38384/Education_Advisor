@@ -1,5 +1,5 @@
 import { Database } from 'better-sqlite3';
-import { ReviewRecommendation, ReviewResult } from '../model/review.model';
+import { ReviewFeaturedMethod, ReviewRecommendation, ReviewResult } from '../model/review.model';
 
 export interface CreateReviewResultInput {
     userId: number;
@@ -24,39 +24,142 @@ interface ReviewResultRow {
     createdAt: string;
 }
 
+function parseFeaturedMethod(value: unknown): ReviewFeaturedMethod | null {
+    if (value == null) {
+        return null;
+    }
+
+    if (typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('Invalid review_result.recommendations JSON');
+    }
+
+    const record = value as Record<string, unknown>;
+    const methodTag = typeof record.methodTag === 'string' ? record.methodTag.trim() : '';
+    if (!methodTag) {
+        throw new Error('Invalid review_result.recommendations JSON');
+    }
+
+    const latestYear = record.latestYear == null
+        ? null
+        : (typeof record.latestYear === 'number' && Number.isFinite(record.latestYear)
+            ? Math.round(record.latestYear)
+            : null);
+
+    if (record.latestYear != null && latestYear == null) {
+        throw new Error('Invalid review_result.recommendations JSON');
+    }
+
+    const latestScore = record.latestScore == null
+        ? null
+        : (typeof record.latestScore === 'number' && Number.isFinite(record.latestScore)
+            ? record.latestScore
+            : null);
+
+    if (record.latestScore != null && latestScore == null) {
+        throw new Error('Invalid review_result.recommendations JSON');
+    }
+
+    if (record.methodAlias != null && typeof record.methodAlias !== 'string') {
+        throw new Error('Invalid review_result.recommendations JSON');
+    }
+
+    if (record.shortComment != null && typeof record.shortComment !== 'string') {
+        throw new Error('Invalid review_result.recommendations JSON');
+    }
+
+    return {
+        methodTag,
+        methodAlias: typeof record.methodAlias === 'string' ? record.methodAlias : null,
+        latestYear,
+        latestScore,
+        shortComment: typeof record.shortComment === 'string' ? record.shortComment : '',
+    };
+}
+
 function parseRecommendations(rawValue: string): ReviewRecommendation[] {
+    let parsed: unknown;
     try {
-        const parsed = JSON.parse(rawValue);
-        if (!Array.isArray(parsed)) {
-            return [];
+        parsed = JSON.parse(rawValue);
+    } catch {
+        throw new Error('Invalid review_result.recommendations JSON');
+    }
+
+    if (!Array.isArray(parsed)) {
+        throw new Error('Invalid review_result.recommendations JSON');
+    }
+
+    return parsed.map((item) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw new Error('Invalid review_result.recommendations JSON');
         }
 
-        return parsed
-            .filter((item) => item && typeof item === 'object')
-            .map((item) => {
-                const value = item as Partial<ReviewRecommendation>;
-                return {
-                    name: String(value.name ?? ''),
-                    score: Number(value.score ?? 0),
-                    reason: String(value.reason ?? ''),
-                };
-            });
-    } catch {
-        return [];
-    }
+        const value = item as Record<string, unknown>;
+
+        const name = typeof value.name === 'string' ? value.name.trim() : '';
+        const reason = typeof value.reason === 'string' ? value.reason.trim() : '';
+        const score = value.score;
+
+        if (!name || !reason || typeof score !== 'number' || !Number.isFinite(score)) {
+            throw new Error('Invalid review_result.recommendations JSON');
+        }
+
+        const hasAnyRichField = value.universityCode != null
+            || value.majorCode != null
+            || value.majorName != null
+            || value.universityName != null
+            || value.featuredMethod != null;
+
+        if (!hasAnyRichField) {
+            return {
+                name,
+                score,
+                reason,
+                universityCode: '',
+                universityName: null,
+                majorCode: '',
+                majorName: name,
+                featuredMethod: null,
+            };
+        }
+
+        const universityCode = typeof value.universityCode === 'string' ? value.universityCode.trim() : '';
+        const majorCode = typeof value.majorCode === 'string' ? value.majorCode.trim() : '';
+        const majorName = typeof value.majorName === 'string' ? value.majorName.trim() : '';
+
+        if (!universityCode || !majorCode || !majorName) {
+            throw new Error('Invalid review_result.recommendations JSON');
+        }
+
+        if (value.universityName != null && typeof value.universityName !== 'string') {
+            throw new Error('Invalid review_result.recommendations JSON');
+        }
+
+        return {
+            name,
+            score,
+            reason,
+            universityCode,
+            universityName: typeof value.universityName === 'string' ? value.universityName : null,
+            majorCode,
+            majorName,
+            featuredMethod: parseFeaturedMethod(value.featuredMethod),
+        };
+    });
 }
 
 function parseSnapshot(rawValue: string): Record<string, unknown> {
+    let parsed: unknown;
     try {
-        const parsed = JSON.parse(rawValue);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            return {};
-        }
-
-        return parsed as Record<string, unknown>;
+        parsed = JSON.parse(rawValue);
     } catch {
-        return {};
+        throw new Error('Invalid review_result.inputSnapshot JSON');
     }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Invalid review_result.inputSnapshot JSON');
+    }
+
+    return parsed as Record<string, unknown>;
 }
 
 function toModel(row: ReviewResultRow): ReviewResult {

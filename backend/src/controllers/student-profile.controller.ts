@@ -28,7 +28,7 @@ export class StudentProfileController {
             }
 
             const body = await parseBody(req);
-            const result = this.service.upsertMyProfile(req.user.userId, {
+            const result = await this.service.upsertMyProfile(req.user.userId, {
                 fullName: body.fullName,
                 phone: body.phone,
                 gender: body.gender,
@@ -38,6 +38,7 @@ export class StudentProfileController {
                 grade10: body.grade10,
                 grade11: body.grade11,
                 grade12: body.grade12,
+                transcript: body.transcript,
                 favoriteSubjects: body.favoriteSubjects,
                 targetMajor: body.targetMajor,
                 targetUniversity: body.targetUniversity,

@@ -111,6 +111,7 @@ export function createDatabase(databasePath?: string) {
       grade10 REAL,
       grade11 REAL,
       grade12 REAL,
+      transcript TEXT,
       favoriteSubjects TEXT,
       targetMajor TEXT,
       targetUniversity TEXT,
@@ -136,6 +137,7 @@ export function createDatabase(databasePath?: string) {
       schoolId TEXT NOT NULL,
       majorId TEXT NOT NULL,
       methodId TEXT NOT NULL,
+      snapshot TEXT,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES "user"(id) ON DELETE CASCADE,
       UNIQUE(userId, schoolId, majorId, methodId)
@@ -311,6 +313,12 @@ export function createDatabase(databasePath?: string) {
   // Migration: Add QA conversation support
   if (!columnExists('qa_message', 'conversationId')) {
     db.exec('ALTER TABLE qa_message ADD COLUMN conversationId INTEGER');
+  }
+  if (!columnExists('admission_cart_item', 'snapshot')) {
+    db.exec('ALTER TABLE admission_cart_item ADD COLUMN snapshot TEXT');
+  }
+  if (!columnExists('student_profile', 'transcript')) {
+    db.exec('ALTER TABLE student_profile ADD COLUMN transcript TEXT');
   }
 
   db.exec(`

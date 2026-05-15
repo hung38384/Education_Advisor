@@ -18,12 +18,12 @@ for _stream in (sys.stdout, sys.stderr):
 
 from app.core.config import settings
 from app.db.connection import connect_to_mongo, close_mongo_connection
-from app.api.routes import advisor, fast_predict
+from app.api.routes import advisor, ai_qa, fast_predict, admissions
 
 # Configure logging
 logging.basicConfig(
     level=settings.LOG_LEVEL,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -32,26 +32,26 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager for FastAPI application.
-    
+
     Manages startup and shutdown events:
     - Startup: Establishes MongoDB connection
     - Shutdown: Closes MongoDB connection
-    
+
     This replaces the deprecated @app.on_event decorator pattern.
     """
     # Startup
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.APP_VERSION}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
-    
+
     try:
         await connect_to_mongo()
         logger.info("Application startup completed successfully")
     except Exception as e:
         logger.error(f"Failed to start application: {str(e)}")
         raise
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down application...")
     try:
@@ -85,12 +85,15 @@ app.add_middleware(
 
 app.include_router(advisor.router, prefix="/api/v1")
 app.include_router(fast_predict.router, prefix="/api/v1")
+app.include_router(admissions.router, prefix="/api/v1")
+app.include_router(ai_qa.router)
+
 
 @app.get("/", tags=["Health"])
 async def root():
     """
     Root endpoint to verify API is running.
-    
+
     Returns:
         dict: Basic application information
     """
@@ -107,7 +110,7 @@ async def root():
 async def health_check():
     """
     Health check endpoint for monitoring application status.
-    
+
     Returns:
         dict: Health status information
     """
@@ -123,7 +126,7 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
@@ -131,4 +134,3 @@ if __name__ == "__main__":
         reload=settings.DEBUG,
         log_level=settings.LOG_LEVEL.lower(),
     )
-

@@ -71,6 +71,18 @@ export interface AskQAInput {
     conversationId?: number;
 }
 
+export type AskQuestionResponse = AskQAResponse;
+
+export interface AdvisePayload {
+    conversationId?: number;
+    universityCode: string;
+    universityName?: string | null;
+    majorCode: string;
+    majorName: string;
+    methodTag?: string | null;
+    targetYear?: number | null;
+}
+
 function buildDeleteConversationPath(conversationId: number): string {
     return API_ROUTES.QA.CONVERSATION_DELETE.replace('{id}', String(conversationId));
 }
@@ -107,6 +119,11 @@ export const qaService = {
             question: input.question,
             ...(typeof input.conversationId === 'number' ? { conversationId: input.conversationId } : {}),
         });
+        return response.data;
+    },
+
+    async advise(payload: AdvisePayload): Promise<AskQuestionResponse> {
+        const response = await api.post<AskQuestionResponse>('/qa/advise', payload);
         return response.data;
     },
 };

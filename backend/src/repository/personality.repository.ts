@@ -30,7 +30,7 @@ function parseAnswers(rawValue: string): Record<string, PersonalityAnswer> {
         }
 
         return Object.entries(parsed).reduce<Record<string, PersonalityAnswer>>((acc, [key, value]) => {
-            if (value === 'A' || value === 'B') {
+            if (value === 'A' || value === 'B' || value === 'C' || value === 'D') {
                 acc[key] = value;
             }
             return acc;

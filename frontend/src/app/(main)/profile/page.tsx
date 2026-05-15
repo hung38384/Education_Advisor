@@ -7,6 +7,20 @@ import { Button, Card, Input, Textarea } from '@/components/ui';
 import { useMyProfile, useUpsertMyProfile } from '@/hooks/useProfile';
 import { getApiErrorMessage } from '@/lib/api-error';
 
+const REQUIRED_TRANSCRIPT_SUBJECTS = [
+    'Toán',
+    'Ngữ văn',
+    'Ngoại ngữ',
+    'Vật lý',
+    'Hóa học',
+    'Sinh học',
+    'Lịch sử',
+    'Địa lý',
+    'Giáo dục công dân',
+] as const;
+
+type TranscriptFormState = Record<string, string>;
+
 interface ProfileFormState {
     fullName: string;
     phone: string;
@@ -17,10 +31,15 @@ interface ProfileFormState {
     grade10: string;
     grade11: string;
     grade12: string;
+    transcript: TranscriptFormState;
     favoriteSubjects: string;
     targetMajor: string;
     targetUniversity: string;
     bio: string;
+}
+
+function createEmptyTranscript(): TranscriptFormState {
+    return Object.fromEntries(REQUIRED_TRANSCRIPT_SUBJECTS.map((subject) => [subject, '']));
 }
 
 const EMPTY_FORM: ProfileFormState = {
@@ -33,6 +52,7 @@ const EMPTY_FORM: ProfileFormState = {
     grade10: '',
     grade11: '',
     grade12: '',
+    transcript: createEmptyTranscript(),
     favoriteSubjects: '',
     targetMajor: '',
     targetUniversity: '',
@@ -53,6 +73,20 @@ function toNullableNumber(value: string): number | null {
     return parsed;
 }
 
+function toTranscriptPayload(transcript: TranscriptFormState): Record<string, number> | null {
+    const payload: Record<string, number> = {};
+
+    for (const subject of REQUIRED_TRANSCRIPT_SUBJECTS) {
+        const parsed = toNullableNumber(transcript[subject] ?? '');
+        if (parsed === null) {
+            return null;
+        }
+        payload[subject] = parsed;
+    }
+
+    return payload;
+}
+
 export default function ProfilePage() {
     const profileQuery = useMyProfile();
     const upsertProfileMutation = useUpsertMyProfile();
@@ -61,6 +95,7 @@ export default function ProfilePage() {
     const [message, setMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const hasHydratedForm = useRef(false);
+    const transcriptFieldsetRef = useRef<HTMLFieldSetElement>(null);
 
     useEffect(() => {
         if (hasHydratedForm.current || !profileQuery.isSuccess) {
@@ -79,6 +114,12 @@ export default function ProfilePage() {
                 grade10: profile.grade10 == null ? '' : String(profile.grade10),
                 grade11: profile.grade11 == null ? '' : String(profile.grade11),
                 grade12: profile.grade12 == null ? '' : String(profile.grade12),
+                transcript: Object.fromEntries(
+                    REQUIRED_TRANSCRIPT_SUBJECTS.map((subject) => [
+                        subject,
+                        profile.transcript?.[subject] == null ? '' : String(profile.transcript[subject]),
+                    ])
+                ),
                 favoriteSubjects: (profile.favoriteSubjects ?? []).join(', '),
                 targetMajor: profile.targetMajor ?? '',
                 targetUniversity: profile.targetUniversity ?? '',
@@ -94,6 +135,13 @@ export default function ProfilePage() {
         setMessage(null);
         setErrorMessage(null);
 
+        const transcript = toTranscriptPayload(form.transcript);
+        if (!transcript) {
+            setErrorMessage('Vui lòng nhập điểm tất cả các môn học');
+            transcriptFieldsetRef.current?.focus();
+            return;
+        }
+
         try {
             await upsertProfileMutation.mutateAsync({
                 fullName: form.fullName,
@@ -105,6 +153,7 @@ export default function ProfilePage() {
                 grade10: toNullableNumber(form.grade10),
                 grade11: toNullableNumber(form.grade11),
                 grade12: toNullableNumber(form.grade12),
+                transcript,
                 favoriteSubjects: form.favoriteSubjects
                     .split(',')
                     .map((item) => item.trim())
@@ -118,6 +167,8 @@ export default function ProfilePage() {
             setErrorMessage(getApiErrorMessage(error, 'Không thể lưu hồ sơ'));
         }
     };
+
+    const transcriptErrorMessage = errorMessage === 'Vui lòng nhập điểm tất cả các môn học' ? errorMessage : null;
 
     return (
         <main className="space-y-5">
@@ -258,6 +309,43 @@ export default function ProfilePage() {
                                 />
                             </label>
                         </div>
+                        <fieldset
+                            ref={transcriptFieldsetRef}
+                            className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 md:col-span-2 md:grid-cols-3"
+                            aria-describedby={transcriptErrorMessage ? 'transcript-help transcript-error' : 'transcript-help'}
+                            aria-invalid={transcriptErrorMessage ? true : undefined}
+                            tabIndex={-1}
+                        >
+                            <legend className="text-base font-semibold text-slate-900 md:col-span-3">Điểm tất cả các môn học</legend>
+                            <p id="transcript-help" className="text-sm text-slate-600 md:col-span-3">
+                                Nhập đủ điểm từng môn bắt buộc theo thang 0-10 để hệ thống tư vấn chính xác hơn.
+                            </p>
+                            {transcriptErrorMessage && (
+                                <p id="transcript-error" className="text-sm text-red-700 md:col-span-3" role="alert">
+                                    {transcriptErrorMessage}
+                                </p>
+                            )}
+                            {REQUIRED_TRANSCRIPT_SUBJECTS.map((subject) => (
+                                <label key={subject} className="grid gap-1 text-sm font-medium text-slate-700">
+                                    {subject} <span className="text-red-700">(bắt buộc)</span>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={10}
+                                        step="0.1"
+                                        value={form.transcript[subject] ?? ''}
+                                        onChange={(event) => setForm((prev) => ({
+                                            ...prev,
+                                            transcript: {
+                                                ...prev.transcript,
+                                                [subject]: event.target.value,
+                                            },
+                                        }))}
+                                        required
+                                    />
+                                </label>
+                            ))}
+                        </fieldset>
                         <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
                             Ghi chú cá nhân
                             <Textarea
@@ -275,8 +363,8 @@ export default function ProfilePage() {
                     </form>
                 )}
 
-                {message && <p className="text-sm text-green-700">{message}</p>}
-                {errorMessage && <p className="text-sm text-red-700">{errorMessage}</p>}
+                {message && <p className="text-sm text-green-700" role="status">{message}</p>}
+                {errorMessage && !transcriptErrorMessage && <p className="text-sm text-red-700" role="alert">{errorMessage}</p>}
             </Card>
         </main>
     );

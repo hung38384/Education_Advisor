@@ -12,7 +12,7 @@ export class ReviewController {
                 return;
             }
 
-            const result = this.service.run(req.user.userId);
+            const result = await this.service.run(req.user.userId);
             sendSuccess(res, result);
         } catch (error) {
             this.handleError(res, error, 'Không thể chạy đánh giá độ phù hợp');

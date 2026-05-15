@@ -1,98 +1,70 @@
 'use client';
 
+import Link from 'next/link';
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
 import { Button, Card } from '@/components/ui';
-import { useLatestPersonality, usePersonalityQuestions, useSubmitPersonality } from '@/hooks/usePersonality';
+import { usePersonalityQuestions, useSubmitPersonality } from '@/hooks/usePersonality';
 import { getApiErrorMessage } from '@/lib/api-error';
+import type { PersonalityAnswer, PersonalitySubmission } from '@/services/personalityService';
 import {
-    ASSESSMENT_TESTS,
-    LOCAL_TEST_QUESTIONS,
-    type AssessmentQuestion,
-    type AssessmentResult,
-    type AssessmentTestId,
-    scoreAssessment,
-    toMbtiAssessmentQuestions,
-    toMbtiPayload,
-} from './personality-tests';
+    canAdvanceFromQuestion,
+    canSubmitCurrentStep,
+    canSubmitQuiz,
+    getNextQuestionIndex,
+    getPersonalityQuizMode,
+} from './personality-flow';
+import { assessmentTests, mapBackendQuestion } from './personality-tests';
 
 export default function PersonalityPage() {
     const questionsQuery = usePersonalityQuestions();
-    const latestQuery = useLatestPersonality();
     const submitMutation = useSubmitPersonality();
 
-    const [selectedTestId, setSelectedTestId] = useState<AssessmentTestId | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, string>>({});
-    const [result, setResult] = useState<AssessmentResult | null>(null);
+    const [answers, setAnswers] = useState<Record<string, PersonalityAnswer>>({});
+    const [submittedResult, setSubmittedResult] = useState<PersonalitySubmission | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const mbtiQuestions = useMemo(
-        () => toMbtiAssessmentQuestions(questionsQuery.data?.questions ?? []),
+    const questions = useMemo(
+        () => (questionsQuery.data?.questions ?? []).map((question) => mapBackendQuestion(question)),
         [questionsQuery.data?.questions]
     );
 
-    const activeQuestions = useMemo<AssessmentQuestion[]>(() => {
-        if (!selectedTestId) {
-            return [];
-        }
-
-        if (selectedTestId === 'mbti') {
-            return mbtiQuestions;
-        }
-
-        return LOCAL_TEST_QUESTIONS[selectedTestId];
-    }, [mbtiQuestions, selectedTestId]);
-
-    const selectedTest = selectedTestId
-        ? ASSESSMENT_TESTS.find((test) => test.id === selectedTestId) ?? null
-        : null;
-    const currentQuestion = activeQuestions[currentIndex];
-    const answeredCount = activeQuestions.filter((question) => answers[question.id]).length;
-    const allAnswered = activeQuestions.length > 0 && answeredCount === activeQuestions.length;
-    const isFirstQuestion = currentIndex === 0;
-    const isLastQuestion = currentIndex === activeQuestions.length - 1;
+    const test = assessmentTests[0];
+    const currentQuestion = questions[currentIndex];
+    const questionIds = useMemo(() => questions.map((question) => question.id), [questions]);
+    const answeredCount = questions.filter((question) => answers[question.id]).length;
+    const canSubmit = canSubmitQuiz(answers, questionIds);
+    const isLastQuestion = currentIndex === questions.length - 1;
+    const canSubmitCurrentQuestion = canSubmitCurrentStep(isLastQuestion, canSubmit);
+    const currentQuestionAnswered = currentQuestion ? canAdvanceFromQuestion(answers, currentQuestion.id) : false;
+    const progressWidth = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
+    const quizMode = getPersonalityQuizMode({
+        questionsCount: questions.length,
+        submittedResult,
+        latestSubmission: null,
+        isLoading: questionsQuery.isLoading,
+        isError: questionsQuery.isError,
+    });
 
     const resetTestProgress = () => {
         setCurrentIndex(0);
         setAnswers({});
-        setResult(null);
+        setSubmittedResult(null);
         setErrorMessage(null);
-    };
-
-    const handleSelectTest = (testId: AssessmentTestId) => {
-        setSelectedTestId(testId);
-        resetTestProgress();
-    };
-
-    const handleBackToSelection = () => {
-        setSelectedTestId(null);
-        resetTestProgress();
     };
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setErrorMessage(null);
-        setResult(null);
 
-        if (!selectedTestId) {
-            setErrorMessage('Vui lòng chọn bài kiểm tra trước khi làm bài.');
-            return;
-        }
-
-        if (!allAnswered) {
-            setErrorMessage('Vui lòng trả lời tất cả câu hỏi trước khi nộp bài.');
+        if (!canSubmitCurrentQuestion) {
             return;
         }
 
         try {
-            if (selectedTestId === 'mbti') {
-                const response = await submitMutation.mutateAsync({ answers: toMbtiPayload(answers) });
-                setResult(scoreAssessment(selectedTestId, activeQuestions, answers, response.submission.mbtiType));
-                return;
-            }
-
-            setResult(scoreAssessment(selectedTestId, activeQuestions, answers));
+            const response = await submitMutation.mutateAsync({ answers });
+            setSubmittedResult(response.submission);
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'Không thể nộp bài đánh giá'));
         }
@@ -103,79 +75,42 @@ export default function PersonalityPage() {
             <div className="space-y-1">
                 <h1 className="text-2xl font-semibold text-slate-900">Đánh giá tính cách</h1>
                 <p className="text-sm text-slate-600">
-                    Chọn bài kiểm tra trước, sau đó hệ thống sẽ hiển thị từng câu hỏi để bạn làm bài.
+                    Hoàn thành {test.title} bằng câu hỏi từ hệ thống để nhận kết quả MBTI và điểm theo từng cặp tính cách.
                 </p>
             </div>
 
-            {!selectedTest && !result && (
-                <Card className="space-y-4">
-                    <div className="space-y-1">
-                        <h2 className="text-lg font-semibold text-slate-900">Chọn bài kiểm tra</h2>
-                        <p className="text-sm text-slate-600">
-                            Nội dung câu hỏi chỉ hiển thị sau khi bạn chọn MBTI, EQ hoặc DISC.
-                        </p>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                        {ASSESSMENT_TESTS.map((test) => (
-                            <button
-                                key={test.id}
-                                type="button"
-                                className="rounded-lg border border-slate-200 bg-white p-4 text-left text-slate-900 transition-colors hover:border-slate-900 hover:bg-slate-50"
-                                onClick={() => handleSelectTest(test.id)}
-                            >
-                                <span className="text-lg font-semibold">{test.name}</span>
-                                <span className="mt-2 block text-sm text-slate-600">{test.description}</span>
-                                <span className="mt-3 inline-flex text-sm font-medium text-slate-900">Bắt đầu làm bài</span>
-                            </button>
-                        ))}
-                    </div>
-                </Card>
-            )}
-
-            {selectedTest && !result && (
+            {quizMode !== 'result' && (
                 <>
                     <Card className="space-y-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <h2 className="text-lg font-semibold text-slate-900">Bài kiểm tra đang làm: {selectedTest.name}</h2>
-                                {selectedTestId === 'mbti' && (
-                                    <p className="mt-1 text-sm text-slate-700">
-                                        Kết quả MBTI gần nhất: <strong>{latestQuery.data?.submission?.mbtiType ?? 'Chưa có'}</strong>
-                                    </p>
-                                )}
-                                <p className="mt-1 text-sm text-slate-700">
-                                    Đã trả lời: {answeredCount}/{activeQuestions.length}
+                            <div className="space-y-1">
+                                <h2 className="text-lg font-semibold text-slate-900">{test.title}</h2>
+                                <p className="text-sm text-slate-600">{test.description}</p>
+                                <p className="text-sm text-slate-700">
+                                    Tiến độ: {answeredCount}/{questions.length} câu đã trả lời
                                 </p>
-                                {selectedTestId !== 'mbti' && (
-                                    <p className="mt-1 text-sm text-amber-700">
-                                        EQ và DISC được chấm trực tiếp trên giao diện trong phiên bản này.
-                                    </p>
-                                )}
+                                <p className="text-sm text-slate-700">
+                                    Mỗi câu là một bước riêng. Bạn cần chọn đáp án hiện tại để đi tiếp và không thể quay lại câu trước.
+                                </p>
                             </div>
-                            <Button type="button" variant="secondary" onClick={handleBackToSelection}>
-                                Đổi bài kiểm tra
-                            </Button>
                         </div>
                     </Card>
 
                     <Card className="space-y-4">
-                        {selectedTestId === 'mbti' && questionsQuery.isLoading ? (
+                        {quizMode === 'loading' ? (
                             <p className="text-sm text-slate-700">Đang tải câu hỏi MBTI...</p>
-                        ) : selectedTestId === 'mbti' && questionsQuery.isError ? (
+                        ) : quizMode === 'error' ? (
                             <p className="text-sm text-red-700">Không tải được câu hỏi MBTI.</p>
-                        ) : !currentQuestion ? (
-                            <p className="text-sm text-slate-700">Chưa có câu hỏi cho bài kiểm tra này.</p>
+                        ) : quizMode === 'empty' ? (
+                            <p className="text-sm text-slate-700">Chưa có câu hỏi MBTI từ hệ thống.</p>
                         ) : (
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <p className="text-sm font-medium text-slate-600">
-                                        Câu {currentIndex + 1}/{activeQuestions.length}
+                                        Câu {currentIndex + 1}/{questions.length}
                                     </p>
                                     <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 md:w-56">
-                                        <div
-                                            className="h-full rounded-full bg-slate-900"
-                                            style={{ width: `${((currentIndex + 1) / activeQuestions.length) * 100}%` }}
-                                        />
+                                        <div className="h-full rounded-full bg-slate-900" style={{ width: `${progressWidth}%` }} />
                                     </div>
                                 </div>
 
@@ -199,30 +134,29 @@ export default function PersonalityPage() {
                                                         }))
                                                     }
                                                 />
-                                                <span>{choice.label}</span>
+                                                <span>
+                                                    <strong className="mr-2 text-slate-900">{choice.value}</strong>
+                                                    {choice.label}
+                                                </span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap justify-between gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        disabled={isFirstQuestion}
-                                        onClick={() => setCurrentIndex((index) => Math.max(index - 1, 0))}
-                                    >
-                                        Trước
-                                    </Button>
+                                <div className="flex justify-end">
                                     {isLastQuestion ? (
-                                        <Button type="submit" disabled={submitMutation.isPending || !allAnswered}>
+                                        <Button type="submit" disabled={submitMutation.isPending || !canSubmitCurrentQuestion}>
                                             {submitMutation.isPending ? 'Đang nộp...' : 'Nộp bài'}
                                         </Button>
                                     ) : (
                                         <Button
                                             type="button"
-                                            disabled={!answers[currentQuestion.id]}
-                                            onClick={() => setCurrentIndex((index) => Math.min(index + 1, activeQuestions.length - 1))}
+                                            disabled={!currentQuestionAnswered}
+                                            onClick={() =>
+                                                setCurrentIndex((index) =>
+                                                    getNextQuestionIndex(index, questions.length, currentQuestion.id, answers)
+                                                )
+                                            }
                                         >
                                             Tiếp theo
                                         </Button>
@@ -236,26 +170,29 @@ export default function PersonalityPage() {
                 </>
             )}
 
-            {result && selectedTest && (
+            {quizMode === 'result' && submittedResult && (
                 <Card className="space-y-3 border-slate-900">
                     <h2 className="text-lg font-semibold text-slate-900">Kết quả đánh giá</h2>
-                    <p className="text-sm text-slate-600">Bài kiểm tra: {selectedTest.name}</p>
-                    <p className="text-base font-semibold text-slate-900">{result.title}</p>
-                    <div>
-                        <p className="text-sm font-semibold text-slate-900">Nhận xét tính cách</p>
-                        <p className="mt-1 text-sm text-slate-700">{result.summary}</p>
+                    <p className="text-base font-semibold text-slate-900">Kết quả MBTI: {submittedResult.mbtiType}</p>
+                    <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                        <p>E {submittedResult.scores.E} - I {submittedResult.scores.I}</p>
+                        <p>S {submittedResult.scores.S} - N {submittedResult.scores.N}</p>
+                        <p>T {submittedResult.scores.T} - F {submittedResult.scores.F}</p>
+                        <p>J {submittedResult.scores.J} - P {submittedResult.scores.P}</p>
                     </div>
-                    <div>
-                        <p className="text-sm font-semibold text-slate-900">Gợi ý học tập</p>
-                        <p className="mt-1 text-sm text-slate-700">{result.recommendation}</p>
-                    </div>
+                    <p className="text-sm text-slate-600">
+                        Kết quả này sẽ được dùng cùng hồ sơ học tập để gợi ý mức độ phù hợp ngành và trường.
+                    </p>
                     <div className="flex flex-wrap gap-2">
                         <Button type="button" variant="secondary" onClick={resetTestProgress}>
                             Làm lại bài này
                         </Button>
-                        <Button type="button" variant="secondary" onClick={handleBackToSelection}>
-                            Chọn bài kiểm tra khác
-                        </Button>
+                        <Link
+                            href="/review"
+                            className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                        >
+                            Sang trang đánh giá phù hợp
+                        </Link>
                     </div>
                 </Card>
             )}
