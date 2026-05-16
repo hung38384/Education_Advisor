@@ -13,12 +13,23 @@ export interface StudentProfile {
     grade10: number | null;
     grade11: number | null;
     grade12: number | null;
+    transcript: Record<string, number> | null;
+    certificates: StudentCertificate[];
     favoriteSubjects: string[];
     targetMajor: string | null;
     targetUniversity: string | null;
     bio: string | null;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface StudentCertificate {
+    type: string;
+    name: string;
+    score: number | null;
+    issuedAt: string | null;
+    expiresAt: string | null;
+    note: string | null;
 }
 
 export interface UpsertProfilePayload {
@@ -31,6 +42,8 @@ export interface UpsertProfilePayload {
     grade10?: number | null;
     grade11?: number | null;
     grade12?: number | null;
+    transcript?: Record<string, number> | null;
+    certificates?: StudentCertificate[];
     favoriteSubjects?: string[];
     targetMajor?: string | null;
     targetUniversity?: string | null;

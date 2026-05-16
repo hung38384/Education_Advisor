@@ -3,7 +3,7 @@ import {
     admissionService,
     type AdmissionCartResponse,
     type AdmissionCartViewItem,
-    type AdmissionCatalogResponse,
+    type AdmissionSearchParams,
     type CreateAdmissionCartPayload,
 } from '@/services/admissionService';
 
@@ -38,18 +38,7 @@ function createEmptyCart(): AdmissionCartResponse {
     };
 }
 
-function createOptimisticCartItem(
-    payload: CreateAdmissionCartPayload,
-    catalog: AdmissionCatalogResponse | undefined
-): AdmissionCartViewItem | null {
-    const school = catalog?.schools.find((entry) => entry.id === payload.schoolId);
-    const major = school?.majors.find((entry) => entry.id === payload.majorId);
-    const method = major?.admissionMethods.find((entry) => entry.id === payload.methodId);
-
-    if (!school || !major || !method) {
-        return null;
-    }
-
+function createOptimisticCartItem(payload: CreateAdmissionCartPayload): AdmissionCartViewItem {
     const optimisticId = nextOptimisticCartItemId;
     nextOptimisticCartItemId -= 1;
 
@@ -57,21 +46,21 @@ function createOptimisticCartItem(
         id: optimisticId,
         createdAt: new Date().toISOString(),
         school: {
-            id: school.id,
-            name: school.name,
-            city: school.city,
+            id: payload.schoolId,
+            name: payload.snapshot.schoolName,
+            city: 'Chưa xác định',
         },
         major: {
-            id: major.id,
-            name: major.name,
-            field: major.field,
+            id: payload.majorId,
+            name: payload.snapshot.majorName,
+            field: 'social',
         },
         method: {
-            id: method.id,
-            name: method.name,
-            type: method.type,
-            requiredAverage: method.requiredAverage,
-            description: method.description,
+            id: payload.methodId,
+            name: payload.snapshot.methodName,
+            type: 'direct',
+            requiredAverage: payload.snapshot.requiredAverage,
+            description: payload.snapshot.description,
         },
         evaluation: {
             chanceScore: 0,
@@ -83,10 +72,10 @@ function createOptimisticCartItem(
     };
 }
 
-export function useAdmissionCatalog() {
+export function useAdmissionCatalog(params: AdmissionSearchParams) {
     return useQuery({
-        queryKey: ADMISSION_CATALOG_QUERY_KEY,
-        queryFn: admissionService.getCatalog,
+        queryKey: [...ADMISSION_CATALOG_QUERY_KEY, params],
+        queryFn: () => admissionService.listCatalog(params),
     });
 }
 
@@ -106,11 +95,10 @@ export function useAddAdmissionCartItem() {
             await queryClient.cancelQueries({ queryKey: ADMISSION_CART_QUERY_KEY });
 
             const previousCart = queryClient.getQueryData<AdmissionCartResponse>(ADMISSION_CART_QUERY_KEY);
-            const catalog = queryClient.getQueryData<AdmissionCatalogResponse>(ADMISSION_CATALOG_QUERY_KEY);
-            const optimisticItem = createOptimisticCartItem(payload, catalog);
+            const optimisticItem = createOptimisticCartItem(payload);
             const baseCart = previousCart ?? createEmptyCart();
 
-            if (optimisticItem && !baseCart.items.some((item) => hasSelection(item, payload))) {
+            if (!baseCart.items.some((item) => hasSelection(item, payload))) {
                 queryClient.setQueryData<AdmissionCartResponse>(ADMISSION_CART_QUERY_KEY, {
                     ...baseCart,
                     items: [...baseCart.items, optimisticItem],
@@ -119,7 +107,7 @@ export function useAddAdmissionCartItem() {
 
             return {
                 previousCart,
-                optimisticId: optimisticItem?.id,
+                optimisticId: optimisticItem.id,
             };
         },
         onError: (_error, _payload, context) => {

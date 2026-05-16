@@ -6,32 +6,52 @@ export type AdmissionChanceLevel = (typeof ADMISSION_CHANCE_LEVELS)[number];
 
 export type AdmissionMajorField = 'engineering' | 'business' | 'health' | 'social';
 
-export interface AdmissionMethod {
-    id: string;
-    name: string;
-    type: AdmissionMethodType;
+export interface AdmissionSearchParams {
+    q?: string;
+    year?: number;
+    methodTag?: string;
+    universityCode?: string;
+    minScore?: number;
+    maxScore?: number;
+    page?: number;
+    pageSize?: number;
+}
+
+export interface AdmissionCatalogMethod {
+    methodTag: string;
+    methodAlias: string | null;
+    subjectCombinations: string[];
+    yearlyScores: Array<{ year: number; score: number }>;
+    shortComment: string;
+}
+
+export interface AdmissionCatalogItem {
+    universityCode: string;
+    universityName: string | null;
+    majorCode: string;
+    majorName: string;
+    methods: AdmissionCatalogMethod[];
+}
+
+export interface AdmissionCatalogResponse {
+    items: AdmissionCatalogItem[];
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    filters: {
+        years: number[];
+        methodTags: string[];
+        universities: Array<{ code: string; name?: string | null }>;
+    };
+}
+
+export interface AdmissionFavoriteSnapshot {
+    schoolName: string;
+    majorName: string;
+    methodName: string;
     requiredAverage: number;
-    difficulty: number;
     description: string;
-    personalizedComment?: string;
-}
-
-export interface AdmissionMajor {
-    id: string;
-    name: string;
-    field: AdmissionMajorField;
-    admissionMethods: AdmissionMethod[];
-}
-
-export interface AdmissionSchool {
-    id: string;
-    name: string;
-    city: string;
-    majors: AdmissionMajor[];
-}
-
-export interface AdmissionCatalogResult {
-    schools: AdmissionSchool[];
 }
 
 export interface AdmissionCartItem {
@@ -40,6 +60,7 @@ export interface AdmissionCartItem {
     schoolId: string;
     majorId: string;
     methodId: string;
+    snapshot: AdmissionFavoriteSnapshot | null;
     createdAt: string;
 }
 
@@ -47,6 +68,7 @@ export interface CreateAdmissionCartItemInput {
     schoolId: string;
     majorId: string;
     methodId: string;
+    snapshot: AdmissionFavoriteSnapshot;
 }
 
 export interface AdmissionProfileSnapshot {

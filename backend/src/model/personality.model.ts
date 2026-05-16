@@ -1,12 +1,11 @@
+export type PersonalityAnswer = 'A' | 'B' | 'C' | 'D';
+
 export interface PersonalityQuestion {
     id: string;
     prompt: string;
     dimension: 'E/I' | 'S/N' | 'T/F' | 'J/P';
-    optionA: string;
-    optionB: string;
+    choices: Array<{ value: PersonalityAnswer; label: string }>;
 }
-
-export type PersonalityAnswer = 'A' | 'B';
 
 export interface PersonalityScores {
     E: number;

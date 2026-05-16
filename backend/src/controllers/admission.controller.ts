@@ -13,7 +13,16 @@ export class AdmissionController {
                 return;
             }
 
-            const result = this.service.listCatalog(req.user.userId);
+            const result = await this.service.listCatalog(req.user.userId, {
+                q: typeof req.query.q === 'string' ? req.query.q : undefined,
+                year: Number(req.query.year),
+                methodTag: typeof req.query.methodTag === 'string' ? req.query.methodTag : undefined,
+                universityCode: typeof req.query.universityCode === 'string' ? req.query.universityCode : undefined,
+                minScore: Number(req.query.minScore),
+                maxScore: Number(req.query.maxScore),
+                page: Number(req.query.page),
+                pageSize: Number(req.query.pageSize),
+            });
             sendSuccess(res, result);
         } catch (error) {
             this.handleError(res, error, 'Không thể lấy danh mục xét tuyển');
@@ -42,10 +51,16 @@ export class AdmissionController {
             }
 
             const body = await parseBody(req);
+            if (!body || typeof body !== 'object' || Array.isArray(body)) {
+                sendBadRequest(res, 'Thông tin lựa chọn xét tuyển không hợp lệ');
+                return;
+            }
+
             const result = this.service.addToFavorites(req.user.userId, {
                 schoolId: body.schoolId,
                 majorId: body.majorId,
                 methodId: body.methodId,
+                snapshot: body.snapshot,
             });
 
             sendSuccess(res, result, 201);

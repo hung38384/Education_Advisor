@@ -203,6 +203,30 @@ def get_llms():
 # 2. Create Expert Agents with Proper System Prompts
 # ============================================================================
 
+def _bound_tools_match_create_react_agent(candidate_llm, tools) -> bool:
+    kwargs = getattr(candidate_llm, "kwargs", None)
+    if not isinstance(kwargs, dict):
+        return False
+
+    bound_tools = kwargs.get("tools")
+    if not isinstance(bound_tools, list) or len(bound_tools) != len(tools):
+        return False
+
+    expected_names = {tool.name for tool in tools}
+    bound_names = set()
+    for bound_tool in bound_tools:
+        if not isinstance(bound_tool, dict):
+            continue
+        if bound_tool.get("type") == "function":
+            function = bound_tool.get("function")
+            if isinstance(function, dict) and isinstance(function.get("name"), str):
+                bound_names.add(function["name"])
+        elif isinstance(bound_tool.get("name"), str):
+            bound_names.add(bound_tool["name"])
+
+    return expected_names == bound_names
+
+
 def create_expert_agent(llm, tools, system_prompt):
     """
     Create a ReAct agent with a custom system prompt.
@@ -215,12 +239,15 @@ def create_expert_agent(llm, tools, system_prompt):
     Returns:
         Function that acts as an agent node
     """
-    # FIX: Tắt parallel_tool_calls để tránh Groq gọi tool hàng chục lần song song
-    # Groq LLaMA mặc định bật parallel_tool_calls → gây loop 50+ lần → nổ token
+    llm_with_tools = llm
     if tools:
-        llm_with_tools = llm.bind_tools(tools, parallel_tool_calls=False)
-    else:
-        llm_with_tools = llm
+        try:
+            candidate_llm = llm.bind_tools(tools, parallel_tool_calls=False)
+        except Exception as exc:
+            logger.warning("Provider-side tool binding failed; letting LangGraph bind tools: %s", exc)
+        else:
+            if _bound_tools_match_create_react_agent(candidate_llm, tools):
+                llm_with_tools = candidate_llm
     return create_react_agent(model=llm_with_tools, tools=tools, state_modifier=system_prompt)
 
 
@@ -382,6 +409,193 @@ def _extract_thpt_scores_from_query(query: str) -> dict[str, float]:
     }
 
 
+def _mentions_no_thpt_exam_score(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return any(
+        term in normalized
+        for term in [
+            "chua co diem thi",
+            "chua co diem thpt",
+            "chua co diem thi thpt",
+            "chua co ket qua thi",
+            "chua co ket qua thpt",
+            "khong co diem thi",
+            "khong co diem thpt",
+            "chua thi thpt",
+        ]
+    )
+
+
+def _mentions_explicit_thpt_exam_method(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return any(
+        term in normalized
+        for term in [
+            "diem thi thpt",
+            "thi thpt",
+            "tot nghiep thpt",
+            "thpt quoc gia",
+            "thptqg",
+            "thpt_qg",
+            "diem thi tot nghiep",
+        ]
+    )
+
+
+def _is_pure_cutoff_lookup(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return (
+        "diem chuan" in normalized
+        and any(term in normalized for term in ["bao nhieu", "la bao nhieu", "may diem", "tra cuu", "cho biet"])
+    )
+
+
+def _needs_thpt_exam_scores_for_assessment(query: str, state: dict | None = None) -> bool:
+    if _is_pure_cutoff_lookup(query):
+        return False
+
+    normalized = normalize_vietnamese_text(query)
+    profile = (state or {}).get("user_profile", {}) if state else {}
+    assessment_terms = ["co hoi", "danh gia", "do", "truot", "xet nganh", "xet tuyen", "dang ky"]
+    is_assessment = any(term in normalized for term in assessment_terms)
+    if not is_assessment:
+        return False
+
+    if _mentions_no_thpt_exam_score(query):
+        alternative_method_signal = any(
+            term in normalized
+            for term in ["hoc ba", "hsa", "tsa", "dgnl", "dgtd", "ielts", "chung chi", "ket hop"]
+        )
+        if alternative_method_signal and not _mentions_explicit_thpt_exam_method(query):
+            return False
+        return True
+
+    if not _mentions_explicit_thpt_exam_method(query):
+        return False
+
+    has_query_exam_scores = bool(_extract_thpt_scores_from_query(query))
+    has_profile_exam_scores = bool(profile.get("national_exam_scores"))
+    return not has_query_exam_scores and not has_profile_exam_scores
+
+
+def _format_missing_thpt_exam_scores_message(query: str) -> str:
+    if _mentions_no_thpt_exam_score(query):
+        return (
+            "Mình chưa thể đánh giá cơ hội đỗ theo điểm thi THPT vì bạn đang cho biết là chưa có điểm thi. "
+            "Hệ thống không lấy điểm học bạ/transcript trong hồ sơ để thay cho điểm thi THPT.\n\n"
+            "Bạn có thể gửi điểm thi thử hoặc điểm dự kiến theo tổ hợp, ví dụ: Toán 9.0, Lý 8.5, Hóa 8.0; "
+            "hoặc hỏi mình đánh giá mức độ phù hợp ngành và kế hoạch cải thiện trước khi có điểm thi."
+        )
+    return (
+        "Bạn đang hỏi đánh giá cơ hội theo điểm thi THPT, nhưng hồ sơ hiện tại chưa có điểm thi THPT riêng. "
+        "Mình không tự dùng điểm học bạ/transcript để thay điểm thi THPT.\n\n"
+        "Vui lòng cung cấp điểm thi THPT hoặc điểm thi thử theo tổ hợp muốn xét, ví dụ: Toán 9.0, Lý 8.5, Hóa 8.0."
+    )
+
+
+def _format_score_vs_cutoff_assessment(
+    university_code: str,
+    major_code: str | None,
+    major_name: str | None,
+    year: str,
+    method_tag: str,
+    student_score: float,
+    subject_combination: str | None = None,
+) -> str:
+    row = _lookup_major_cutoff_for_year(
+        university_code,
+        major_code,
+        major_name,
+        year,
+        method_tag,
+        subject_combination,
+    )
+    display_major = major_name or major_code or "ngành mục tiêu"
+    combination_text = f" theo tổ hợp {subject_combination}" if subject_combination else ""
+    if not row:
+        return (
+            f"Mình đã ghi nhận điểm xét tuyển của bạn là {student_score:g} điểm{combination_text}, "
+            f"nhưng chưa tìm thấy điểm chuẩn ngành {display_major} của "
+            f"{_display_university_name(university_code)} ({university_code}) năm {year} theo phương thức {method_tag} để so sánh."
+        )
+
+    cutoff = float(row.get("score") or 0)
+    diff = student_score - cutoff
+    if diff >= 0:
+        label = "AN TOÀN"
+        advice = "Điểm của bạn đạt hoặc vượt điểm chuẩn tham chiếu. Bạn có thể tự tin hơn khi sắp xếp nguyện vọng."
+    elif diff >= -1:
+        label = "THỬ THÁCH"
+        advice = "Điểm của bạn đang sát mức điểm chuẩn, nên cần chuẩn bị thêm phương án dự phòng."
+    else:
+        label = "TRƯỢT"
+        advice = "Với mức điểm hiện tại, lựa chọn này rất khó. Bạn nên cân nhắc phương thức khác, ngành khác hoặc nguyện vọng dự phòng."
+
+    selected_major_name = row.get("major_name") or display_major
+    selected_major_code = row.get("major_code") or major_code or "không rõ mã"
+    combo = subject_combination or ((row.get("subject_combinations") or [None])[0])
+    combo_line = f" theo tổ hợp {combo}" if combo else ""
+    return (
+        "Mình đã dùng thông tin bạn vừa bổ sung và context trước đó trong hộp thoại.\n\n"
+        f"Ngành mục tiêu: {selected_major_name} ({selected_major_code}) tại {university_code}.\n\n"
+        "Kết quả điểm xét tuyển:\n"
+        f"- Phương thức: {method_tag}{combo_line}\n"
+        f"- Điểm xét tuyển của bạn: {student_score:g}\n\n"
+        "Đánh giá cơ hội:\n"
+        f"- Điểm chuẩn tham chiếu năm {year}: {cutoff:g}\n"
+        f"- Chênh lệch: {diff:.2f}\n"
+        f"- Kết luận: {label}. {advice}"
+    )
+
+
+def _format_bka_tsa_assessment(
+    major_code: str | None,
+    major_name: str | None,
+    year: str,
+    tsa_score: float,
+    ielts_score: float | None,
+) -> str:
+    bonus = _bka_tsa_ielts_bonus(ielts_score)
+    total_score = tsa_score + bonus
+    row = _lookup_major_cutoff_for_year("BKA", major_code, major_name, year, "DGTD_TSA")
+    display_major = major_name or major_code or "ngành mục tiêu"
+    if not row:
+        return (
+            f"Mình đã nhận diện phương thức ĐGTD/TSA của BKA và tính được điểm xét tuyển: "
+            f"TSA {tsa_score:g} + điểm thưởng IELTS {bonus:g} = {total_score:g}. "
+            f"Tuy nhiên chưa tìm thấy điểm chuẩn ngành {display_major} năm {year} theo phương thức DGTD_TSA để đánh giá cơ hội."
+        )
+
+    cutoff = float(row.get("score") or 0)
+    diff = total_score - cutoff
+    if diff >= 0:
+        label = "AN TOÀN"
+        advice = "Điểm của bạn đạt hoặc vượt điểm chuẩn tham chiếu."
+    elif diff >= -3:
+        label = "THỬ THÁCH"
+        advice = "Điểm của bạn đang gần ngưỡng, nên vẫn cần phương án dự phòng."
+    else:
+        label = "TRƯỢT"
+        advice = "Điểm của bạn thấp hơn điểm chuẩn khá nhiều, nên cân nhắc thêm phương thức/nguyện vọng khác."
+
+    selected_major_name = row.get("major_name") or display_major
+    selected_major_code = row.get("major_code") or major_code or "không rõ mã"
+    ielts_text = f"{ielts_score:g}" if ielts_score is not None else "không có"
+    return (
+        "Mình đã nhận diện đây là phương thức Đánh giá tư duy/TSA của BKA.\n\n"
+        f"Ngành mục tiêu: {selected_major_name} ({selected_major_code}) tại BKA.\n\n"
+        "Kết quả điểm xét tuyển:\n"
+        f"- TSA: {tsa_score:g}\n"
+        f"- IELTS: {ielts_text}\n"
+        f"- Điểm thưởng IELTS: {bonus:g}\n"
+        f"- Tổng điểm xét tuyển: {total_score:g}\n\n"
+        "Đánh giá cơ hội:\n"
+        f"- Điểm chuẩn tham chiếu năm {year}: {cutoff:g}\n"
+        f"- Chênh lệch: {diff:.2f}\n"
+        f"- Kết luận: {label}. {advice}"
+    )
+
+
 def _best_thpt_combination(transcript: dict[str, float], requested_combination: str | None = None) -> tuple[str | None, dict[str, float], list[str]]:
     if requested_combination:
         combinations = [requested_combination]
@@ -439,6 +653,50 @@ def _kha_ielts_conversion_score(ielts: float | None) -> float:
     if ielts >= 5.5:
         return 8.0
     return 0.0
+
+
+def _extract_tsa_score_from_query(query: str) -> float | None:
+    patterns = [
+        r"(?:TSA|DGTD|ĐGTD|danh gia tu duy|đánh giá tư duy)[^\d]*(\d+(?:\.\d+)?)",
+        r"(\d+(?:\.\d+)?)\s*(?:diem|điểm)?\s*(?:TSA|DGTD|ĐGTD|danh gia tu duy|đánh giá tư duy)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, query or "", re.IGNORECASE)
+        if not match:
+            continue
+        try:
+            return float(match.group(1))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _extract_ielts_score_from_query(query: str) -> float | None:
+    match = re.search(r"(?:IELTS|ielts)[^\d]*(\d+(?:\.\d+)?)", query or "", re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
+def _mentions_no_ielts(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    return any(
+        term in normalized
+        for term in [
+            "khong co ielts",
+            "chua co ielts",
+            "khong ielts",
+            "chua co chung chi ielts",
+        ]
+    )
+
+
+def _extract_major_code_from_query(query: str) -> str | None:
+    match = re.search(r"\b([A-Z]{1,5}\d{1,3})\b", query or "", re.IGNORECASE)
+    return match.group(1).upper() if match else None
 
 
 def _is_personalized_admission_query(query: str, state: dict | None = None) -> bool:
@@ -580,6 +838,12 @@ def _extract_year_from_query(query: str) -> str | None:
     normalized = normalize_vietnamese_text(query)
     match = re.search(r"\b(20\d{2}|19\d{2})\b", normalized)
     return match.group(1) if match else None
+
+
+def _extract_years_from_query(query: str) -> list[str]:
+    normalized = normalize_vietnamese_text(query)
+    years = re.findall(r"\b(20\d{2}|19\d{2})\b", normalized)
+    return list(dict.fromkeys(years))
 
 
 def _resolve_lookup_method_tag(query: str, target_uni: str | None = None) -> str | None:
@@ -823,6 +1087,159 @@ def _format_single_major_cutoff_result(
     )
 
 
+def _extract_major_name_for_year_cutoff_comparison(query: str, target_uni: str | None = None) -> str | None:
+    normalized = normalize_vietnamese_text(query)
+    normalized = re.sub(r"\b(20\d{2}|19\d{2})\b", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    patterns = [
+        r"\bnganh\s+(.+?)\s+(?:phuong thuc|theo|giua|nam|cua)\b",
+        r"\bnganh\s+(.+?)\s+(?:nhung|ma|va)\b",
+        r"\bdiem\s+(?:chuan\s+)?nganh\s+(.+?)\s+(?:phuong thuc|theo|giua|nam|cua)\b",
+    ]
+    if target_uni:
+        patterns.insert(0, rf"\bnganh\s+(.+?)\s+{re.escape(str(target_uni).lower())}\b")
+    major_name = None
+    for pattern in patterns:
+        match = re.search(pattern, normalized)
+        if match:
+            major_name = match.group(1).strip(" .,:;")
+            break
+
+    if not major_name:
+        major_name = _extract_single_major_name_for_cutoff(query)
+    if not major_name:
+        return None
+
+    target_uni = str(target_uni or "").lower()
+    cleanup_terms = [
+        target_uni,
+        "thpt_qg",
+        "thpt qg",
+        "diem thi thpt",
+        "hoc ba",
+        "tsa",
+        "dgtd",
+        "hsa",
+        "dgnl",
+        "apt",
+        "ielts",
+        "chung chi quoc te",
+    ]
+    for term in cleanup_terms:
+        if term:
+            major_name = re.sub(rf"\b{re.escape(term)}\b", " ", major_name)
+    major_name = re.sub(r"\s+", " ", major_name).strip(" .,:;")
+    return major_name if len(major_name) >= 2 else None
+
+
+def _lookup_major_cutoff_for_year(
+    university_code: str,
+    major_code: str | None,
+    major_name: str | None,
+    year: str,
+    method_tag: str,
+    subject_combination: str | None = None,
+) -> dict | None:
+    if major_code:
+        tool_args = {
+            "university": university_code,
+            "major": str(major_code),
+            "year": str(year),
+            "method_tag": method_tag,
+        }
+        if subject_combination:
+            tool_args["subject_combination"] = subject_combination
+        result_text = str(
+            get_historical_scores.invoke(tool_args)
+        )
+        payload = _extract_json_payload(result_text)
+        if payload and payload.get("status") == "success":
+            selected = next((item for item in payload.get("history", []) if item.get("selected")), None)
+            selected = selected or (payload.get("history") or [None])[0]
+            score = payload.get("selected_cutoff_score")
+            if score is None and selected:
+                score = selected.get("score")
+            if score is not None:
+                return {
+                    "year": str(year),
+                    "score": float(score),
+                    "major_code": payload.get("selected_major_code") or (selected or {}).get("major_code") or major_code,
+                    "major_name": payload.get("selected_major_name") or (selected or {}).get("major_name") or major_name,
+                    "method_tag": method_tag,
+                    "method_alias": (selected or {}).get("method_alias"),
+                    "subject_combinations": (selected or {}).get("subject_combinations"),
+                }
+
+    if major_name:
+        result_text = get_major_cutoffs_all_methods(
+            university=university_code,
+            major_name=major_name,
+            year=str(year),
+        )
+        payload = _extract_json_payload(result_text)
+        if payload and payload.get("status") == "success":
+            for item in payload.get("cutoffs", []):
+                if str(item.get("method_tag") or "").upper() == method_tag:
+                    return {
+                        "year": str(item.get("year") or year),
+                        "score": float(item.get("score") or 0),
+                        "major_code": item.get("major_code") or payload.get("matched_major_code"),
+                        "major_name": item.get("major_name") or payload.get("matched_major_name") or major_name,
+                        "method_tag": item.get("method_tag") or method_tag,
+                        "method_alias": item.get("method_alias"),
+                    }
+    return None
+
+
+def _format_same_major_year_cutoff_comparison(
+    university_code: str,
+    major_label: str,
+    method_tag: str,
+    years: list[str],
+    rows: list[dict],
+) -> str:
+    found_by_year = {str(row.get("year")): row for row in rows}
+    missing_years = [year for year in years if year not in found_by_year]
+    if len(rows) < 2:
+        year_text = ", ".join(years)
+        missing_text = f" Thiếu dữ liệu năm: {', '.join(missing_years)}." if missing_years else ""
+        return (
+            f"Mình chưa tìm thấy đủ dữ liệu điểm chuẩn ngành {major_label} của "
+            f"{_display_university_name(university_code)} ({university_code}) theo phương thức {method_tag} "
+            f"cho các năm {year_text}.{missing_text}"
+        )
+
+    sorted_rows = sorted(rows, key=lambda item: int(item.get("year") or 0))
+    lines = [
+        f"So sánh điểm chuẩn ngành {sorted_rows[0].get('major_name') or major_label} "
+        f"của {_display_university_name(university_code)} ({university_code}) theo phương thức {method_tag}:",
+        "",
+    ]
+    for row in sorted_rows:
+        combos = row.get("subject_combinations") or []
+        combo_text = f" - tổ hợp: {', '.join(combos)}" if combos else ""
+        lines.append(f"- Năm {row['year']}: {row['score']:g} điểm{combo_text}")
+
+    first = sorted_rows[0]
+    last = sorted_rows[-1]
+    diff = float(last["score"]) - float(first["score"])
+    direction = "tăng" if diff > 0 else "giảm" if diff < 0 else "không đổi"
+    lines.extend(
+        [
+            "",
+            f"Kết luận: từ {first['year']} đến {last['year']}, điểm chuẩn {direction} {abs(diff):.2f} điểm.",
+        ]
+    )
+    if any(float(row.get("score") or 0) > 30 for row in sorted_rows) and any(float(row.get("score") or 0) <= 30 for row in sorted_rows):
+        lines.append(
+            "Lưu ý: các năm có dấu hiệu dùng thang/công thức điểm khác nhau, nên phần chênh lệch chỉ là đối chiếu dữ liệu công bố, không nên hiểu trực tiếp là mức cạnh tranh thay đổi đúng bằng số điểm này."
+        )
+    if missing_years:
+        lines.append(f"Chưa tìm thấy dữ liệu cho năm: {', '.join(missing_years)}.")
+    return "\n".join(lines)
+
+
 def _is_gibberish(query: str) -> bool:
     normalized = normalize_vietnamese_text(query).replace(" ", "")
     if len(normalized) < 8:
@@ -881,6 +1298,17 @@ def _is_major_cutoff_comparison_query(query: str) -> bool:
     )
 
 
+def _is_same_major_year_cutoff_comparison_query(query: str) -> bool:
+    normalized = normalize_vietnamese_text(query)
+    years = _extract_years_from_query(query)
+    return (
+        len(years) >= 2
+        and "diem" in normalized
+        and ("nganh" in normalized or "diem chuan" in normalized)
+        and any(term in normalized for term in ["so sanh", "giua", "qua cac nam", "theo nam"])
+    )
+
+
 def _is_cutoff_ranking_query(query: str) -> bool:
     normalized = normalize_vietnamese_text(query)
     return (
@@ -923,10 +1351,28 @@ def _extract_plain_score(query: str) -> float | None:
 
 def _is_eligible_major_query(query: str) -> bool:
     normalized = normalize_vietnamese_text(query)
-    score = _extract_plain_score(query)
-    if score is None:
+    has_score_signal = (
+        _extract_plain_score(query) is not None
+        or _extract_tsa_score_from_query(query) is not None
+        or bool(_extract_thpt_scores_from_query(query))
+    )
+    if not has_score_signal:
         return False
-    intent_terms = ["do nganh nao", "vao nganh nao", "nganh nao", "co the do", "co the vao", "du nganh"]
+    intent_terms = [
+        "do nganh nao",
+        "do nhung nganh nao",
+        "do duoc nganh nao",
+        "vao nganh nao",
+        "vao nhung nganh nao",
+        "nganh nao",
+        "nhung nganh nao",
+        "cac nganh nao",
+        "co the do",
+        "co the vao",
+        "co the xet tuyen",
+        "du nganh",
+        "loc nganh",
+    ]
     return any(term in normalized for term in intent_terms)
 
 
@@ -1052,6 +1498,103 @@ def _apply_followup_to_pending(pending: dict | None, query: str, state: AgentSta
             pending_clarification=data,
         )
 
+    if data.get("intent") == "thpt_exam_score_assessment":
+        combination = _extract_requested_subject_combination(query, state.get("user_profile", {}) or {})
+        if combination:
+            data["subject_combination"] = combination
+            data["method_tag"] = data.get("method_tag") or "THPT_QG"
+        subject_scores = _extract_thpt_scores_from_query(query)
+        if subject_scores and data.get("score") is None:
+            requested_combination = data.get("subject_combination")
+            combination, subjects, missing = _best_thpt_combination(
+                subject_scores,
+                str(requested_combination).upper() if requested_combination else None,
+            )
+            if subjects:
+                data["score"] = sum(float(value) for value in subjects.values())
+                data["subject_combination"] = combination
+            elif missing:
+                data["missing_subjects"] = missing
+        data["method_tag"] = data.get("method_tag") or "THPT_QG"
+        data["year"] = data.get("year") or _latest_admission_year_for_lookup(state)
+
+        major_name = _extract_major_name_for_year_cutoff_comparison(query, str(data.get("target_university") or target_uni or ""))
+        if major_name:
+            data["major_name"] = major_name
+            data["major_code"] = None
+
+        required = ["target_university", "score", "method_tag", "year"]
+        data["missing_slots"] = _missing_slots(data, required)
+        if not data.get("major_code") and not data.get("major_name"):
+            data["missing_slots"].append("major_name")
+
+        if not data["missing_slots"]:
+            return _make_final_message(
+                _format_score_vs_cutoff_assessment(
+                    str(data["target_university"]).upper(),
+                    str(data["major_code"]) if data.get("major_code") else None,
+                    str(data["major_name"]) if data.get("major_name") else None,
+                    str(data["year"]),
+                    str(data["method_tag"]),
+                    float(data["score"]),
+                    str(data["subject_combination"]).upper() if data.get("subject_combination") else None,
+                ),
+                pending_clarification=None,
+            )
+
+        if data.get("missing_subjects"):
+            combination_text = f" cho tổ hợp {data.get('subject_combination')}" if data.get("subject_combination") else ""
+            return _make_final_message(
+                f"Mình đã nhận điểm từng môn, nhưng chưa đủ để tính điểm thi THPT{combination_text}. "
+                f"Còn thiếu: {', '.join(data['missing_subjects'])}.",
+                pending_clarification=data,
+            )
+
+        return _make_final_message(
+            "Mình đã nhận thêm thông tin, nhưng vẫn còn thiếu dữ kiện để đánh giá cơ hội theo điểm thi THPT: "
+            + ", ".join(dict.fromkeys(data["missing_slots"]))
+            + ".",
+            pending_clarification=data,
+        )
+
+    if data.get("intent") == "bka_tsa_assessment":
+        major_code = _extract_major_code_from_query(query)
+        if major_code:
+            data["major_code"] = major_code
+        major_name = _extract_major_name_for_year_cutoff_comparison(query, "BKA")
+        if major_name:
+            data["major_name"] = major_name
+        tsa_score = _extract_tsa_score_from_query(query)
+        if tsa_score is not None:
+            data["tsa_score"] = tsa_score
+        ielts_score = _extract_ielts_score_from_query(query)
+        if ielts_score is not None:
+            data["ielts_score"] = ielts_score
+        data["target_university"] = "BKA"
+        data["method_tag"] = "DGTD_TSA"
+        data["year"] = data.get("year") or _latest_admission_year_for_lookup(state)
+        required = ["target_university", "year", "method_tag", "tsa_score"]
+        data["missing_slots"] = _missing_slots(data, required)
+        if not data.get("major_code") and not data.get("major_name"):
+            data["missing_slots"].append("major_code")
+        if not data["missing_slots"]:
+            return _make_final_message(
+                _format_bka_tsa_assessment(
+                    str(data["major_code"]) if data.get("major_code") else None,
+                    str(data["major_name"]) if data.get("major_name") else None,
+                    str(data["year"]),
+                    float(data["tsa_score"]),
+                    float(data["ielts_score"]) if data.get("ielts_score") is not None else None,
+                ),
+                pending_clarification=None,
+            )
+        return _make_final_message(
+            "Mình đã nhận thêm thông tin, nhưng vẫn còn thiếu dữ kiện để đánh giá BKA theo TSA: "
+            + ", ".join(dict.fromkeys(data["missing_slots"]))
+            + ".",
+            pending_clarification=data,
+        )
+
     if data.get("intent") == "major_cutoff_comparison":
         major_names = _extract_compared_major_names(query)
         if len(major_names) >= 2:
@@ -1129,6 +1672,198 @@ def preflight_node(state: AgentState) -> dict:
             "Hệ thống hiện chỉ tư vấn chắc chắn trong phạm vi một trường ở mỗi hộp thoại để tránh đối chiếu sai mã ngành. "
             "Ngoài ra, mã ngành giữa các trường không luôn tương đương nhau; ví dụ IT1 là mã của BKA, còn UET thường dùng mã khác như CN1. "
             "Bạn vui lòng mở đúng hộp thoại của trường muốn tư vấn, hoặc nêu rõ hai ngành tương ứng cần so sánh."
+        )
+
+    tsa_score = _extract_tsa_score_from_query(query)
+    if target_uni == "BKA" and tsa_score is not None:
+        profile = state.get("user_profile", {}) or {}
+        year = _extract_year_from_query(query) or profile.get("target_year") or _latest_admission_year_for_lookup(state)
+        major_code = _extract_major_code_from_query(query) or profile.get("target_major_code") or profile.get("target_major") or profile.get("major_code")
+        major_name = _extract_major_name_for_year_cutoff_comparison(query, target_uni) or profile.get("target_major_name") or profile.get("major_name")
+        ielts_score = _extract_ielts_score_from_query(query)
+        if ielts_score is None and not _mentions_no_ielts(query) and profile.get("ielts") is not None:
+            try:
+                ielts_score = float(profile.get("ielts"))
+            except (TypeError, ValueError):
+                ielts_score = None
+        if _is_eligible_major_query(query):
+            bonus = _bka_tsa_ielts_bonus(ielts_score)
+            total_score = float(tsa_score) + bonus
+            result = find_eligible_majors_by_score(
+                university="BKA",
+                score=total_score,
+                method_tag="DGTD_TSA",
+                year=str(year) if year else None,
+                limit=10,
+            )
+            prefix = (
+                "Mình đã nhận diện đây là câu lọc các ngành có thể xét tuyển theo phương thức ĐGTD/TSA của BKA.\n"
+                f"- TSA: {float(tsa_score):g}\n"
+                f"- IELTS: {ielts_score:g}\n"
+                f"- Điểm thưởng IELTS: {bonus:g}\n"
+                f"- Tổng điểm xét tuyển dùng để lọc ngành: {total_score:g}\n\n"
+                if ielts_score is not None
+                else
+                "Mình đã nhận diện đây là câu lọc các ngành có thể xét tuyển theo phương thức ĐGTD/TSA của BKA.\n"
+                f"- TSA: {float(tsa_score):g}\n"
+                "- IELTS: không có/không sử dụng\n"
+                f"- Tổng điểm xét tuyển dùng để lọc ngành: {total_score:g}\n\n"
+            )
+            return _make_final_message(
+                prefix + _format_eligible_major_result("BKA", total_score, "DGTD_TSA", str(year) if year else None, result)
+            )
+        if major_code or major_name:
+            return _make_final_message(
+                _format_bka_tsa_assessment(
+                    str(major_code) if major_code else None,
+                    str(major_name) if major_name else None,
+                    str(year),
+                    float(tsa_score),
+                    ielts_score,
+                )
+            )
+        return _make_final_message(
+            "Mình đã nhận diện điểm TSA/ĐGTD của BKA, nhưng cần biết ngành hoặc mã ngành cần xét, ví dụ IT1.",
+            pending_clarification=_build_pending(
+                "bka_tsa_assessment",
+                ["target_university", "major_code", "year", "tsa_score"],
+                target_university="BKA",
+                major_code=None,
+                major_name=None,
+                year=str(year),
+                method_tag="DGTD_TSA",
+                tsa_score=float(tsa_score),
+                ielts_score=ielts_score,
+            ),
+        )
+
+    if _is_eligible_major_query(query):
+        if not target_uni:
+            return _make_final_message(
+                "Bạn muốn lọc ngành theo điểm cho trường nào? Vui lòng chọn hoặc nhập mã trường trước."
+            )
+
+        score = _extract_plain_score(query)
+        subject_combination = _extract_requested_subject_combination(query, state.get("user_profile", {}) or {})
+        subject_scores = _extract_thpt_scores_from_query(query)
+        if score is None and subject_scores:
+            combination, subjects, _ = _best_thpt_combination(subject_scores, subject_combination)
+            if subjects:
+                score = sum(float(value) for value in subjects.values())
+                subject_combination = combination
+        method_tag = _resolve_lookup_method_tag(query, target_uni)
+        if not method_tag and subject_combination in SUBJECT_COMBINATIONS:
+            method_tag = "THPT_QG"
+        if not method_tag:
+            return _make_final_message(
+                f"Mình đã hiểu bạn có khoảng {score:g} điểm và muốn biết có thể đỗ ngành nào ở {_display_university_name(target_uni)} ({target_uni}). "
+                "Tuy nhiên cần biết điểm này thuộc phương thức nào để tránh lọc sai ngành: điểm thi THPT, học bạ, TSA/ĐGTD, HSA/ĐGNL hay phương thức khác?",
+                pending_clarification=_build_pending(
+                    "eligible_major_by_score",
+                    ["target_university", "score", "method_tag"],
+                    target_university=target_uni,
+                    score=score,
+                    method_tag=None,
+                    year=_extract_year_from_query(query) or (state.get("user_profile", {}) or {}).get("target_year"),
+                ),
+            )
+        if score is None:
+            return _make_final_message(
+                f"Mình hiểu bạn muốn lọc ngành ở {_display_university_name(target_uni)} ({target_uni}), "
+                "nhưng cần có tổng điểm xét tuyển hoặc đủ điểm các môn trong tổ hợp."
+            )
+
+        year_match = re.search(r"\b(20\d{2}|19\d{2})\b", normalized)
+        year = year_match.group(1) if year_match else (state.get("user_profile", {}) or {}).get("target_year")
+        result = find_eligible_majors_by_score(
+            university=target_uni,
+            score=score,
+            method_tag=method_tag,
+            year=str(year) if year else None,
+            limit=10,
+        )
+        return _make_final_message(_format_eligible_major_result(target_uni, score, method_tag, year, result))
+
+    if _needs_thpt_exam_scores_for_assessment(query, state):
+        profile = state.get("user_profile", {}) or {}
+        pending_year = _extract_year_from_query(query) or profile.get("target_year") or _latest_admission_year_for_lookup(state)
+        pending_method = _resolve_lookup_method_tag(query, target_uni) or "THPT_QG"
+        pending_major_name = _extract_major_name_for_year_cutoff_comparison(query, target_uni) or profile.get("target_major_name") or profile.get("major_name")
+        pending_major_code = profile.get("target_major_code") or profile.get("target_major") or profile.get("major_code")
+        pending_combination = _extract_requested_subject_combination(query, profile)
+        pending = _build_pending(
+            "thpt_exam_score_assessment",
+            ["target_university", "score", "method_tag", "year"],
+            target_university=target_uni,
+            major_code=str(pending_major_code) if pending_major_code else None,
+            major_name=str(pending_major_name) if pending_major_name else None,
+            year=str(pending_year) if pending_year else None,
+            method_tag=pending_method,
+            subject_combination=pending_combination,
+            score=None,
+        )
+        if not pending.get("major_code") and not pending.get("major_name"):
+            pending["missing_slots"].append("major_name")
+        return _make_final_message(
+            _format_missing_thpt_exam_scores_message(query),
+            pending_clarification=pending,
+        )
+
+    if _is_same_major_year_cutoff_comparison_query(query):
+        if not target_uni:
+            return _make_final_message(
+                "Bạn muốn so sánh điểm chuẩn của ngành này ở trường nào? Vui lòng chọn hoặc nhập mã trường trước."
+            )
+        method_tag = _resolve_lookup_method_tag(query, target_uni)
+        years = _extract_years_from_query(query)
+        profile = state.get("user_profile", {}) or {}
+        subject_combination = _extract_requested_subject_combination(query, profile)
+        extracted_major_name = _extract_major_name_for_year_cutoff_comparison(query, target_uni)
+        profile_major_name = profile.get("target_major_name") or profile.get("major_name")
+        major_name = extracted_major_name or profile_major_name
+        major_code = profile.get("target_major_code") or profile.get("target_major") or profile.get("major_code")
+
+        if extracted_major_name and profile_major_name:
+            extracted_norm = normalize_vietnamese_text(extracted_major_name)
+            profile_norm = normalize_vietnamese_text(str(profile_major_name))
+            if extracted_norm not in profile_norm and profile_norm not in extracted_norm:
+                major_code = None
+
+        if method_tag and len(years) >= 2 and (major_code or major_name):
+            rows = []
+            for year in years:
+                row = _lookup_major_cutoff_for_year(
+                    target_uni,
+                    str(major_code) if major_code else None,
+                    str(major_name) if major_name else None,
+                    str(year),
+                    method_tag,
+                    subject_combination,
+                )
+                if row:
+                    rows.append(row)
+            return _make_final_message(
+                _format_same_major_year_cutoff_comparison(
+                    target_uni,
+                    str(major_name or major_code),
+                    method_tag,
+                    years,
+                    rows,
+                )
+            )
+
+        return _make_final_message(
+            f"Mình hiểu bạn muốn so sánh điểm chuẩn theo các năm tại {_display_university_name(target_uni)} ({target_uni}), "
+            "nhưng cần đủ tên/mã ngành và phương thức xét tuyển. Ví dụ: "
+            "“So sánh điểm chuẩn ngành Khoa học máy tính KHA phương thức THPT_QG giữa năm 2024 và 2025”.",
+            pending_clarification=_build_pending(
+                "same_major_year_cutoff_comparison",
+                ["target_university", "major_name", "method_tag", "years"],
+                target_university=target_uni,
+                major_name=major_name,
+                method_tag=method_tag,
+                years=years if len(years) >= 2 else None,
+            ),
         )
 
     if _is_personalized_admission_query(query, state):
@@ -1265,7 +2000,16 @@ def preflight_node(state: AgentState) -> dict:
             )
 
         score = _extract_plain_score(query)
+        subject_combination = _extract_requested_subject_combination(query, state.get("user_profile", {}) or {})
+        subject_scores = _extract_thpt_scores_from_query(query)
+        if score is None and subject_scores:
+            combination, subjects, _ = _best_thpt_combination(subject_scores, subject_combination)
+            if subjects:
+                score = sum(float(value) for value in subjects.values())
+                subject_combination = combination
         method_tag = _resolve_lookup_method_tag(query, target_uni)
+        if not method_tag and subject_combination in SUBJECT_COMBINATIONS:
+            method_tag = "THPT_QG"
         if not method_tag:
             return _make_final_message(
                 f"Mình đã hiểu bạn có khoảng {score:g} điểm và muốn biết có thể đỗ ngành nào ở {_display_university_name(target_uni)} ({target_uni}). "
@@ -1278,6 +2022,11 @@ def preflight_node(state: AgentState) -> dict:
                     method_tag=None,
                     year=_extract_year_from_query(query) or (state.get("user_profile", {}) or {}).get("target_year"),
                 ),
+            )
+        if score is None:
+            return _make_final_message(
+                f"Mình hiểu bạn muốn lọc ngành ở {_display_university_name(target_uni)} ({target_uni}), "
+                "nhưng cần có tổng điểm xét tuyển hoặc đủ điểm các môn trong tổ hợp."
             )
 
         year_match = re.search(r"\b(20\d{2}|19\d{2})\b", normalized)
@@ -1595,6 +2344,21 @@ def data_strategist_node(state: AgentState) -> dict:
     if not method_tag:
         method_tag = _resolve_lookup_method_tag(_query_with_profile_combination(query, user_profile), target_uni)
     subject_combination = calculated_details.get("subject_combination") or _extract_requested_subject_combination(query, user_profile)
+    if not method_tag and subject_combination in SUBJECT_COMBINATIONS:
+        method_tag = "THPT_QG"
+        logger.info(
+            "Data Strategist inferred method_tag=THPT_QG from requested subject combination=%s",
+            subject_combination,
+        )
+    if not method_tag and calculated_score is not None:
+        inferred_combination, inferred_subjects, _ = _best_thpt_combination(_normalized_transcript(user_profile), subject_combination)
+        if inferred_combination and inferred_subjects:
+            method_tag = "THPT_QG"
+            subject_combination = subject_combination or inferred_combination
+            logger.info(
+                "Data Strategist inferred method_tag=THPT_QG from calculated score/transcript; combination=%s",
+                subject_combination,
+            )
 
     called_agents = state.get("called_agents", [])
     if "DataStrategist" not in called_agents:
@@ -1806,9 +2570,43 @@ def score_calculator_node(state: AgentState) -> dict:
             called_agents = called_agents + ["ScoreCalculator"]
         return {"messages": [calculation_msg], "called_agents": called_agents, "calculated_score": total, "calculated_details": details}
 
+    if _needs_thpt_exam_scores_for_assessment(query_text, state):
+        report = (
+            "[SCORE CALCULATION REPORT]\n"
+            "Phuong thuc: THPT_QG\n"
+            "Chua co diem thi THPT rieng de tinh diem xet tuyen. "
+            "Khong dung diem hoc ba/transcript trong ho so de thay diem thi THPT."
+        )
+        return _score_return(
+            report,
+            None,
+            {
+                "method_tag": "THPT_QG",
+                "missing_exam_scores": True,
+                "missing_subjects": list(SUBJECT_DISPLAY.keys()),
+                "total_score": None,
+            },
+        )
+
     transcript = _normalized_transcript(user_profile)
     transcript.update(_extract_thpt_scores_from_query(query_text))
     requested_combination = _extract_requested_subject_combination(query_text, user_profile)
+
+    if not resolved_method_tag and requested_combination in SUBJECT_COMBINATIONS:
+        resolved_method_tag = "THPT_QG"
+        logger.info(
+            "   Inferred method_tag=THPT_QG from requested subject combination=%s",
+            requested_combination,
+        )
+
+    if not resolved_method_tag:
+        inferred_combination, inferred_subjects, _ = _best_thpt_combination(transcript, requested_combination)
+        if inferred_combination and inferred_subjects:
+            resolved_method_tag = "THPT_QG"
+            logger.info(
+                "   Inferred method_tag=THPT_QG from available transcript subjects; combination=%s",
+                inferred_combination,
+            )
 
     if resolved_method_tag == "THPT_QG":
         normalized_major_name = normalize_vietnamese_text(str(user_profile.get("target_major_name") or ""))

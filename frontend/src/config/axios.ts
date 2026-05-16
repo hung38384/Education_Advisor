@@ -1,12 +1,15 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { ACCESS_TOKEN_STORAGE_KEY } from '@/config/auth';
 
-const DEFAULT_AXIOS_TIMEOUT = 60 * 1000; // 60s
+const DEFAULT_AXIOS_TIMEOUT = 180 * 1000; // 180s for slower free-tier AI responses
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001/api';
+const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || DEFAULT_AXIOS_TIMEOUT);
 
 const api = axios.create({
     baseURL: API_BASE_URL,
-    timeout: DEFAULT_AXIOS_TIMEOUT,
+    timeout: Number.isFinite(API_TIMEOUT_MS) && API_TIMEOUT_MS > 0
+        ? API_TIMEOUT_MS
+        : DEFAULT_AXIOS_TIMEOUT,
     headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
