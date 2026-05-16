@@ -104,6 +104,7 @@ export class ReviewService {
                 const prediction = await this.predictClient.predict({
                     mbti: personality.mbtiType,
                     academic_scores: academicScores,
+                    ielts: this.findCertificateScore(profile.certificates, 'IELTS') ?? undefined,
                 });
                 predictionTargets = uniqueStrings(prediction.predictions).slice(0, 6);
                 if (predictionTargets.length > 0) {
@@ -248,6 +249,15 @@ export class ReviewService {
         }
 
         return trimmed.toUpperCase();
+    }
+
+    private findCertificateScore(
+        certificates: Array<{ type: string; score: number | null }> | null | undefined,
+        type: string
+    ): number | null {
+        const normalizedType = type.trim().toUpperCase();
+        const matched = (certificates ?? []).find((item) => item.type.trim().toUpperCase() === normalizedType && typeof item.score === 'number');
+        return typeof matched?.score === 'number' && Number.isFinite(matched.score) ? matched.score : null;
     }
 
     private buildFallbackTargets(

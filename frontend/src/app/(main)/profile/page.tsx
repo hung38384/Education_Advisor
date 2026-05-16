@@ -19,7 +19,18 @@ const REQUIRED_TRANSCRIPT_SUBJECTS = [
     'Giáo dục công dân',
 ] as const;
 
+const CERTIFICATE_TYPES = ['IELTS', 'TOEFL', 'TOEIC', 'VSTEP', 'SAT', 'ACT', 'HSA', 'TSA', 'OTHER'] as const;
+
 type TranscriptFormState = Record<string, string>;
+
+interface CertificateFormState {
+    type: string;
+    name: string;
+    score: string;
+    issuedAt: string;
+    expiresAt: string;
+    note: string;
+}
 
 interface ProfileFormState {
     fullName: string;
@@ -32,6 +43,7 @@ interface ProfileFormState {
     grade11: string;
     grade12: string;
     transcript: TranscriptFormState;
+    certificates: CertificateFormState[];
     favoriteSubjects: string;
     targetMajor: string;
     targetUniversity: string;
@@ -53,6 +65,7 @@ const EMPTY_FORM: ProfileFormState = {
     grade11: '',
     grade12: '',
     transcript: createEmptyTranscript(),
+    certificates: [],
     favoriteSubjects: '',
     targetMajor: '',
     targetUniversity: '',
@@ -73,6 +86,17 @@ function toNullableNumber(value: string): number | null {
     return parsed;
 }
 
+function createEmptyCertificate(): CertificateFormState {
+    return {
+        type: 'IELTS',
+        name: '',
+        score: '',
+        issuedAt: '',
+        expiresAt: '',
+        note: '',
+    };
+}
+
 function toTranscriptPayload(transcript: TranscriptFormState): Record<string, number> | null {
     const payload: Record<string, number> = {};
 
@@ -85,6 +109,35 @@ function toTranscriptPayload(transcript: TranscriptFormState): Record<string, nu
     }
 
     return payload;
+}
+
+function toCertificatesPayload(certificates: CertificateFormState[]) {
+    return certificates
+        .map((certificate) => {
+            const type = certificate.type.trim().toUpperCase();
+            const name = certificate.name.trim() || type;
+            const score = toNullableNumber(certificate.score);
+            const hasAnyValue =
+                Boolean(certificate.name.trim()) ||
+                score !== null ||
+                Boolean(certificate.issuedAt.trim()) ||
+                Boolean(certificate.expiresAt.trim()) ||
+                Boolean(certificate.note.trim());
+
+            if (!hasAnyValue) {
+                return null;
+            }
+
+            return {
+                type,
+                name,
+                score,
+                issuedAt: certificate.issuedAt || null,
+                expiresAt: certificate.expiresAt || null,
+                note: certificate.note || null,
+            };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
 export default function ProfilePage() {
@@ -120,6 +173,14 @@ export default function ProfilePage() {
                         profile.transcript?.[subject] == null ? '' : String(profile.transcript[subject]),
                     ])
                 ),
+                certificates: (profile.certificates ?? []).map((certificate) => ({
+                    type: certificate.type ?? 'OTHER',
+                    name: certificate.name ?? '',
+                    score: certificate.score == null ? '' : String(certificate.score),
+                    issuedAt: certificate.issuedAt ?? '',
+                    expiresAt: certificate.expiresAt ?? '',
+                    note: certificate.note ?? '',
+                })),
                 favoriteSubjects: (profile.favoriteSubjects ?? []).join(', '),
                 targetMajor: profile.targetMajor ?? '',
                 targetUniversity: profile.targetUniversity ?? '',
@@ -154,6 +215,7 @@ export default function ProfilePage() {
                 grade11: toNullableNumber(form.grade11),
                 grade12: toNullableNumber(form.grade12),
                 transcript,
+                certificates: toCertificatesPayload(form.certificates),
                 favoriteSubjects: form.favoriteSubjects
                     .split(',')
                     .map((item) => item.trim())
@@ -345,6 +407,119 @@ export default function ProfilePage() {
                                     />
                                 </label>
                             ))}
+                        </fieldset>
+                        <fieldset className="grid gap-3 rounded-md border border-slate-200 bg-white p-4 md:col-span-2">
+                            <legend className="text-base font-semibold text-slate-900 md:col-span-2">Chứng chỉ và bài thi riêng</legend>
+                            <p className="text-sm text-slate-600">
+                                Không bắt buộc. Có thể bỏ trống nếu bạn chưa có chứng chỉ, hoặc thêm nhiều chứng chỉ nếu có.
+                            </p>
+                            <div className="space-y-3">
+                                {form.certificates.length === 0 ? (
+                                    <p className="text-sm text-slate-600">Chưa có chứng chỉ nào.</p>
+                                ) : (
+                                    form.certificates.map((certificate, index) => (
+                                        <div key={index} className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 md:grid-cols-3">
+                                            <label className="grid gap-1 text-sm font-medium text-slate-700">
+                                                Loại
+                                                <select
+                                                    className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                                                    value={certificate.type}
+                                                    onChange={(event) => setForm((prev) => ({
+                                                        ...prev,
+                                                        certificates: prev.certificates.map((item, itemIndex) => itemIndex === index ? { ...item, type: event.target.value } : item),
+                                                    }))}
+                                                >
+                                                    {CERTIFICATE_TYPES.map((type) => (
+                                                        <option key={type} value={type}>{type}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            <label className="grid gap-1 text-sm font-medium text-slate-700">
+                                                Tên chứng chỉ
+                                                <Input
+                                                    type="text"
+                                                    value={certificate.name}
+                                                    onChange={(event) => setForm((prev) => ({
+                                                        ...prev,
+                                                        certificates: prev.certificates.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item),
+                                                    }))}
+                                                    placeholder={certificate.type}
+                                                />
+                                            </label>
+                                            <label className="grid gap-1 text-sm font-medium text-slate-700">
+                                                Điểm
+                                                <Input
+                                                    type="number"
+                                                    min={0}
+                                                    step="0.1"
+                                                    value={certificate.score}
+                                                    onChange={(event) => setForm((prev) => ({
+                                                        ...prev,
+                                                        certificates: prev.certificates.map((item, itemIndex) => itemIndex === index ? { ...item, score: event.target.value } : item),
+                                                    }))}
+                                                />
+                                            </label>
+                                            <label className="grid gap-1 text-sm font-medium text-slate-700">
+                                                Ngày cấp
+                                                <Input
+                                                    type="date"
+                                                    value={certificate.issuedAt}
+                                                    onChange={(event) => setForm((prev) => ({
+                                                        ...prev,
+                                                        certificates: prev.certificates.map((item, itemIndex) => itemIndex === index ? { ...item, issuedAt: event.target.value } : item),
+                                                    }))}
+                                                />
+                                            </label>
+                                            <label className="grid gap-1 text-sm font-medium text-slate-700">
+                                                Ngày hết hạn
+                                                <Input
+                                                    type="date"
+                                                    value={certificate.expiresAt}
+                                                    onChange={(event) => setForm((prev) => ({
+                                                        ...prev,
+                                                        certificates: prev.certificates.map((item, itemIndex) => itemIndex === index ? { ...item, expiresAt: event.target.value } : item),
+                                                    }))}
+                                                />
+                                            </label>
+                                            <label className="grid gap-1 text-sm font-medium text-slate-700">
+                                                Ghi chú
+                                                <Input
+                                                    type="text"
+                                                    value={certificate.note}
+                                                    onChange={(event) => setForm((prev) => ({
+                                                        ...prev,
+                                                        certificates: prev.certificates.map((item, itemIndex) => itemIndex === index ? { ...item, note: event.target.value } : item),
+                                                    }))}
+                                                />
+                                            </label>
+                                            <div className="md:col-span-3">
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    onClick={() => setForm((prev) => ({
+                                                        ...prev,
+                                                        certificates: prev.certificates.filter((_, itemIndex) => itemIndex !== index),
+                                                    }))}
+                                                >
+                                                    Xóa chứng chỉ
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <div>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => setForm((prev) => ({
+                                        ...prev,
+                                        certificates: [...prev.certificates, createEmptyCertificate()],
+                                    }))}
+                                >
+                                    Thêm chứng chỉ
+                                </Button>
+                            </div>
                         </fieldset>
                         <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
                             Ghi chú cá nhân

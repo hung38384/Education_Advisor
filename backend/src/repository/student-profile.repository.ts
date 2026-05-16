@@ -1,5 +1,5 @@
 import { Database } from 'better-sqlite3';
-import { StudentProfile, SubjectTranscript, UpsertStudentProfileInput } from '../model/student-profile.model';
+import { CERTIFICATE_TYPES, StudentCertificate, StudentProfile, SubjectTranscript, UpsertStudentProfileInput } from '../model/student-profile.model';
 
 export interface StudentProfileRepository {
     findByUserId(userId: number): StudentProfile | undefined;
@@ -19,12 +19,56 @@ interface StudentProfileRow {
     grade11: number | null;
     grade12: number | null;
     transcript: string | null;
+    certificates: string | null;
     favoriteSubjects: string | null;
     targetMajor: string | null;
     targetUniversity: string | null;
     bio: string | null;
     createdAt: string;
     updatedAt: string;
+}
+
+function parseCertificates(rawValue: string | null): StudentCertificate[] {
+    if (!rawValue) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(rawValue);
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed.flatMap((item): StudentCertificate[] => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+                return [];
+            }
+
+            const record = item as Record<string, unknown>;
+            const rawType = typeof record.type === 'string' ? record.type.trim().toUpperCase() : '';
+            const type = CERTIFICATE_TYPES.includes(rawType as StudentCertificate['type'])
+                ? rawType as StudentCertificate['type']
+                : 'OTHER';
+            const name = typeof record.name === 'string' && record.name.trim()
+                ? record.name.trim()
+                : type;
+            const rawScore = record.score;
+            const score = typeof rawScore === 'number' && Number.isFinite(rawScore)
+                ? rawScore
+                : null;
+
+            return [{
+                type,
+                name,
+                score,
+                issuedAt: typeof record.issuedAt === 'string' && record.issuedAt.trim() ? record.issuedAt.trim() : null,
+                expiresAt: typeof record.expiresAt === 'string' && record.expiresAt.trim() ? record.expiresAt.trim() : null,
+                note: typeof record.note === 'string' && record.note.trim() ? record.note.trim() : null,
+            }];
+        });
+    } catch {
+        return [];
+    }
 }
 
 function parseFavoriteSubjects(rawValue: string | null): string[] {
@@ -82,6 +126,7 @@ function toModel(row: StudentProfileRow): StudentProfile {
         grade11: row.grade11,
         grade12: row.grade12,
         transcript: parseTranscript(row.transcript),
+        certificates: parseCertificates(row.certificates),
         favoriteSubjects: parseFavoriteSubjects(row.favoriteSubjects),
         targetMajor: row.targetMajor,
         targetUniversity: row.targetUniversity,
@@ -118,11 +163,12 @@ export class SQLiteStudentProfileRepository implements StudentProfileRepository 
                 grade11,
                 grade12,
                 transcript,
+                certificates,
                 favoriteSubjects,
                 targetMajor,
                 targetUniversity,
                 bio
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(userId) DO UPDATE SET
                 fullName = excluded.fullName,
                 phone = excluded.phone,
@@ -134,6 +180,7 @@ export class SQLiteStudentProfileRepository implements StudentProfileRepository 
                 grade11 = excluded.grade11,
                 grade12 = excluded.grade12,
                 transcript = excluded.transcript,
+                certificates = excluded.certificates,
                 favoriteSubjects = excluded.favoriteSubjects,
                 targetMajor = excluded.targetMajor,
                 targetUniversity = excluded.targetUniversity,
@@ -153,6 +200,7 @@ export class SQLiteStudentProfileRepository implements StudentProfileRepository 
             input.grade11 ?? null,
             input.grade12 ?? null,
             input.transcript ? JSON.stringify(input.transcript) : null,
+            JSON.stringify(input.certificates ?? []),
             JSON.stringify(input.favoriteSubjects ?? []),
             input.targetMajor ?? null,
             input.targetUniversity ?? null,

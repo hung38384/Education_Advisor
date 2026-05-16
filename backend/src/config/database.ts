@@ -112,6 +112,7 @@ export function createDatabase(databasePath?: string) {
       grade11 REAL,
       grade12 REAL,
       transcript TEXT,
+      certificates TEXT,
       favoriteSubjects TEXT,
       targetMajor TEXT,
       targetUniversity TEXT,
@@ -319,6 +320,9 @@ export function createDatabase(databasePath?: string) {
   }
   if (!columnExists('student_profile', 'transcript')) {
     db.exec('ALTER TABLE student_profile ADD COLUMN transcript TEXT');
+  }
+  if (!columnExists('student_profile', 'certificates')) {
+    db.exec('ALTER TABLE student_profile ADD COLUMN certificates TEXT');
   }
 
   db.exec(`

@@ -1,5 +1,7 @@
 import {
+    CERTIFICATE_TYPES,
     REQUIRED_TRANSCRIPT_SUBJECTS,
+    StudentCertificate,
     StudentProfile,
     SubjectTranscript,
     UpsertStudentProfileInput,
@@ -70,6 +72,7 @@ export class StudentProfileService {
         const grade11 = this.normalizeScore(input.grade11);
         const grade12 = this.normalizeScore(input.grade12);
         const transcript = this.normalizeTranscript(input.transcript);
+        const certificates = this.normalizeCertificates(input.certificates);
 
         const favoriteSubjects = (input.favoriteSubjects ?? [])
             .map((item) => item.trim())
@@ -87,11 +90,74 @@ export class StudentProfileService {
             grade11,
             grade12,
             transcript,
+            certificates,
             favoriteSubjects,
             targetMajor: this.normalizeOptionalText(input.targetMajor),
             targetUniversity: this.normalizeOptionalText(input.targetUniversity),
             bio: this.normalizeOptionalText(input.bio),
         };
+    }
+
+    private normalizeCertificates(value: StudentCertificate[] | null | undefined): StudentCertificate[] {
+        if (value === null || value === undefined) {
+            return [];
+        }
+
+        if (!Array.isArray(value)) {
+            throw new StudentProfileServiceError('Danh sách chứng chỉ không hợp lệ', 400);
+        }
+
+        return value
+            .flatMap((item): StudentCertificate[] => {
+                if (!item || typeof item !== 'object' || Array.isArray(item)) {
+                    return [];
+                }
+
+                const rawType = typeof item.type === 'string' ? item.type.trim().toUpperCase() : '';
+                const type = CERTIFICATE_TYPES.includes(rawType as StudentCertificate['type'])
+                    ? rawType as StudentCertificate['type']
+                    : 'OTHER';
+                const name = this.normalizeOptionalText(item.name) || type;
+                const score = this.normalizeCertificateScore(type, item.score);
+
+                return [{
+                    type,
+                    name,
+                    score,
+                    issuedAt: this.normalizeOptionalText(item.issuedAt),
+                    expiresAt: this.normalizeOptionalText(item.expiresAt),
+                    note: this.normalizeOptionalText(item.note),
+                }];
+            })
+            .slice(0, 20);
+    }
+
+    private normalizeCertificateScore(type: StudentCertificate['type'], value: number | null | undefined): number | null {
+        if (value === null || value === undefined) {
+            return null;
+        }
+
+        const score = Number(value);
+        if (!Number.isFinite(score) || score < 0) {
+            throw new StudentProfileServiceError('Điểm chứng chỉ không hợp lệ', 400);
+        }
+
+        const maxByType: Partial<Record<StudentCertificate['type'], number>> = {
+            IELTS: 9,
+            TOEFL: 120,
+            TOEIC: 990,
+            VSTEP: 10,
+            SAT: 1600,
+            ACT: 36,
+            HSA: 150,
+            TSA: 100,
+        };
+        const maxScore = maxByType[type];
+        if (maxScore !== undefined && score > maxScore) {
+            throw new StudentProfileServiceError(`Điểm ${type} phải nằm trong khoảng 0-${maxScore}`, 400);
+        }
+
+        return Number(score.toFixed(2));
     }
 
     private normalizeOptionalText(value: string | null | undefined): string | null {

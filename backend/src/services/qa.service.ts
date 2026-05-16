@@ -63,6 +63,15 @@ interface QAAnswerContext {
     latestReview: ReturnType<ReviewRepository['findLatestByUserId']>;
 }
 
+interface ConversationAdvisorContext {
+    universityCode: string;
+    universityName?: string | null;
+    majorCode: string;
+    majorName: string;
+    methodTag?: string | null;
+    targetYear?: number | null;
+}
+
 export class QAServiceError extends Error {
     constructor(
         message: string,
@@ -531,6 +540,42 @@ export class QAService {
         question: string,
         context: QAAnswerContext
     ): Promise<{ answer: string; metadata: Record<string, unknown> }> {
+        const advisorContext = this.findConversationAdvisorContext(userId, conversationId);
+        if (advisorContext && this.advisorClient) {
+            try {
+                const advisorResult = await this.advisorClient.advise(
+                    this.buildAdvisorPayload(conversationId, question, advisorContext, context)
+                );
+
+                return {
+                    answer: advisorResult.advice,
+                    metadata: {
+                        strategy: 'advisor-service',
+                        advisorStatus: advisorResult.status,
+                        advisorContext,
+                        reusedAdvisorContext: true,
+                    },
+                };
+            } catch (error) {
+                if (!(error instanceof AdvisorClientError)) {
+                    throw error;
+                }
+
+                const fallbackReason = this.getAdvisorFallbackReason(error);
+                console.warn(`[qa] Advisor service failed for user ${userId}. Fallback reason: ${fallbackReason}`);
+
+                return {
+                    answer: 'Hiá»‡n táº¡i há»‡ thá»‘ng tÆ° váº¥n nÃ¢ng cao Ä‘ang báº­n. MÃ¬nh Ä‘Ã£ lÆ°u yÃªu cáº§u cá»§a báº¡n, vui lÃ²ng thá»­ láº¡i sau Ã­t phÃºt.',
+                    metadata: {
+                        strategy: 'advisor-fallback',
+                        fallbackReason,
+                        advisorContext,
+                        reusedAdvisorContext: true,
+                    },
+                };
+            }
+        }
+
         if (this.qaInferenceClient) {
             try {
                 const history = this.qaRepository
@@ -612,6 +657,14 @@ export class QAService {
                     metadata: {
                         strategy: 'advisor-service',
                         advisorStatus: advisorResult.status,
+                        advisorContext: {
+                            universityCode: input.universityCode,
+                            universityName: input.universityName ?? null,
+                            majorCode: input.majorCode,
+                            majorName: input.majorName,
+                            methodTag: input.methodTag ?? null,
+                            targetYear: input.targetYear ?? null,
+                        },
                     },
                 };
             } catch (error) {
@@ -644,17 +697,19 @@ export class QAService {
     private buildAdvisorPayload(
         conversationId: number,
         prompt: string,
-        input: AdviseSchoolMajorInput,
+        input: AdviseSchoolMajorInput | ConversationAdvisorContext,
         context: QAAnswerContext
     ): AdvisorInput {
         const targetUniversity = (input.universityCode || '').trim();
+        const targetMajor = (input.majorCode || '').trim();
+        const targetMajorName = (input.majorName || '').trim();
         const payload: AdvisorInput = {
             query: prompt,
             session_id: `${targetUniversity}:${conversationId}`,
             conversation_id: String(conversationId),
             target_university: targetUniversity,
-            target_major: (input.majorCode || '').trim(),
-            target_major_name: (input.majorName || '').trim(),
+            target_major: targetMajor,
+            target_major_name: targetMajorName,
         };
 
         if (typeof input.targetYear === 'number' && Number.isFinite(input.targetYear)) {
@@ -667,6 +722,11 @@ export class QAService {
         }
 
         if (context.profile) {
+            const certificates = context.profile.certificates ?? [];
+            const ielts = this.findCertificateScore(certificates, 'IELTS');
+            const tsaScore = this.findCertificateScore(certificates, 'TSA');
+            const hsaScore = this.findCertificateScore(certificates, 'HSA');
+
             const academicScores: Record<string, number> = {};
             if (typeof context.profile.grade10 === 'number' && Number.isFinite(context.profile.grade10)) {
                 academicScores.grade10 = context.profile.grade10;
@@ -685,15 +745,28 @@ export class QAService {
             if (context.profile.transcript) {
                 payload.transcript = context.profile.transcript;
             }
+            if (certificates.length > 0) {
+                payload.certificates = certificates;
+            }
+            if (ielts !== null) {
+                payload.ielts = ielts;
+            }
+            if (tsaScore !== null) {
+                payload.tsa_score = tsaScore;
+            }
+            if (hsaScore !== null) {
+                payload.hsa_score = hsaScore;
+            }
 
             payload.student_profile = {
                 full_name: context.profile.fullName,
                 city: context.profile.city,
                 school_name: context.profile.schoolName,
-                target_major: context.profile.targetMajor,
-                target_university: context.profile.targetUniversity,
+                target_major: targetMajor || context.profile.targetMajor,
+                target_university: targetUniversity || context.profile.targetUniversity,
                 favorite_subjects: context.profile.favoriteSubjects,
                 transcript: context.profile.transcript,
+                certificates,
             };
         }
 
@@ -703,6 +776,84 @@ export class QAService {
         }
 
         return payload;
+    }
+
+    private findCertificateScore(
+        certificates: Array<{ type: string; score: number | null }>,
+        type: string
+    ): number | null {
+        const normalizedType = type.trim().toUpperCase();
+        const matched = certificates.find((item) => item.type.trim().toUpperCase() === normalizedType && typeof item.score === 'number');
+        return typeof matched?.score === 'number' && Number.isFinite(matched.score) ? matched.score : null;
+    }
+
+    private findConversationAdvisorContext(userId: number, conversationId: number): ConversationAdvisorContext | null {
+        const messages = this.qaRepository.listByConversationId(userId, conversationId, 100);
+        for (const message of [...messages].reverse()) {
+            const metadata = message.metadata;
+            if (!metadata || typeof metadata !== 'object') {
+                continue;
+            }
+
+            const rawContext = metadata.advisorContext;
+            if (!rawContext || typeof rawContext !== 'object' || Array.isArray(rawContext)) {
+                continue;
+            }
+
+            const context = rawContext as Record<string, unknown>;
+            const universityCode = typeof context.universityCode === 'string' ? context.universityCode.trim() : '';
+            const majorCode = typeof context.majorCode === 'string' ? context.majorCode.trim() : '';
+            const majorName = typeof context.majorName === 'string' ? context.majorName.trim() : '';
+            if (!universityCode || !majorName) {
+                continue;
+            }
+
+            const targetYear = typeof context.targetYear === 'number' && Number.isFinite(context.targetYear)
+                ? Math.round(context.targetYear)
+                : null;
+
+            return {
+                universityCode,
+                universityName: typeof context.universityName === 'string' ? context.universityName : null,
+                majorCode,
+                majorName,
+                methodTag: typeof context.methodTag === 'string' ? context.methodTag : null,
+                targetYear,
+            };
+        }
+
+        return this.inferAdvisorContextFromConversation(messages);
+    }
+
+    private inferAdvisorContextFromConversation(messages: QAMessage[]): ConversationAdvisorContext | null {
+        const combinedUserText = [...messages]
+            .reverse()
+            .filter((message) => message.role === 'user')
+            .map((message) => message.message)
+            .join('\n');
+
+        const universityMatch = combinedUserText.match(/\b([A-Z]{3})\b/);
+        const universityCode = universityMatch?.[1]?.trim().toUpperCase() || '';
+        const majorMatch = combinedUserText.match(/ngành\s+(.+?)(?:\s+tại\s+|\s+theo\s+|\s+với\s+|\s+năm\s+|\n|$)/i);
+        const majorName = majorMatch?.[1]?.trim().replace(/\b[A-Z]{3}\b$/, '').trim() || '';
+
+        if (!universityCode || !majorName) {
+            return null;
+        }
+
+        const yearMatch = combinedUserText.match(/\b(20\d{2}|19\d{2})\b/);
+        const methodTag = /\bD01\b|\bA00\b|\bA01\b|\bD07\b|THPT|tốt nghiệp/i.test(combinedUserText)
+            ? 'THPT_QG'
+            : null;
+
+        return {
+            universityCode,
+            universityName: null,
+            majorCode: '',
+            majorName,
+            methodTag,
+            targetYear: yearMatch ? Number(yearMatch[1]) : null,
+        };
     }
 
     private buildAdvisePrompt(majorName: string, universityCode: string, universityName?: string | null): string {

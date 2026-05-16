@@ -9,6 +9,17 @@ export interface AdvisorInput {
     target_major_name?: string;
     target_year?: string;
     mbti?: string;
+    ielts?: number;
+    tsa_score?: number;
+    hsa_score?: number;
+    certificates?: Array<{
+        type: string;
+        name: string;
+        score: number | null;
+        issuedAt?: string | null;
+        expiresAt?: string | null;
+        note?: string | null;
+    }>;
     academic_scores?: {
         grade10?: number;
         grade11?: number;
@@ -23,6 +34,14 @@ export interface AdvisorInput {
         target_university?: string | null;
         favorite_subjects?: string | string[] | null;
         transcript?: Record<string, number> | null;
+        certificates?: Array<{
+            type: string;
+            name: string;
+            score: number | null;
+            issuedAt?: string | null;
+            expiresAt?: string | null;
+            note?: string | null;
+        }>;
     };
     method_tag?: string;
 }

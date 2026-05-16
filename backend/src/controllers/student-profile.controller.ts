@@ -39,6 +39,7 @@ export class StudentProfileController {
                 grade11: body.grade11,
                 grade12: body.grade12,
                 transcript: body.transcript,
+                certificates: body.certificates,
                 favoriteSubjects: body.favoriteSubjects,
                 targetMajor: body.targetMajor,
                 targetUniversity: body.targetUniversity,
