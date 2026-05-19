@@ -6,6 +6,12 @@ from typing import Any, Dict, List, Optional
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.ai.university_registry import (
+    SUPPORTED_UNIVERSITY_CODES,
+    is_supported_university,
+    normalize_university_code,
+)
+
 
 _SEARCH_FIELDS = [
     "university_code",
@@ -61,6 +67,12 @@ def build_mongo_query(
 ) -> Dict[str, Any]:
     query: Dict[str, Any] = {}
 
+    def add_and_condition(condition: Dict[str, Any]) -> None:
+        if "$and" in query:
+            query["$and"].append(condition)
+        else:
+            query["$and"] = [condition]
+
     if q and q.strip():
         terms = [term for term in q.strip().split() if term]
         and_conditions: List[Dict[str, Any]] = []
@@ -79,7 +91,12 @@ def build_mongo_query(
         query["method_tag"] = method_tag
 
     if university_code:
-        query["university_code"] = university_code
+        normalized_university = normalize_university_code(university_code)
+        query["university_code"] = (
+            normalized_university if is_supported_university(normalized_university) else "__UNSUPPORTED__"
+        )
+    else:
+        add_and_condition({"university_code": {"$in": list(SUPPORTED_UNIVERSITY_CODES)}})
 
     score_filter: Dict[str, float] = {}
     if min_score is not None:

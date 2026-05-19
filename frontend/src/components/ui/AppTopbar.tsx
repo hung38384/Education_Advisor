@@ -112,7 +112,7 @@ export default function AppTopbar({ userName, role }: AppTopbarProps) {
                         aria-controls="app-mobile-menu"
                         onClick={() => setMobileOpen((open) => !open)}
                     >
-                        Thực đơn
+                        Menu
                     </Button>
 
                     <div ref={userMenuRef} className="relative">

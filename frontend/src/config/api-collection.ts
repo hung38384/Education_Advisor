@@ -14,6 +14,7 @@ export const API_ROUTES = {
         QUESTIONS: '/personality/questions',
         SUBMIT: '/personality/submit',
         LATEST: '/personality/latest',
+        HISTORY: '/personality/history',
     },
     REVIEW: {
         RUN: '/review/run',

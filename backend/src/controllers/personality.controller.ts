@@ -47,6 +47,20 @@ export class PersonalityController {
         }
     }
 
+    public async getHistory(req: Request, res: Response): Promise<void> {
+        try {
+            if (!req.user?.userId) {
+                sendError(res, 'Chưa đăng nhập', 401);
+                return;
+            }
+
+            const result = this.service.getHistory(req.user.userId);
+            sendSuccess(res, result);
+        } catch (error) {
+            this.handleError(res, error, 'Không thể lấy lịch sử đánh giá tính cách');
+        }
+    }
+
     private handleError(res: Response, error: unknown, fallbackMessage: string): void {
         if (error instanceof PersonalityServiceError) {
             sendError(res, error.message, error.statusCode);

@@ -336,12 +336,18 @@ const ANSWER_WEIGHTS: Record<PersonalityAnswer, [number, number]> = {
     D: [0, 2],
 };
 
+const PERSONALITY_HISTORY_LIMIT = 50;
+
 export interface PersonalityQuestionsResult {
     questions: PersonalityQuestion[];
 }
 
 export interface PersonalityLatestResult {
     submission: PersonalitySubmission | null;
+}
+
+export interface PersonalityHistoryResult {
+    submissions: PersonalitySubmission[];
 }
 
 export interface SubmitPersonalityResult {
@@ -387,6 +393,10 @@ export class PersonalityService {
     getLatest(userId: number): PersonalityLatestResult {
         const submission = this.repository.findLatestByUserId(userId) ?? null;
         return { submission };
+    }
+
+    getHistory(userId: number): PersonalityHistoryResult {
+        return { submissions: this.repository.findAllByUserId(userId, PERSONALITY_HISTORY_LIMIT) };
     }
 
     private validateAnswers(input: Record<string, PersonalityAnswer> | undefined): Record<string, PersonalityAnswer> {

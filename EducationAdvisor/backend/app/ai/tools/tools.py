@@ -20,6 +20,8 @@ from langchain.tools import tool
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
+from app.ai.university_registry import is_supported_university, normalize_university_code
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -125,10 +127,12 @@ def find_eligible_majors_by_score(
     import json as json_lib
 
     processed_method_tag = extract_method_tag(method_tag) if method_tag else None
-    university = str(university).strip().upper() if university else None
+    university = normalize_university_code(university)
 
     if not university:
         return "Cần có mã trường để lọc danh sách ngành phù hợp."
+    if not is_supported_university(university):
+        return f"Truong {university} chua nam trong danh sach ho tro cua he thong."
     if score is None:
         return "Cần có điểm xét tuyển để lọc danh sách ngành phù hợp."
     if not processed_method_tag:
@@ -282,7 +286,7 @@ def compare_major_cutoffs(
         return best_record, best_score
 
     processed_method_tag = extract_method_tag(method_tag) if method_tag else None
-    university = str(university).strip().upper() if university else None
+    university = normalize_university_code(university)
 
     if not university or not processed_method_tag or not year or len(major_names or []) < 2:
         return json_lib.dumps(
@@ -292,6 +296,16 @@ def compare_major_cutoffs(
                 "year": year,
                 "method_tag": processed_method_tag,
                 "major_names": major_names or [],
+            },
+            ensure_ascii=False,
+        )
+
+    if not is_supported_university(university):
+        return json_lib.dumps(
+            {
+                "status": "unsupported_university",
+                "university": university,
+                "message": "University is outside the supported allowlist.",
             },
             ensure_ascii=False,
         )
@@ -397,7 +411,7 @@ def get_major_cutoffs_all_methods(
                 continue
         return 0.0
 
-    university = str(university).strip().upper() if university else None
+    university = normalize_university_code(university)
     requested_major = str(major_name or "").strip()
     target = normalize_text(requested_major)
     if not university or not requested_major or not year:
@@ -407,6 +421,16 @@ def get_major_cutoffs_all_methods(
                 "university": university,
                 "major_name": requested_major,
                 "year": year,
+            },
+            ensure_ascii=False,
+        )
+
+    if not is_supported_university(university):
+        return json_lib.dumps(
+            {
+                "status": "unsupported_university",
+                "university": university,
+                "message": "University is outside the supported allowlist.",
             },
             ensure_ascii=False,
         )
@@ -553,12 +577,14 @@ def search_admission_rules(
         vectorstore = get_vectorstore()
 
         # Normalize parameters to strings
-        university = str(university).strip().upper() if university else None
+        university = normalize_university_code(university)
         year = str(year).strip() if year else None
 
-        # REFACTOR: Khử nhiễu mã trường do LLM sinh ra ("BBKA" -> "BKA")
-        if university:
-            university = re.sub(r'^(.)\1+', r'\1', university)
+        if university and not is_supported_university(university):
+            return (
+                f"Truong {university} chua nam trong danh sach ho tro cua he thong. "
+                "He thong se bo qua cac truong ngoai danh sach cho phep."
+            )
 
         # =================================================================
         # TEMPORAL ANCHORING: Chiến lược Fallback lùi năm
@@ -581,33 +607,78 @@ def search_admission_rules(
             # ChromaDB $and syntax cho multi-key filter
             return {"$and": [{k: v} for k, v in conditions.items()]}
 
+        def _year_values(value: Optional[str]) -> list[Any]:
+            """Try both metadata shapes: year stored as string and as integer."""
+            if not value:
+                return []
+            values: list[Any] = [value]
+            try:
+                int_value = int(value)
+                if int_value not in values:
+                    values.append(int_value)
+            except (TypeError, ValueError):
+                pass
+            return values
+
+        def _unique_filters(filters: list[dict]) -> list[dict]:
+            seen = set()
+            unique = []
+            for item in filters:
+                marker = repr(item)
+                if marker in seen:
+                    continue
+                seen.add(marker)
+                unique.append(item)
+            return unique
+
+        def _search_first(filters: list[dict], label: str) -> tuple[list[Any], Optional[dict]]:
+            for raw_filter in _unique_filters(filters):
+                chroma_filter = _build_chroma_filter(raw_filter)
+                found = vectorstore.similarity_search(query, k=3, filter=chroma_filter)
+                logger.info(f"   🔎 [{label}] ChromaDB filter={chroma_filter} → {len(found)} result(s)")
+                if found:
+                    return found, chroma_filter
+            return [], None
+
         # Bước 1: Thử tìm với year cụ thể
         results = []
         used_fallback = False
+        selected_filter = None
 
         if year and university:
-            strict_conditions = {"university": university, "year": year}
-            strict_filter = _build_chroma_filter(strict_conditions)
-            results = vectorstore.similarity_search(query, k=3, filter=strict_filter)
-            logger.info(f"   🔎 [Strict] ChromaDB filter={strict_filter} → {len(results)} result(s)")
+            strict_filters = []
+            for year_value in _year_values(year):
+                strict_filters.extend(
+                    [
+                        {"university": university, "year": year_value},
+                        {"university_code": university, "year": year_value},
+                    ]
+                )
+            results, selected_filter = _search_first(strict_filters, "Strict")
 
             # Bước 2: Nếu rỗng → Fallback bỏ year, chỉ giữ university
             if not results:
-                fallback_filter = {"university": university}
-                results = vectorstore.similarity_search(query, k=3, filter=fallback_filter)
+                fallback_filters = [
+                    {"university": university},
+                    {"university_code": university},
+                ]
+                results, selected_filter = _search_first(fallback_filters, "Fallback")
                 used_fallback = True
                 logger.warning(
                     f"   🔄 [Fallback] Year '{year}' không có dữ liệu → "
-                    f"tìm lại với filter={fallback_filter} → {len(results)} result(s)"
+                    f"tìm lại với filter={selected_filter} → {len(results)} result(s)"
                 )
         elif university:
             # Chỉ có university, không có year
-            results = vectorstore.similarity_search(query, k=3, filter={"university": university})
-            logger.info(f"   🔎 ChromaDB filter={{university: {university}}} → {len(results)} result(s)")
+            university_filters = [
+                {"university": university},
+                {"university_code": university},
+            ]
+            results, selected_filter = _search_first(university_filters, "University")
         elif year:
             # Chỉ có year, không có university
-            results = vectorstore.similarity_search(query, k=3, filter={"year": year})
-            logger.info(f"   🔎 ChromaDB filter={{year: {year}}} → {len(results)} result(s)")
+            year_filters = [{"year": year_value} for year_value in _year_values(year)]
+            results, selected_filter = _search_first(year_filters, "Year")
         else:
             # Không có filter nào → tìm tất cả
             results = vectorstore.similarity_search(query, k=3)
@@ -634,7 +705,7 @@ def search_admission_rules(
             
             formatted_result = (
                 f"[Kết quả {idx}]\n"
-                f"Trường: {metadata.get('university', 'N/A')}\n"
+                f"Trường: {metadata.get('university') or metadata.get('university_code', 'N/A')}\n"
                 f"Năm: {metadata.get('year', 'N/A')}\n"
                 f"Nguồn: {metadata.get('source', 'N/A')}\n"
                 f"Nội dung:\n{content}\n"
@@ -787,11 +858,13 @@ def get_historical_scores(
         f"Subject combo: {requested_combination}"
     )
     
-    # REFACTOR: Normalize + Regex khử nhiễu mã trường do LLM sinh ra
-    # Ví dụ: "BBKA" -> "BKA", "TTMU" -> "TMU", "QQHI" -> "QHI"
-    university = str(university).strip().upper() if university else None
-    if university:
-        university = re.sub(r'^(.)\1+', r'\1', university)
+    # Normalize university codes through the supported allowlist.
+    university = normalize_university_code(university)
+    if university and not is_supported_university(university):
+        return (
+            f"Truong {university} chua nam trong danh sach ho tro cua he thong. "
+            "He thong se bo qua cac truong ngoai danh sach cho phep."
+        )
     major = str(major).strip() if major else None
 
     if not major:

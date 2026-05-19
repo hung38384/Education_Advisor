@@ -1,11 +1,11 @@
 import type { PersonalityAnswer } from '@/services/personalityService';
 
 export type PersonalityQuizMode = 'loading' | 'error' | 'empty' | 'quiz' | 'result';
+export type PersonalityTab = 'quiz' | 'result' | 'history';
 
 interface QuizModeInput {
     questionsCount: number;
     submittedResult: unknown | null;
-    latestSubmission: unknown | null;
     isLoading: boolean;
     isError: boolean;
 }

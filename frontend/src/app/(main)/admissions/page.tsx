@@ -5,6 +5,7 @@ import { ChangeEvent, Fragment, useMemo, useState } from 'react';
 import { Button, Card } from '@/components/ui';
 import { useAddAdmissionCartItem, useAdmissionCart, useAdmissionCatalog } from '@/hooks/useAdmissions';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { formatAdmissionMethodName, formatUniversityName } from '@/lib/utils';
 import type {
     AdmissionCatalogItem,
     AdmissionCatalogMethod,
@@ -106,8 +107,8 @@ export default function AdmissionsPage() {
     };
 
     const handleAdd = async (item: AdmissionCatalogItem, method: AdmissionCatalogMethod) => {
-        const schoolName = item.universityName || item.universityCode;
-        const methodName = method.methodAlias || method.methodTag;
+        const schoolName = formatUniversityName(item.universityName, item.universityCode);
+        const methodName = formatAdmissionMethodName(method.methodAlias, method.methodTag);
         const latestScore = method.yearlyScores[0]?.score ?? 0;
         const description = method.shortComment || 'Chưa có dữ liệu';
 
@@ -184,9 +185,14 @@ export default function AdmissionsPage() {
                             {catalog ? `${catalog.total} kết quả` : 'Đang chuẩn bị dữ liệu'} · 15 dòng/trang
                         </p>
                     </div>
-                    {catalogQuery.isFetching && !catalogQuery.isLoading && (
-                        <span className="text-sm text-slate-500">Đang cập nhật...</span>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {catalogQuery.isFetching && !catalogQuery.isLoading && (
+                            <span className="text-sm text-slate-500">Đang cập nhật...</span>
+                        )}
+                        <Button type="button" variant="secondary" className="px-3 py-1.5 text-xs" onClick={handleResetFilters}>
+                            Xóa bộ lọc
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -238,7 +244,7 @@ export default function AdmissionsPage() {
                             <option value="">Tất cả</option>
                             {catalog?.filters.universities.map((university) => (
                                 <option key={university.code} value={university.code}>
-                                    {university.name ? `${university.code} - ${university.name}` : university.code}
+                                    {`${university.code} - ${formatUniversityName(university.name, university.code)}`}
                                 </option>
                             ))}
                         </select>
@@ -269,12 +275,6 @@ export default function AdmissionsPage() {
                             />
                         </label>
                     </div>
-                </div>
-
-                <div className="flex justify-end">
-                    <Button type="button" variant="secondary" className="px-3 py-1.5 text-xs" onClick={handleResetFilters}>
-                        Xóa bộ lọc
-                    </Button>
                 </div>
 
                 {catalogQuery.isLoading ? (
@@ -308,7 +308,7 @@ export default function AdmissionsPage() {
                                             <tr>
                                                 <td className="px-4 py-3 font-medium text-slate-900">{item.universityCode}</td>
                                                 <td className="px-4 py-3 text-slate-700">
-                                                    {item.universityName || item.universityCode}
+                                                    {formatUniversityName(item.universityName, item.universityCode)}
                                                 </td>
                                                 <td className="px-4 py-3 text-slate-700">{item.majorCode}</td>
                                                 <td className="px-4 py-3 text-slate-900">{item.majorName}</td>
@@ -332,7 +332,7 @@ export default function AdmissionsPage() {
                                                         ) : (
                                                             <div className="grid gap-3 md:grid-cols-2">
                                                                 {item.methods.map((method) => {
-                                                                    const methodName = method.methodAlias || method.methodTag;
+                                                                    const methodName = formatAdmissionMethodName(method.methodAlias, method.methodTag);
                                                                     return (
                                                                         <div
                                                                             key={method.methodTag}

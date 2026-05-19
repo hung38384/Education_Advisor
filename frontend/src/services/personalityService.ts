@@ -51,6 +51,10 @@ export interface LatestPersonalityResponse {
     submission: PersonalitySubmission | null;
 }
 
+export interface PersonalityHistoryResponse {
+    submissions: PersonalitySubmission[];
+}
+
 export const personalityService = {
     async getQuestions(): Promise<QuestionsResponse> {
         const response = await api.get<QuestionsResponse>(API_ROUTES.PERSONALITY.QUESTIONS);
@@ -64,6 +68,11 @@ export const personalityService = {
 
     async getLatest(): Promise<LatestPersonalityResponse> {
         const response = await api.get<LatestPersonalityResponse>(API_ROUTES.PERSONALITY.LATEST);
+        return response.data;
+    },
+
+    async getHistory(): Promise<PersonalityHistoryResponse> {
+        const response = await api.get<PersonalityHistoryResponse>(API_ROUTES.PERSONALITY.HISTORY);
         return response.data;
     },
 };

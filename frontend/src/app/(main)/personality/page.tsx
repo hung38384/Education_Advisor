@@ -1,10 +1,14 @@
 'use client';
 
-import Link from 'next/link';
-import type { FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import type { FormEvent, KeyboardEvent } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Button, Card } from '@/components/ui';
-import { usePersonalityQuestions, useSubmitPersonality } from '@/hooks/usePersonality';
+import {
+    useLatestPersonality,
+    usePersonalityHistory,
+    usePersonalityQuestions,
+    useSubmitPersonality,
+} from '@/hooks/usePersonality';
 import { getApiErrorMessage } from '@/lib/api-error';
 import type { PersonalityAnswer, PersonalitySubmission } from '@/services/personalityService';
 import {
@@ -13,17 +17,30 @@ import {
     canSubmitQuiz,
     getNextQuestionIndex,
     getPersonalityQuizMode,
+    type PersonalityTab,
 } from './personality-flow';
+import PersonalityHistoryView from './PersonalityHistoryView';
+import PersonalityResultView from './PersonalityResultView';
 import { assessmentTests, mapBackendQuestion } from './personality-tests';
+
+const PERSONALITY_TABS: Array<{ id: PersonalityTab; label: string }> = [
+    { id: 'quiz', label: 'Làm bài' },
+    { id: 'result', label: 'Kết quả' },
+    { id: 'history', label: 'Lịch sử' },
+];
 
 export default function PersonalityPage() {
     const questionsQuery = usePersonalityQuestions();
+    const latestPersonalityQuery = useLatestPersonality();
     const submitMutation = useSubmitPersonality();
 
+    const [activeTab, setActiveTab] = useState<PersonalityTab>('quiz');
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, PersonalityAnswer>>({});
     const [submittedResult, setSubmittedResult] = useState<PersonalitySubmission | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+    const personalityHistoryQuery = usePersonalityHistory(activeTab === 'history');
 
     const questions = useMemo(
         () => (questionsQuery.data?.questions ?? []).map((question) => mapBackendQuestion(question)),
@@ -39,19 +56,52 @@ export default function PersonalityPage() {
     const canSubmitCurrentQuestion = canSubmitCurrentStep(isLastQuestion, canSubmit);
     const currentQuestionAnswered = currentQuestion ? canAdvanceFromQuestion(answers, currentQuestion.id) : false;
     const progressWidth = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
+    const latestSubmission = latestPersonalityQuery.data?.submission ?? null;
+    const resultSubmission = submittedResult ?? latestSubmission;
+    const historySubmissions = personalityHistoryQuery.data?.submissions ?? [];
     const quizMode = getPersonalityQuizMode({
         questionsCount: questions.length,
         submittedResult,
-        latestSubmission: null,
         isLoading: questionsQuery.isLoading,
         isError: questionsQuery.isError,
     });
 
     const resetTestProgress = () => {
+        setActiveTab('quiz');
         setCurrentIndex(0);
         setAnswers({});
         setSubmittedResult(null);
         setErrorMessage(null);
+    };
+
+    const handleTabChange = (tab: PersonalityTab) => {
+        if (tab === 'quiz' && submittedResult) {
+            resetTestProgress();
+            return;
+        }
+
+        setActiveTab(tab);
+    };
+
+    const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tabIndex: number) => {
+        const lastIndex = PERSONALITY_TABS.length - 1;
+        let nextIndex = tabIndex;
+
+        if (event.key === 'ArrowRight') {
+            nextIndex = tabIndex === lastIndex ? 0 : tabIndex + 1;
+        } else if (event.key === 'ArrowLeft') {
+            nextIndex = tabIndex === 0 ? lastIndex : tabIndex - 1;
+        } else if (event.key === 'Home') {
+            nextIndex = 0;
+        } else if (event.key === 'End') {
+            nextIndex = lastIndex;
+        } else {
+            return;
+        }
+
+        event.preventDefault();
+        handleTabChange(PERSONALITY_TABS[nextIndex].id);
+        tabRefs.current[nextIndex]?.focus();
     };
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -65,6 +115,7 @@ export default function PersonalityPage() {
         try {
             const response = await submitMutation.mutateAsync({ answers });
             setSubmittedResult(response.submission);
+            setActiveTab('result');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'Không thể nộp bài đánh giá'));
         }
@@ -79,8 +130,42 @@ export default function PersonalityPage() {
                 </p>
             </div>
 
-            {quizMode !== 'result' && (
-                <>
+            <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm" role="tablist">
+                {PERSONALITY_TABS.map((tab, index) => {
+                    const isActive = activeTab === tab.id;
+
+                    return (
+                        <button
+                            key={tab.id}
+                            ref={(element) => {
+                                tabRefs.current[index] = element;
+                            }}
+                            id={`personality-tab-${tab.id}`}
+                            type="button"
+                            role="tab"
+                            aria-controls={`personality-panel-${tab.id}`}
+                            aria-selected={isActive}
+                            tabIndex={isActive ? 0 : -1}
+                            onClick={() => handleTabChange(tab.id)}
+                            onKeyDown={(event) => handleTabKeyDown(event, index)}
+                            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 ${
+                                isActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {activeTab === 'quiz' && (
+                <section
+                    id="personality-panel-quiz"
+                    role="tabpanel"
+                    aria-labelledby="personality-tab-quiz"
+                    tabIndex={0}
+                    className="space-y-5 focus:outline-none"
+                >
                     <Card className="space-y-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="space-y-1">
@@ -106,16 +191,23 @@ export default function PersonalityPage() {
                         ) : (
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <p className="text-sm font-medium text-slate-600">
+                                    <p className="text-sm font-medium text-slate-600" aria-live="polite">
                                         Câu {currentIndex + 1}/{questions.length}
                                     </p>
-                                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 md:w-56">
+                                    <div
+                                        className="h-2 w-full overflow-hidden rounded-full bg-slate-100 md:w-56"
+                                        role="progressbar"
+                                        aria-label="Tiến độ làm bài"
+                                        aria-valuemin={1}
+                                        aria-valuemax={questions.length}
+                                        aria-valuenow={currentIndex + 1}
+                                    >
                                         <div className="h-full rounded-full bg-slate-900" style={{ width: `${progressWidth}%` }} />
                                     </div>
                                 </div>
 
-                                <div className="rounded-md border border-slate-200 p-4">
-                                    <p className="text-base font-semibold text-slate-900">{currentQuestion.prompt}</p>
+                                <fieldset className="rounded-md border border-slate-200 p-4">
+                                    <legend className="text-base font-semibold text-slate-900">{currentQuestion.prompt}</legend>
                                     <div className="mt-4 grid gap-2">
                                         {currentQuestion.choices.map((choice) => (
                                             <label
@@ -141,7 +233,7 @@ export default function PersonalityPage() {
                                             </label>
                                         ))}
                                     </div>
-                                </div>
+                                </fieldset>
 
                                 <div className="flex justify-end">
                                     {isLastQuestion ? (
@@ -165,36 +257,59 @@ export default function PersonalityPage() {
                             </form>
                         )}
 
-                        {errorMessage && <p className="text-sm text-red-700">{errorMessage}</p>}
+                        {errorMessage && <p className="text-sm text-red-700" role="alert">{errorMessage}</p>}
                     </Card>
-                </>
+                </section>
             )}
 
-            {quizMode === 'result' && submittedResult && (
-                <Card className="space-y-3 border-slate-900">
-                    <h2 className="text-lg font-semibold text-slate-900">Kết quả đánh giá</h2>
-                    <p className="text-base font-semibold text-slate-900">Kết quả MBTI: {submittedResult.mbtiType}</p>
-                    <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-                        <p>E {submittedResult.scores.E} - I {submittedResult.scores.I}</p>
-                        <p>S {submittedResult.scores.S} - N {submittedResult.scores.N}</p>
-                        <p>T {submittedResult.scores.T} - F {submittedResult.scores.F}</p>
-                        <p>J {submittedResult.scores.J} - P {submittedResult.scores.P}</p>
-                    </div>
-                    <p className="text-sm text-slate-600">
-                        Kết quả này sẽ được dùng cùng hồ sơ học tập để gợi ý mức độ phù hợp ngành và trường.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="secondary" onClick={resetTestProgress}>
-                            Làm lại bài này
-                        </Button>
-                        <Link
-                            href="/review"
-                            className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400"
-                        >
-                            Sang trang đánh giá phù hợp
-                        </Link>
-                    </div>
-                </Card>
+            {activeTab === 'result' && (
+                <section
+                    id="personality-panel-result"
+                    role="tabpanel"
+                    aria-labelledby="personality-tab-result"
+                    tabIndex={0}
+                    className="focus:outline-none"
+                    aria-live="polite"
+                >
+                    {resultSubmission ? (
+                        <PersonalityResultView submission={resultSubmission} onRetake={resetTestProgress} />
+                    ) : latestPersonalityQuery.isLoading ? (
+                        <Card>
+                            <p className="text-sm text-slate-700">Đang tải kết quả đánh giá mới nhất...</p>
+                        </Card>
+                    ) : latestPersonalityQuery.isError ? (
+                        <Card>
+                            <p className="text-sm text-red-700">Không tải được kết quả đánh giá mới nhất.</p>
+                        </Card>
+                    ) : (
+                        <Card className="space-y-3">
+                            <h2 className="text-lg font-semibold text-slate-900">Chưa có kết quả đánh giá</h2>
+                            <p className="text-sm text-slate-700">
+                                Hãy hoàn thành bài MBTI để xem tổng điểm, nhận xét theo 4 nhóm và gợi ý cải thiện.
+                            </p>
+                            <Button type="button" onClick={() => setActiveTab('quiz')}>
+                                Làm bài MBTI
+                            </Button>
+                        </Card>
+                    )}
+                </section>
+            )}
+
+            {activeTab === 'history' && (
+                <section
+                    id="personality-panel-history"
+                    role="tabpanel"
+                    aria-labelledby="personality-tab-history"
+                    tabIndex={0}
+                    className="focus:outline-none"
+                    aria-live="polite"
+                >
+                    <PersonalityHistoryView
+                        submissions={historySubmissions}
+                        isLoading={personalityHistoryQuery.isLoading}
+                        isError={personalityHistoryQuery.isError}
+                    />
+                </section>
             )}
         </main>
     );

@@ -82,7 +82,12 @@ from app.ai.nodes.receptionist import (
 from app.ai.ml.ml_recommender import get_recommender
 
 # Import University Registry (Multi-University Support)
-from app.ai.university_registry import get_university_info, get_university_name
+from app.ai.university_registry import (
+    get_university_info,
+    get_university_name,
+    is_supported_university,
+    normalize_university_code,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -341,6 +346,17 @@ UNIVERSITY_DISPLAY_NAMES = {
     "TCT": "\u0110\u1ea1i h\u1ecdc C\u1ea7n Th\u01a1",
     "DDT": "\u0110\u1ea1i h\u1ecdc Duy T\u00e2n",
     "DTT": "\u0110\u1ea1i h\u1ecdc T\u00f4n \u0110\u1ee9c Th\u1eafng",
+}
+
+UNIVERSITY_ALIAS_MAP = {
+    code: aliases
+    for code, aliases in UNIVERSITY_ALIAS_MAP.items()
+    if normalize_university_code(code) == code
+}
+UNIVERSITY_DISPLAY_NAMES = {
+    normalize_university_code(code) or code: name
+    for code, name in UNIVERSITY_DISPLAY_NAMES.items()
+    if normalize_university_code(code) == code
 }
 
 ADMISSION_KEYWORDS = {
@@ -720,17 +736,18 @@ def _get_latest_user_query(state: dict) -> str:
 
 def _current_university(state: dict) -> str | None:
     profile = state.get("user_profile", {}) or {}
-    return (profile.get("target_university") or state.get("target_university") or None)
+    current = normalize_university_code(profile.get("target_university") or state.get("target_university"))
+    return current if is_supported_university(current) else None
 
 
 def _detect_mentioned_university(query: str) -> str | None:
     normalized = normalize_vietnamese_text(query)
     for code, aliases in UNIVERSITY_ALIAS_MAP.items():
         if re.search(rf"\b{re.escape(code.lower())}\b", normalized):
-            return code
+            return normalize_university_code(code)
         for alias in aliases:
             if alias and alias in normalized:
-                return code
+                return normalize_university_code(code)
     return None
 
 
@@ -742,7 +759,9 @@ def _detect_mentioned_universities(query: str) -> list[str]:
         if not matched:
             matched = any(alias and alias in normalized for alias in aliases)
         if matched and code not in detected:
-            detected.append(code)
+            normalized_code = normalize_university_code(code)
+            if normalized_code and normalized_code not in detected:
+                detected.append(normalized_code)
     return detected
 
 

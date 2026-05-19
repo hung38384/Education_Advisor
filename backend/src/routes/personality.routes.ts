@@ -7,6 +7,7 @@ export function createPersonalityRouter(controller: PersonalityController, authe
     router.get('/api/personality/questions', authenticateToken, (req, res) => controller.getQuestions(req, res));
     router.post('/api/personality/submit', authenticateToken, (req, res) => controller.submit(req, res));
     router.get('/api/personality/latest', authenticateToken, (req, res) => controller.getLatest(req, res));
+    router.get('/api/personality/history', authenticateToken, (req, res) => controller.getHistory(req, res));
 
     return router;
 }

@@ -11,6 +11,7 @@ export interface CreatePersonalitySubmissionInput {
 export interface PersonalityRepository {
     create(input: CreatePersonalitySubmissionInput): PersonalitySubmission | undefined;
     findLatestByUserId(userId: number): PersonalitySubmission | undefined;
+    findAllByUserId(userId: number, limit: number): PersonalitySubmission[];
 }
 
 interface PersonalitySubmissionRow {
@@ -121,5 +122,18 @@ export class SQLitePersonalityRepository implements PersonalityRepository {
         }
 
         return toModel(row);
+    }
+
+    findAllByUserId(userId: number, limit: number): PersonalitySubmission[] {
+        const stmt = this.db.prepare(`
+            SELECT *
+            FROM personality_submission
+            WHERE userId = ?
+            ORDER BY createdAt DESC, id DESC
+            LIMIT ?
+        `);
+
+        const rows = stmt.all(userId, limit) as PersonalitySubmissionRow[];
+        return rows.map((row) => toModel(row));
     }
 }

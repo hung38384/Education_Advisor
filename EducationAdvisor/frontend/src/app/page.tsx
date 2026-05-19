@@ -6,10 +6,22 @@ import { requestAdvice } from "@/services/advisor";
 import type { AdviceRequest } from "@/types/advisor";
 
 const UNIVERSITY_OPTIONS = [
-  { label: "Bach Khoa Ha Noi (BKA)", value: "BKA" },
-  { label: "Thuong Mai University (TMU)", value: "TMU" },
-  { label: "National Economics University (KHA)", value: "KHA" },
-  { label: "Hanoi Law University (LPH)", value: "LPH" },
+  { label: "Dai hoc Bach khoa Ha Noi (BKA)", value: "BKA" },
+  { label: "Dai hoc Can Tho (CTU)", value: "CTU" },
+  { label: "Dai hoc Duy Tan (DDT)", value: "DDT" },
+  { label: "Dai hoc Duoc Ha Noi (DKH)", value: "DKH" },
+  { label: "Hoc vien Ngoai giao (HQT)", value: "HQT" },
+  { label: "Dai hoc Kinh te Quoc dan (KHA)", value: "KHA" },
+  { label: "Dai hoc Luat Ha Noi (LPH)", value: "LPH" },
+  { label: "Dai hoc Ngoai thuong (NTH)", value: "NTH" },
+  { label: "Dai hoc Ngoai ngu - DHQGHN (QHF)", value: "QHF" },
+  { label: "Dai hoc Cong nghe - DHQGHN (QHI)", value: "QHI" },
+  { label: "Dai hoc KHXH&NV - DHQGHN (QHX)", value: "QHX" },
+  { label: "Dai hoc Su pham Ha Noi (SPH)", value: "SPH" },
+  { label: "Dai hoc Can Tho / ma TCT (TCT)", value: "TCT" },
+  { label: "Dai hoc Thuong mai (TMU)", value: "TMU" },
+  { label: "Dai hoc Y Duoc TPHCM (YDS)", value: "YDS" },
+  { label: "Dai hoc Y Ha Noi (YHB)", value: "YHB" },
 ];
 
 export default function HomePage() {

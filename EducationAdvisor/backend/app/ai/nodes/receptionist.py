@@ -12,6 +12,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.tools import tool
 
+from app.ai.university_registry import is_supported_university, normalize_university_code
+
 
 # ============================================================================
 # 1. ĐỊNH NGHĨA ENUM VÀ PYDANTIC MODEL
@@ -688,7 +690,14 @@ def receptionist_node(state: Dict[str, Any]) -> Dict[str, Any]:
     
     # Cập nhật mã trường nếu có
     if extracted.target_university:
-        user_profile["target_university"] = extracted.target_university
+        normalized_university = normalize_university_code(extracted.target_university)
+        if is_supported_university(normalized_university):
+            user_profile["target_university"] = normalized_university
+        else:
+            logger.info(
+                "   Bỏ qua mã trường ngoài danh sách hỗ trợ: %s",
+                extracted.target_university,
+            )
 
     target_year = extracted.target_year or extract_target_year_from_text(user_message)
     if target_year:
@@ -741,7 +750,11 @@ def receptionist_node(state: Dict[str, Any]) -> Dict[str, Any]:
     user_profile["intent"] = extracted.intent
     
     # Tìm mã ngành nếu có tên ngành và trường
-    lookup_university = extracted.target_university or user_profile.get("target_university")
+    lookup_university = normalize_university_code(
+        user_profile.get("target_university") or extracted.target_university
+    )
+    if lookup_university and not is_supported_university(lookup_university):
+        lookup_university = None
     if extracted.target_major_name and lookup_university:
         logger.info(f"   🔍 Tìm mã ngành: {extracted.target_major_name} tại {lookup_university}")
         major_code = find_major_code_by_name(

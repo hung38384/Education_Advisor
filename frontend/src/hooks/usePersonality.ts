@@ -3,6 +3,7 @@ import { personalityService, type SubmitPersonalityPayload } from '@/services/pe
 
 export const PERSONALITY_QUESTIONS_QUERY_KEY = ['personality', 'questions'] as const;
 export const PERSONALITY_LATEST_QUERY_KEY = ['personality', 'latest'] as const;
+export const PERSONALITY_HISTORY_QUERY_KEY = ['personality', 'history'] as const;
 
 export function usePersonalityQuestions() {
     return useQuery({
@@ -18,6 +19,14 @@ export function useLatestPersonality() {
     });
 }
 
+export function usePersonalityHistory(enabled = true) {
+    return useQuery({
+        queryKey: PERSONALITY_HISTORY_QUERY_KEY,
+        queryFn: personalityService.getHistory,
+        enabled,
+    });
+}
+
 export function useSubmitPersonality() {
     const queryClient = useQueryClient();
 
@@ -25,6 +34,7 @@ export function useSubmitPersonality() {
         mutationFn: (payload: SubmitPersonalityPayload) => personalityService.submit(payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: PERSONALITY_LATEST_QUERY_KEY });
+            queryClient.invalidateQueries({ queryKey: PERSONALITY_HISTORY_QUERY_KEY });
         },
     });
 }

@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button, Card } from '@/components/ui';
 import { useAdmissionCart, useRemoveAdmissionCartItem } from '@/hooks/useAdmissions';
+import { useAdviseQa } from '@/hooks/useQa';
 import { getApiErrorMessage } from '@/lib/api-error';
-import type { AdmissionChanceLevel } from '@/services/admissionService';
+import type { AdmissionCartViewItem, AdmissionChanceLevel } from '@/services/admissionService';
 
 const CHANCE_LABEL: Record<AdmissionChanceLevel, string> = {
     high: 'Cao',
@@ -19,10 +21,13 @@ const CHANCE_CLASS: Record<AdmissionChanceLevel, string> = {
 };
 
 export default function AdmissionsFavoritesPage() {
+    const router = useRouter();
     const cartQuery = useAdmissionCart();
     const removeMutation = useRemoveAdmissionCartItem();
+    const adviseMutation = useAdviseQa();
     const [message, setMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [adviseErrorMessage, setAdviseErrorMessage] = useState<string | null>(null);
 
     const cartProfile = cartQuery.data?.profile;
     const cartItems = cartQuery.data?.items ?? [];
@@ -30,11 +35,33 @@ export default function AdmissionsFavoritesPage() {
     const handleRemove = async (id: number) => {
         setMessage(null);
         setErrorMessage(null);
+        setAdviseErrorMessage(null);
         try {
             await removeMutation.mutateAsync(id);
             setMessage('Đã xóa lựa chọn khỏi mục yêu thích.');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'Không thể xóa lựa chọn xét tuyển'));
+        }
+    };
+
+    const handleAdvise = async (item: AdmissionCartViewItem) => {
+        setMessage(null);
+        setErrorMessage(null);
+        setAdviseErrorMessage(null);
+
+        try {
+            const data = await adviseMutation.mutateAsync({
+                universityCode: item.school.id,
+                universityName: item.school.name,
+                majorCode: item.major.id,
+                majorName: item.major.name,
+                methodTag: item.method.id,
+                targetYear: null,
+            });
+
+            router.push(`/qa?conversationId=${data.conversationId}`);
+        } catch (error) {
+            setAdviseErrorMessage(getApiErrorMessage(error, 'Không thể tạo nhận xét cho lựa chọn này'));
         }
     };
 
@@ -68,6 +95,7 @@ export default function AdmissionsFavoritesPage() {
 
             {message && <p className="text-sm text-green-700">{message}</p>}
             {errorMessage && <p className="text-sm text-red-700">{errorMessage}</p>}
+            {adviseErrorMessage && <p className="text-sm text-red-700">{adviseErrorMessage}</p>}
 
             <Card className="space-y-4">
                 <h2 className="text-lg font-semibold text-slate-900">Lựa chọn đã thêm và gợi ý</h2>
@@ -87,14 +115,23 @@ export default function AdmissionsFavoritesPage() {
                                         <p className="text-xs text-slate-600">Phương thức: {item.method.name}</p>
                                         <p className="text-xs text-slate-600">Đã tạo lúc: {new Date(item.createdAt).toLocaleString('vi-VN')}</p>
                                     </div>
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        disabled={removeMutation.isPending}
-                                        onClick={() => void handleRemove(item.id)}
-                                    >
-                                        Xóa
-                                    </Button>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            type="button"
+                                            disabled={adviseMutation.isPending || removeMutation.isPending}
+                                            onClick={() => void handleAdvise(item)}
+                                        >
+                                            {adviseMutation.isPending ? 'Đang tạo nhận xét...' : 'Nhận xét'}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            disabled={removeMutation.isPending || adviseMutation.isPending}
+                                            onClick={() => void handleRemove(item.id)}
+                                        >
+                                            Xóa
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 <div className="mt-3 space-y-2">
