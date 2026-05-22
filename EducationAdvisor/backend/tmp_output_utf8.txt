@@ -1,0 +1,213 @@
+﻿=== STATE DICT ===
+tabnet.initial_bn.weight: torch.Size([17])
+tabnet.initial_bn.bias: torch.Size([17])
+tabnet.initial_bn.running_mean: torch.Size([17])
+tabnet.initial_bn.running_var: torch.Size([17])
+tabnet.initial_bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.initial_bn.weight: torch.Size([17])
+tabnet.encoder.initial_bn.bias: torch.Size([17])
+tabnet.encoder.initial_bn.running_mean: torch.Size([17])
+tabnet.encoder.initial_bn.running_var: torch.Size([17])
+tabnet.encoder.initial_bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.initial_splitter.shared.shared_layers.0.weight: torch.Size([64, 17])
+tabnet.encoder.initial_splitter.shared.shared_layers.1.weight: torch.Size([64, 32])
+tabnet.encoder.initial_splitter.shared.glu_layers.0.fc.weight: torch.Size([64, 17])
+tabnet.encoder.initial_splitter.shared.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.initial_splitter.shared.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.initial_splitter.shared.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.initial_splitter.shared.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.initial_splitter.shared.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.initial_splitter.shared.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.initial_splitter.shared.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.initial_splitter.shared.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.initial_splitter.shared.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.initial_splitter.shared.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.initial_splitter.shared.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.initial_splitter.specifics.glu_layers.0.fc.weight: torch.Size([64, 32])
+tabnet.encoder.initial_splitter.specifics.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.initial_splitter.specifics.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.initial_splitter.specifics.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.initial_splitter.specifics.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.initial_splitter.specifics.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.initial_splitter.specifics.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.initial_splitter.specifics.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.initial_splitter.specifics.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.initial_splitter.specifics.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.initial_splitter.specifics.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.initial_splitter.specifics.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.0.shared.shared_layers.0.weight: torch.Size([64, 17])
+tabnet.encoder.feat_transformers.0.shared.shared_layers.1.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.0.fc.weight: torch.Size([64, 17])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.0.shared.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.0.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.0.specifics.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.1.shared.shared_layers.0.weight: torch.Size([64, 17])
+tabnet.encoder.feat_transformers.1.shared.shared_layers.1.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.0.fc.weight: torch.Size([64, 17])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.1.shared.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.0.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.1.specifics.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.2.shared.shared_layers.0.weight: torch.Size([64, 17])
+tabnet.encoder.feat_transformers.2.shared.shared_layers.1.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.0.fc.weight: torch.Size([64, 17])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.2.shared.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.0.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.2.specifics.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.3.shared.shared_layers.0.weight: torch.Size([64, 17])
+tabnet.encoder.feat_transformers.3.shared.shared_layers.1.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.0.fc.weight: torch.Size([64, 17])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.3.shared.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.0.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.0.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.0.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.0.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.0.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.1.fc.weight: torch.Size([64, 32])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.1.bn.bn.weight: torch.Size([64])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.1.bn.bn.bias: torch.Size([64])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.1.bn.bn.running_mean: torch.Size([64])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.1.bn.bn.running_var: torch.Size([64])
+tabnet.encoder.feat_transformers.3.specifics.glu_layers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.att_transformers.0.fc.weight: torch.Size([17, 16])
+tabnet.encoder.att_transformers.0.bn.bn.weight: torch.Size([17])
+tabnet.encoder.att_transformers.0.bn.bn.bias: torch.Size([17])
+tabnet.encoder.att_transformers.0.bn.bn.running_mean: torch.Size([17])
+tabnet.encoder.att_transformers.0.bn.bn.running_var: torch.Size([17])
+tabnet.encoder.att_transformers.0.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.att_transformers.1.fc.weight: torch.Size([17, 16])
+tabnet.encoder.att_transformers.1.bn.bn.weight: torch.Size([17])
+tabnet.encoder.att_transformers.1.bn.bn.bias: torch.Size([17])
+tabnet.encoder.att_transformers.1.bn.bn.running_mean: torch.Size([17])
+tabnet.encoder.att_transformers.1.bn.bn.running_var: torch.Size([17])
+tabnet.encoder.att_transformers.1.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.att_transformers.2.fc.weight: torch.Size([17, 16])
+tabnet.encoder.att_transformers.2.bn.bn.weight: torch.Size([17])
+tabnet.encoder.att_transformers.2.bn.bn.bias: torch.Size([17])
+tabnet.encoder.att_transformers.2.bn.bn.running_mean: torch.Size([17])
+tabnet.encoder.att_transformers.2.bn.bn.running_var: torch.Size([17])
+tabnet.encoder.att_transformers.2.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.encoder.att_transformers.3.fc.weight: torch.Size([17, 16])
+tabnet.encoder.att_transformers.3.bn.bn.weight: torch.Size([17])
+tabnet.encoder.att_transformers.3.bn.bn.bias: torch.Size([17])
+tabnet.encoder.att_transformers.3.bn.bn.running_mean: torch.Size([17])
+tabnet.encoder.att_transformers.3.bn.bn.running_var: torch.Size([17])
+tabnet.encoder.att_transformers.3.bn.bn.num_batches_tracked: torch.Size([])
+tabnet.final_mapping.weight: torch.Size([7, 16])
+
+=== MODEL PARAMS ===
+{
+  "init_params": {
+    "cat_dims": [],
+    "cat_emb_dim": [],
+    "cat_idxs": [],
+    "clip_value": 1,
+    "device_name": "auto",
+    "epsilon": 1e-15,
+    "gamma": 1.3,
+    "grouped_features": [],
+    "input_dim": 17,
+    "lambda_sparse": 0.001,
+    "mask_type": "entmax",
+    "momentum": 0.02,
+    "n_a": 16,
+    "n_d": 16,
+    "n_indep_decoder": 1,
+    "n_independent": 2,
+    "n_shared": 2,
+    "n_shared_decoder": 1,
+    "n_steps": 4,
+    "optimizer_params": {
+      "lr": 0.02,
+      "weight_decay": 1e-05
+    },
+    "output_dim": 7,
+    "scheduler_params": {
+      "step_size": 10,
+      "gamma": 0.9
+    },
+    "seed": 42,
+    "verbose": 1
+  },
+  "class_attrs": {
+    "preds_mapper": {
+      "0": 0,
+      "1": 1,
+      "2": 2,
+      "3": 3,
+      "4": 4,
+      "5": 5,
+      "6": 6
+    }
+  }
+}
