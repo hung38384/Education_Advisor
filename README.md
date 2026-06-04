@@ -1,36 +1,36 @@
-# Tổng quan dự án Education Advisor
+# Education Advisor Project Overview
 
 <!-- AUTO-GENERATED:START -->
 
-Tài liệu này tổng hợp kiến trúc, module chức năng, công nghệ sử dụng, lệnh phát triển và cấu hình môi trường của dự án `Education Advisor`. Nội dung được đối chiếu từ các nguồn sự thật trong mã nguồn hiện tại như `CLAUDE.md`, `frontend/package.json`, `backend/package.json`, `EducationAdvisor/backend/requirements*.txt`, các file route trong `backend/src/routes/*`, `EducationAdvisor/backend/app/api/routes/*`, `.env.example` và cấu hình khởi động ứng dụng.
+This document summarizes the architecture, feature modules, technology stack, development commands, and environment configuration of the `Education Advisor` project. The content is cross-checked against current source-of-truth files in the codebase, including `CLAUDE.md`, `frontend/package.json`, `backend/package.json`, `EducationAdvisor/backend/requirements*.txt`, route files under `backend/src/routes/*`, `EducationAdvisor/backend/app/api/routes/*`, `.env.example`, and application startup configuration.
 
-## 1. Mục tiêu hệ thống
+## 1. System Goals
 
-`Education Advisor` là hệ thống tư vấn tuyển sinh và định hướng học tập/nghề nghiệp. Dự án kết hợp một ứng dụng web Next.js, một API web Express/TypeScript dùng SQLite để quản lý người dùng và dữ liệu nghiệp vụ, cùng một AI sidecar FastAPI/LangGraph xử lý tư vấn tuyển sinh, hỏi đáp Q&A, tìm kiếm quy chế/điểm chuẩn và dự đoán nhóm ngành/nghề nghiệp. Người dùng có thể đăng ký/đăng nhập, tạo hồ sơ học sinh, làm bài kiểm tra tính cách MBTI, xem đánh giá hồ sơ, hỏi đáp tuyển sinh, tra cứu danh mục tuyển sinh và lưu các lựa chọn yêu thích.
+`Education Advisor` is an admissions counseling and study/career orientation system. The project combines a Next.js web application, an Express/TypeScript web API using SQLite for user and business data, and a FastAPI/LangGraph AI sidecar that handles admissions counseling, Q&A, admissions-rule and benchmark-score search, and major/career-group prediction. Users can register and log in, create student profiles, take an MBTI personality test, view profile reviews, ask admissions questions, browse admissions catalogs, and save favorite options.
 
-## 2. Cấu trúc repository
+## 2. Repository Structure
 
 ```text
 D:\Education_Advisor
-├── frontend/                    # Frontend chính: Next.js 15 App Router
-├── backend/                     # Backend web chính: Express + TypeScript + SQLite
-└── EducationAdvisor/
-    ├── backend/                 # AI sidecar: FastAPI + LangGraph + ML/RAG
-    ├── frontend/                # Frontend cũ: Next.js 14 scaffold
-    └── docker-compose.yml       # Docker Compose cho stack standalone/cũ
++-- frontend/                    # Main frontend: Next.js 15 App Router
++-- backend/                     # Main web backend: Express + TypeScript + SQLite
+`-- EducationAdvisor/
+    +-- backend/                 # AI sidecar: FastAPI + LangGraph + ML/RAG
+    +-- frontend/                # Legacy frontend: Next.js 14 scaffold
+    `-- docker-compose.yml       # Docker Compose for the standalone/legacy stack
 ```
 
-Stack đang hoạt động của dự án gồm frontend chính ở `frontend/`, web backend Express ở `backend/` và AI backend FastAPI ở `EducationAdvisor/backend/`. Phần `EducationAdvisor/frontend/` là scaffold cũ, chỉ nên dùng khi có yêu cầu rõ ràng.
+The active project stack consists of the main frontend in `frontend/`, the Express web backend in `backend/`, and the FastAPI AI backend in `EducationAdvisor/backend/`. The `EducationAdvisor/frontend/` directory is a legacy scaffold and should only be used when explicitly required.
 
-## 3. Kiến trúc tổng thể
+## 3. Overall Architecture
 
-Hệ thống được chia thành ba lớp chính:
+The system is split into three main layers:
 
-1. **Frontend chính (`frontend/`)**: giao diện người dùng Next.js 15 App Router, gọi API Express thông qua Axios client và route constants.
-2. **Web backend (`backend/`)**: Express API viết bằng TypeScript, lưu dữ liệu nghiệp vụ vào SQLite, xác thực JWT, phân quyền, cache Redis có fallback bộ nhớ và làm cầu nối tới AI sidecar.
-3. **AI sidecar (`EducationAdvisor/backend/`)**: FastAPI service dùng LangGraph/LangChain, công cụ tra cứu quy chế tuyển sinh, điểm chuẩn lịch sử, MongoDB/Chroma/Redis và các thành phần ML để phục vụ tư vấn AI.
+1. **Main frontend (`frontend/`)**: a Next.js 15 App Router user interface that calls the Express API through an Axios client and route constants.
+2. **Web backend (`backend/`)**: an Express API written in TypeScript, storing business data in SQLite, handling JWT authentication, authorization, Redis cache with an in-memory fallback, and acting as the bridge to the AI sidecar.
+3. **AI sidecar (`EducationAdvisor/backend/`)**: a FastAPI service using LangGraph/LangChain, admissions-rule lookup tools, historical benchmark-score lookup, MongoDB/Chroma/Redis, and ML components for AI counseling.
 
-Luồng chính của các nghiệp vụ không-AI:
+Main non-AI business flow:
 
 ```text
 Next.js page
@@ -41,7 +41,7 @@ Next.js page
   -> SQLite
 ```
 
-Luồng Q&A/tư vấn AI:
+AI Q&A/counseling flow:
 
 ```text
 frontend/src/app/(main)/qa/page.tsx
@@ -54,263 +54,260 @@ frontend/src/app/(main)/qa/page.tsx
   -> LangGraph/tools/RAG/local fallback
 ```
 
-Luồng đánh giá hồ sơ và tuyển sinh:
+Profile review and admissions flow:
 
 ```text
 Frontend profile/personality/review/admissions pages
   -> Express review/admission services
   -> SQLite repositories + cache
-  -> AI clients gọi FastAPI /api/v1/admissions/search, /api/v1/predict-fast hoặc /api/v1/advisor
+  -> AI clients calling FastAPI /api/v1/admissions/search, /api/v1/predict-fast, or /api/v1/advisor
 ```
 
-## 4. Công nghệ sử dụng
+## 4. Technology Stack
 
-### 4.1 Frontend chính: `frontend/`
+### 4.1 Main Frontend: `frontend/`
 
-| Nhóm | Công nghệ | Phiên bản/ghi chú |
-|------|-----------|-------------------|
-| Framework UI | Next.js | `15.5.9`, App Router |
-| Runtime UI | React, React DOM | `18.3.1` |
-| Ngôn ngữ | TypeScript | `^5.9.3` |
+| Group | Technology | Version/notes |
+|------|------------|---------------|
+| UI framework | Next.js | `15.5.9`, App Router |
+| UI runtime | React, React DOM | `18.3.1` |
+| Language | TypeScript | `^5.9.3` |
 | Styling | Tailwind CSS | `^3.4.1`, PostCSS, Autoprefixer |
-| Data fetching/cache client | TanStack React Query | `^5.90.16` |
+| Data fetching/client cache | TanStack React Query | `^5.90.16` |
 | State management | Jotai | `^2.16.1` |
 | HTTP client | Axios | `^1.13.2` |
-| E2E test | Playwright | `@playwright/test ^1.53.0` |
-| Lint | ESLint + eslint-config-next | ESLint `8.57.0`, Next config `15.5.9` |
+| E2E testing | Playwright | `@playwright/test ^1.53.0` |
+| Linting | ESLint + eslint-config-next | ESLint `8.57.0`, Next config `15.5.9` |
 | Build/dev | npm scripts | `dev`, `build`, `start`, `lint`, `test:e2e` |
 
-### 4.2 Web backend chính: `backend/`
+### 4.2 Main Web Backend: `backend/`
 
-| Nhóm | Công nghệ | Phiên bản/ghi chú |
-|------|-----------|-------------------|
+| Group | Technology | Version/notes |
+|------|------------|---------------|
 | Runtime/API | Node.js + Express | Express `^4.21.2` |
-| Ngôn ngữ | TypeScript | `^5.9.3` |
+| Language | TypeScript | `^5.9.3` |
 | Dev runtime | ts-node, nodemon | `ts-node ^10.9.2`, `nodemon ^3.1.11` |
-| Database cục bộ | SQLite | `better-sqlite3 ^12.5.0`, `sqlite3 ^5.1.7` |
-| Cache | Redis | Node Redis client `^4.7.0`, có fallback in-memory |
+| Local database | SQLite | `better-sqlite3 ^12.5.0`, `sqlite3 ^5.1.7` |
+| Cache | Redis | Node Redis client `^4.7.0`, with in-memory fallback |
 | Auth | JWT + bcryptjs | `jsonwebtoken ^9.0.3`, `bcryptjs ^2.4.3` |
 | CORS/env | cors, dotenv | `cors ^2.8.5`, `dotenv ^17.2.3` |
-| ID tiện ích | uuid | `^13.0.0` |
-| Test | Node test runner + Supertest | `supertest ^7.1.1`; tests chạy từ `dist/**/*.test.js` |
-| Observability | Custom middleware | request logging và `/api/metrics` khi bật `METRICS_ENABLED` |
+| Utility IDs | uuid | `^13.0.0` |
+| Testing | Node test runner + Supertest | `supertest ^7.1.1`; tests run from `dist/**/*.test.js` |
+| Observability | Custom middleware | request logging and `/api/metrics` when `METRICS_ENABLED` is enabled |
 
-Backend này tuân theo layering rõ ràng:
+This backend follows a clear layered architecture:
 
 ```text
 routes -> controllers -> services -> repositories -> models/database
 ```
 
-Các module nghiệp vụ chính:
+Main business modules:
 
-| Module | File/chức năng tiêu biểu |
-|--------|--------------------------|
-| Auth | `auth.routes.ts`, `auth.controller.ts`, `auth.service.ts`, JWT Bearer token, reset password |
-| Admin user | Quản trị người dùng, role/status, yêu cầu `superadmin` |
-| Student profile | Hồ sơ học sinh, điểm học tập, sở thích, mục tiêu ngành/trường |
-| Personality | Bộ câu hỏi MBTI, submit kết quả, latest, history |
-| Review | Chạy đánh giá hồ sơ, lưu kết quả đánh giá |
-| Q&A | Hội thoại, tin nhắn, hỏi đáp AI, advise |
-| Admissions | Danh mục tuyển sinh, danh sách yêu thích |
-| Cache | Redis-backed cache với fallback memory trong `cache-store.ts` |
+| Module | Representative files/features |
+|--------|--------------------------------|
+| Auth | `auth.routes.ts`, `auth.controller.ts`, `auth.service.ts`, JWT Bearer token, password reset |
+| Admin user | User administration, role/status management, requires `superadmin` |
+| Student profile | Student profile, academic scores, interests, target majors/schools |
+| Personality | MBTI question set, result submission, latest result, history |
+| Review | Runs profile reviews and stores review results |
+| Q&A | Conversations, messages, AI Q&A, advice |
+| Admissions | Admissions catalog and favorites list |
+| Cache | Redis-backed cache with memory fallback in `cache-store.ts` |
 | Metrics | `/api/metrics`, request metrics store |
 
-### 4.3 AI sidecar: `EducationAdvisor/backend/`
+### 4.3 AI Sidecar: `EducationAdvisor/backend/`
 
-| Nhóm | Công nghệ | Phiên bản/ghi chú |
-|------|-----------|-------------------|
+| Group | Technology | Version/notes |
+|------|------------|---------------|
 | API framework | FastAPI | `0.110.0` |
 | ASGI server | Uvicorn | `uvicorn[standard] 0.29.0` |
-| Ngôn ngữ | Python | Theo môi trường cài đặt, package qua `requirements.txt` |
+| Language | Python | Based on the installed environment; packages are installed from `requirements.txt` |
 | Validation/config | Pydantic, pydantic-settings | `pydantic 2.7.4`, `pydantic-settings 2.3.4` |
-| Database async | MongoDB | `pymongo`, `motor` |
+| Async database | MongoDB | `pymongo`, `motor` |
 | Cache | Redis | `redis 5.0.4`, Q&A cache namespace/TTL |
 | Vector database | ChromaDB | `chromadb 0.5.0`, `langchain-chroma` |
 | AI orchestration | LangChain, LangGraph | LangChain `0.2.x`, LangGraph `>=0.2.16,<0.3.0` |
-| LLM providers | OpenAI, Google Gemini, Groq, DeepSeek config | `openai`, `langchain-openai`, `langchain-google-genai`, `langchain-groq`; DeepSeek env có trong config |
+| LLM providers | OpenAI, Google Gemini, Groq, DeepSeek config | `openai`, `langchain-openai`, `langchain-google-genai`, `langchain-groq`; DeepSeek env config is present |
 | PDF/rule parsing | MarkItDown, LlamaParse | `markitdown`, `llama-parse` |
-| ML runtime | PyTorch, pytorch-tabnet, scikit-learn, NumPy, joblib | phục vụ dự đoán nhóm nghề/ngành |
-| Fuzzy matching | thefuzz, python-Levenshtein | Chuẩn hóa/khớp thực thể tuyển sinh |
-| HTTP client | httpx, requests | Gọi dịch vụ/nguồn dữ liệu ngoài |
-| Test/dev tools | pytest, pytest-asyncio, pytest-cov, black, flake8, mypy, isort | Có trong requirements đầy đủ |
+| ML runtime | PyTorch, pytorch-tabnet, scikit-learn, NumPy, joblib | Used for major/career-group prediction |
+| Fuzzy matching | thefuzz, python-Levenshtein | Normalizes and matches admissions entities |
+| HTTP client | httpx, requests | Calls external services/data sources |
+| Test/dev tools | pytest, pytest-asyncio, pytest-cov, black, flake8, mypy, isort | Included in the full requirements |
 
-### 4.4 Frontend cũ: `EducationAdvisor/frontend/`
+### 4.4 Legacy Frontend: `EducationAdvisor/frontend/`
 
-Đây là scaffold cũ, chỉ nên chỉnh sửa khi tác vụ chỉ rõ. Công nghệ gồm Next.js `^14.0.0`, React `^18.2.0`, TypeScript `^5.3.0`, Axios `^1.6.0`, Zustand `^4.4.0`, ESLint và `eslint-config-next`.
+This is a legacy scaffold and should only be edited when the task explicitly targets it. It uses Next.js `^14.0.0`, React `^18.2.0`, TypeScript `^5.3.0`, Axios `^1.6.0`, Zustand `^4.4.0`, ESLint, and `eslint-config-next`.
 
-### 4.5 Hạ tầng và dữ liệu ngoài
+### 4.5 Infrastructure and External Data
 
-| Thành phần | Vai trò |
-|------------|---------|
-| SQLite | Lưu dữ liệu web backend: user, reset token, profile, personality, review, Q&A conversation/message, admission favorites |
-| Redis | Cache đa lớp cho Q&A, admissions catalog, conversations/messages, AI sidecar Q&A |
-| MongoDB | Database async cho AI sidecar, dùng bởi FastAPI qua Motor/PyMongo |
-| ChromaDB | Vector database phục vụ retrieval/RAG |
-| PostgreSQL | Có trong `EducationAdvisor/docker-compose.yml` cũ/standalone, không phải database chính của root Express stack |
-| Docker Compose | Stack standalone trong `EducationAdvisor/docker-compose.yml`: frontend cũ, FastAPI backend, PostgreSQL, Redis, Chroma |
-| PDF/Markdown tuyển sinh | Dữ liệu quy chế tuyển sinh trong `EducationAdvisor/backend/data/raw_pdfs` và `processed_rules` |
+| Component | Role |
+|-----------|------|
+| SQLite | Stores web backend data: users, reset tokens, profiles, personality results, reviews, Q&A conversations/messages, and admission favorites |
+| Redis | Multi-layer cache for Q&A, admissions catalog, conversations/messages, and AI sidecar Q&A |
+| MongoDB | Async database for the AI sidecar, used by FastAPI through Motor/PyMongo |
+| ChromaDB | Vector database for retrieval/RAG |
+| PostgreSQL | Present in the legacy/standalone `EducationAdvisor/docker-compose.yml`; it is not the main database for the root Express stack |
+| Docker Compose | Standalone stack in `EducationAdvisor/docker-compose.yml`: legacy frontend, FastAPI backend, PostgreSQL, Redis, Chroma |
+| Admissions PDFs/Markdown | Admissions-rule data in `EducationAdvisor/backend/data/raw_pdfs` and `processed_rules` |
 
-## 5. Chức năng chính
+## 5. Main Features
 
-### 5.1 Xác thực và phân quyền
+### 5.1 Authentication and Authorization
 
-Backend Express cung cấp đăng ký, đăng nhập, quên mật khẩu, đặt lại mật khẩu, đổi mật khẩu và lấy thông tin người dùng hiện tại. Xác thực dùng Bearer token trong `localStorage` phía frontend, Axios interceptor gắn token vào request, Express middleware `createAuthenticateToken` xác minh JWT. Phân quyền quản trị dùng role `user`, `admin`, `superadmin`; các API quản trị người dùng yêu cầu `superadmin`.
+The Express backend provides registration, login, forgot password, reset password, change password, and current-user retrieval. Authentication uses a Bearer token stored in frontend `localStorage`; an Axios interceptor attaches the token to requests, and the Express `createAuthenticateToken` middleware verifies the JWT. Admin authorization uses the `user`, `admin`, and `superadmin` roles; user-management admin APIs require `superadmin`.
 
-### 5.2 Hồ sơ học sinh
+### 5.2 Student Profiles
 
-Người dùng có thể tạo/cập nhật hồ sơ cá nhân gồm họ tên, điện thoại, giới tính, ngày sinh, tỉnh/thành, trường, điểm lớp 10/11/12, học bạ, chứng chỉ, môn yêu thích, ngành/trường mục tiêu và mô tả bản thân. Dữ liệu lưu trong bảng SQLite `student_profile`.
+Users can create and update personal profiles containing full name, phone number, gender, date of birth, province/city, school, grade 10/11/12 scores, transcripts, certificates, favorite subjects, target majors/schools, and a self-description. Data is stored in the SQLite `student_profile` table.
 
-### 5.3 Kiểm tra tính cách
+### 5.3 Personality Test
 
-Frontend cung cấp luồng bài test tính cách, backend lưu các lần nộp trong `personality_submission`, trả về câu hỏi, kết quả mới nhất và lịch sử. Endpoint `latest` được dùng làm ngữ cảnh AI/dự đoán; khi thêm lịch sử không làm thay đổi mục đích của endpoint latest.
+The frontend provides a personality-test flow. The backend stores submissions in `personality_submission` and returns questions, the latest result, and history. The `latest` endpoint is used as AI/prediction context; adding history does not change the purpose of the latest-result endpoint.
 
-### 5.4 Đánh giá hồ sơ
+### 5.4 Profile Review
 
-Module review tổng hợp hồ sơ học sinh, kết quả tính cách và dữ liệu tuyển sinh/AI để tạo điểm tổng quan, tóm tắt và khuyến nghị. Kết quả lưu trong bảng `review_result`.
+The review module combines the student profile, personality result, and admissions/AI data to generate an overview score, summary, and recommendations. Results are stored in the `review_result` table.
 
-### 5.5 Q&A tuyển sinh
+### 5.5 Admissions Q&A
 
-Module Q&A quản lý danh sách hội thoại, tin nhắn và request hỏi đáp. Express lưu conversation/message trong SQLite, lấy ngữ cảnh hồ sơ/tính cách/review, dùng cache Redis/memory và gọi FastAPI sidecar qua `/api/ai/qa/ask`. FastAPI sidecar dùng LangGraph/tools để tra cứu quy chế tuyển sinh, điểm chuẩn lịch sử và trả lời theo ngữ cảnh.
+The Q&A module manages conversations, messages, and question-answering requests. Express stores conversations/messages in SQLite, gathers profile/personality/review context, uses Redis/memory cache, and calls the FastAPI sidecar through `/api/ai/qa/ask`. The FastAPI sidecar uses LangGraph/tools to look up admissions rules and historical benchmark scores, then returns context-aware answers.
 
-### 5.6 Danh mục tuyển sinh và yêu thích
+### 5.6 Admissions Catalog and Favorites
 
-Module admissions cho phép lấy catalog tuyển sinh, thêm/xóa/xem danh sách yêu thích. Express dùng `AdmissionService`, `SQLiteAdmissionCartRepository`, AI admissions client và cache catalog.
+The admissions module lets users fetch the admissions catalog and add, remove, or view favorite options. Express uses `AdmissionService`, `SQLiteAdmissionCartRepository`, the AI admissions client, and catalog cache.
 
+## 6. Database and Main Schema
 
-## 6. Database và schema chính
+The web backend uses SQLite through `better-sqlite3`. The default database file is `backend/data/educationadvisor-web.sqlite`, and it can be changed with `SQLITE_DB_PATH`. The schema is created/migrated when the backend starts in `backend/src/config/database.ts`.
 
-Web backend dùng SQLite qua `better-sqlite3`. File mặc định là `backend/data/educationadvisor-web.sqlite`, có thể đổi bằng `SQLITE_DB_PATH`. Schema được tạo/migrate khi backend khởi động trong `backend/src/config/database.ts`.
+Main tables:
 
-Các bảng chính:
+| Table | Role |
+|------|------|
+| `user` | Accounts, password hash, role, status, token version, soft delete |
+| `password_reset_token` | Password-reset token, hash, expiration, used status |
+| `student_profile` | Student profiles |
+| `personality_submission` | MBTI test history |
+| `admission_cart_item` | Favorite admissions options |
+| `review_result` | Profile review results |
+| `qa_conversation` | Q&A conversations |
+| `qa_message` | User/assistant Q&A messages |
 
-| Bảng | Vai trò |
-|------|---------|
-| `user` | Tài khoản, mật khẩu hash, role, trạng thái, token version, soft-delete |
-| `password_reset_token` | Token đặt lại mật khẩu, hash, hạn dùng, trạng thái đã dùng |
-| `student_profile` | Hồ sơ học sinh |
-| `personality_submission` | Lịch sử bài test MBTI |
-| `admission_cart_item` | Các lựa chọn tuyển sinh yêu thích |
-| `review_result` | Kết quả đánh giá hồ sơ |
-| `qa_conversation` | Hội thoại Q&A |
-| `qa_message` | Tin nhắn user/assistant trong Q&A |
+The AI sidecar uses MongoDB through Motor/PyMongo for AI data, ChromaDB for vector retrieval, and Redis for cache.
 
-AI sidecar dùng MongoDB qua Motor/PyMongo cho các phần dữ liệu AI, ChromaDB cho vector retrieval và Redis cho cache.
+## 7. Cache and Observability
 
-## 7. Cache và quan sát hệ thống
+The project includes cache layers in both the Express backend and the AI sidecar.
 
-Dự án có cache ở cả Express backend và AI sidecar.
+In the Express backend, `backend/src/cache-store.ts` creates `RedisBackedCacheStore`. When Redis is available, data is stored in Redis with TTL; when Redis fails, the cache falls back to an in-memory map inside the Node.js process. Main cache namespaces include Q&A answers, Q&A conversations, Q&A messages, and the admissions catalog.
 
-Ở Express backend, `backend/src/cache-store.ts` tạo `RedisBackedCacheStore`. Khi Redis khả dụng, dữ liệu được lưu bằng Redis với TTL; khi Redis lỗi, cache fallback về in-memory map trong tiến trình Node.js. Các namespace cache chính gồm Q&A answer, Q&A conversations, Q&A messages và admissions catalog.
+In the AI sidecar, `app/ai/qa_service.py` uses `QAResponseCache` on Redis for Q&A answers. If cache is disabled or Redis fails during bootstrap/runtime, the service switches to disabled/no-op cache so the answer flow continues working.
 
-Ở AI sidecar, `app/ai/qa_service.py` dùng `QAResponseCache` trên Redis cho câu trả lời Q&A. Nếu cache bị tắt hoặc Redis bootstrap/runtime lỗi, service chuyển sang cache disabled/noop để không làm hỏng luồng trả lời.
+The Express backend includes request observability middleware and exposes `/api/metrics` when `METRICS_ENABLED=true`.
 
-Express backend có request observability middleware và endpoint `/api/metrics` khi `METRICS_ENABLED=true`.
+## 8. Development Commands
 
-## 8. Lệnh phát triển
+### 8.1 Main Frontend (`frontend/`)
 
-### 8.1 Frontend chính (`frontend/`)
+| Command | Description |
+|---------|-------------|
+| `npm install` | Install frontend dependencies |
+| `npm run dev` | Run the Next.js dev server |
+| `npm run build` | Build the production frontend |
+| `npm run start` | Run the Next.js production server after build |
+| `npm run lint` | Run ESLint |
+| `npm run test:e2e` | Run Playwright E2E tests |
 
-| Command | Mô tả |
-|---------|-------|
-| `npm install` | Cài dependencies frontend |
-| `npm run dev` | Chạy Next.js dev server |
-| `npm run build` | Build production frontend |
-| `npm run start` | Chạy Next.js production server sau khi build |
-| `npm run lint` | Chạy ESLint |
-| `npm run test:e2e` | Chạy Playwright E2E tests |
+### 8.2 Express Backend (`backend/`)
 
-### 8.2 Express backend (`backend/`)
+| Command | Description |
+|---------|-------------|
+| `npm install` | Install backend dependencies |
+| `npm run dev` | Run the full dev stack with orchestration for the FastAPI sidecar and Express |
+| `npm run dev:lite` | Run the dev stack with lightweight AI dependencies |
+| `npm run dev:api` | Run only the Express API with nodemon |
+| `npm run build` | Build TypeScript into `dist/` |
+| `npm test` | Remove `dist`, build, then run the Node test runner on `dist/**/*.test.js` |
+| `npm run start` | Run `ts-node src/server.ts` |
 
-| Command | Mô tả |
-|---------|-------|
-| `npm install` | Cài dependencies backend |
-| `npm run dev` | Chạy full dev stack, tự orchestration FastAPI sidecar + Express |
-| `npm run dev:lite` | Chạy dev stack với AI lite dependencies |
-| `npm run dev:api` | Chạy riêng Express API bằng nodemon |
-| `npm run build` | Build TypeScript sang `dist/` |
-| `npm test` | Xóa `dist`, build rồi chạy Node test runner trên `dist/**/*.test.js` |
-| `npm run start` | Chạy `ts-node src/server.ts` |
+### 8.3 AI Sidecar (`EducationAdvisor/backend/`)
 
-### 8.3 AI sidecar (`EducationAdvisor/backend/`)
+| Command | Description |
+|---------|-------------|
+| `pip install -r requirements.txt` | Install the full AI sidecar dependencies |
+| `pip install -r requirements.dev-lite.txt` | Install the lightweight profile for web/dev integration |
+| `uvicorn app.main:app --reload --port 8000` | Run the FastAPI sidecar directly |
+| `pytest` | Run Python tests |
+| `pytest tests/test_internal_ai_qa_route.py -q` | Run only the internal Q&A route test |
 
-| Command | Mô tả |
-|---------|-------|
-| `pip install -r requirements.txt` | Cài đầy đủ dependencies AI sidecar |
-| `pip install -r requirements.dev-lite.txt` | Cài profile nhẹ cho tích hợp web/dev |
-| `uvicorn app.main:app --reload --port 8000` | Chạy FastAPI sidecar trực tiếp |
-| `pytest` | Chạy test Python |
-| `pytest tests/test_internal_ai_qa_route.py -q` | Chạy riêng test route Q&A nội bộ |
+## 9. Recommended Local Workflow
 
-
-## 9. Quy trình chạy local đề xuất
-
-1. Cài dependencies cho frontend chính:
+1. Install dependencies for the main frontend:
 
 ```powershell
 cd frontend
 npm install
 ```
 
-2. Cài dependencies cho Express backend:
+2. Install dependencies for the Express backend:
 
 ```powershell
 cd backend
 npm install
 ```
 
-3. Cài dependencies AI sidecar. Nếu chỉ cần profile nhẹ để tích hợp web:
+3. Install AI sidecar dependencies. If you only need the lightweight profile for web integration:
 
 ```powershell
 cd EducationAdvisor/backend
 pip install -r requirements.dev-lite.txt
 ```
 
-Hoặc cài đầy đủ để dùng RAG/PDF/vector DB/dev tools:
+Or install the full set for RAG/PDF/vector DB/dev tools:
 
 ```powershell
 cd EducationAdvisor/backend
 pip install -r requirements.txt
 ```
 
-4. Chuẩn bị file môi trường từ các `.env.example` tương ứng.
+4. Prepare environment files from the corresponding `.env.example` files.
 
-5. Chạy backend full stack từ `backend/`:
-
-```powershell
-npm run dev
-```
-
-6. Chạy frontend từ `frontend/`:
+5. Run the full backend stack from `backend/`:
 
 ```powershell
 npm run dev
 ```
 
-Mặc định frontend chạy ở `http://localhost:3000`, Express API ở `http://localhost:5001`, AI sidecar ở `http://localhost:8000`.
+6. Run the frontend from `frontend/`:
 
-## 10. Kiểm thử và chất lượng mã
+```powershell
+npm run dev
+```
 
-| Khu vực | Công cụ | Lệnh |
-|---------|---------|------|
+By default, the frontend runs at `http://localhost:3000`, the Express API at `http://localhost:5001`, and the AI sidecar at `http://localhost:8000`.
+
+## 10. Testing and Code Quality
+
+| Area | Tool | Command |
+|------|------|---------|
 | Frontend | ESLint | `cd frontend && npm run lint` |
 | Frontend | Playwright E2E | `cd frontend && npm run test:e2e` |
 | Express backend | TypeScript compiler | `cd backend && npm run build` |
 | Express backend | Node test runner + Supertest | `cd backend && npm test` |
 | AI sidecar | pytest | `cd EducationAdvisor/backend && pytest` |
-| AI sidecar | black/flake8/mypy/isort | Có trong `requirements.txt`, chạy theo nhu cầu chất lượng mã |
+| AI sidecar | black/flake8/mypy/isort | Included in `requirements.txt`; run as needed for code quality |
 
-## 11. Ghi chú triển khai/hạ tầng
+## 11. Deployment/Infrastructure Notes
 
-`EducationAdvisor/docker-compose.yml` mô tả stack standalone gồm frontend cũ, FastAPI backend, PostgreSQL, Redis và Chroma. Tuy nhiên theo hướng dẫn hiện hành của repo, stack đang phát triển chính dùng frontend root `frontend/`, Express root `backend/` với SQLite và AI sidecar `EducationAdvisor/backend/`. Vì vậy khi triển khai hoặc chạy local cần phân biệt rõ `backend/` là web backend Express, còn `EducationAdvisor/backend/` là AI backend FastAPI.
+`EducationAdvisor/docker-compose.yml` describes a standalone stack that includes the legacy frontend, FastAPI backend, PostgreSQL, Redis, and Chroma. However, according to the repository's current guidance, the main development stack uses the root `frontend/`, the root Express `backend/` with SQLite, and the AI sidecar `EducationAdvisor/backend/`. Therefore, when deploying or running locally, distinguish clearly between `backend/` as the Express web backend and `EducationAdvisor/backend/` as the FastAPI AI backend.
 
-Nếu bật internal API key cho AI sidecar, đặt cùng giá trị ở hai nơi:
+If the internal API key is enabled for the AI sidecar, set the same value in both places:
 
 ```text
 EducationAdvisor/backend/.env: INTERNAL_API_KEY=<secret>
 backend/.env: AI_SERVICE_API_KEY=<secret>
 ```
 
-FastAPI sẽ kiểm tra header `X-Internal-Api-Key` tại endpoint `/api/ai/qa/ask` khi `INTERNAL_API_KEY` không rỗng.
-
+FastAPI checks the `X-Internal-Api-Key` header at the `/api/ai/qa/ask` endpoint when `INTERNAL_API_KEY` is not empty.
 
 <!-- AUTO-GENERATED:END -->
